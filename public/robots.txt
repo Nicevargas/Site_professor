@@ -1,0 +1,6 @@
+# robots.txt para Indexação Inteligente nos Mecanismos de Busca
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://agendaprofessor.com.br/sitemap.xml

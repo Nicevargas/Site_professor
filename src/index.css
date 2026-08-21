@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --primary: #091426;
+    --primary-container: #1e293b;
+    --on-primary: #ffffff;
+    --on-primary-container: #8590a6;
+    --secondary: #00687a;
+    --secondary-container: #57dffe;
+    --on-secondary: #ffffff;
+    --secondary-fixed: #acedff;
+    --secondary-fixed-dim: #4cd7f6;
+    --surface: #f7f9fb;
+    --surface-container-lowest: #ffffff;
+    --surface-container-low: #f2f4f6;
+    --surface-container: #eceef0;
+    --surface-container-high: #e6e8ea;
+    --surface-container-highest: #e0e3e5;
+    --on-surface: #191c1e;
+    --on-surface-variant: #45474c;
+    --outline: #75777d;
+    --outline-variant: #c5c6cd;
+    --tertiary: #201100;
+    --tertiary-fixed: #ffddb8;
+    --tertiary-fixed-dim: #ffb95f;
+    --error: #ba1a1a;
+    --error-container: #ffdad6;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  }
+}
+
+.shadow-ambient {
+  box-shadow: 0px 10px 20px -5px rgba(30, 41, 59, 0.04), 0px 4px 6px -4px rgba(30, 41, 59, 0.04);
+}
+
+.shadow-elevated {
+  box-shadow: 0px 20px 25px -5px rgba(30, 41, 59, 0.08), 0px 8px 10px -6px rgba(30, 41, 59, 0.08);
+}
+
+.shadow-card {
+  box-shadow: 0 4px 10px rgba(30, 41, 59, 0.04);
+}
+
+/* Custom scrollbar for calendar */
+.calendar-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.calendar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.calendar-scroll::-webkit-scrollbar-thumb {
+  background-color: #c5c6cd;
+  border-radius: 10px;
+}

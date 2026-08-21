@@ -1,0 +1,6 @@
+{
+  "name": "Agenda do Professor",
+  "description": "Painel de gestão, agendamento de aulas, controle de serviços, alunos e site profissional para professores e instrutores.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
