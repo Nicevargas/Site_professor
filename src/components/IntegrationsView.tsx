@@ -3,19 +3,18 @@ import { TeacherProfile, ServiceItem, Appointment, Student, Reminder } from '../
 import { 
   Calendar, 
   MessageSquare, 
-  Webhook, 
   Check, 
   Copy, 
   ExternalLink, 
   Zap, 
   Download, 
-  CheckCircle2, 
   Sparkles,
   Layers,
   Send,
-  Play,
-  Settings2,
-  Workflow
+  ShieldCheck,
+  Workflow,
+  Clock,
+  CheckCircle2
 } from 'lucide-react';
 import { downloadIcsCalendarFile } from '../utils/calendarAndWhatsapp';
 import { applyTemplateVariables } from '../utils/mediaAndTextHelpers';
@@ -35,17 +34,7 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
   students,
 }) => {
   const [copiedItem, setCopiedItem] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'n8n' | 'google' | 'whatsapp'>('n8n');
-
-  // n8n Webhook state
-  const [n8nWebhookUrl, setN8nWebhookUrl] = useState(
-    currentTeacher.n8nWebhookUrl || 'https://n8n.seu-dominio.com.br/webhook/whatsapp-8h-confirmacao'
-  );
-  const [n8nSecretToken, setN8nSecretToken] = useState(
-    currentTeacher.n8nAuthToken || 'n8n_sec_prof_' + currentTeacher.id
-  );
-  const [webhookSaved, setWebhookSaved] = useState(false);
-  const [testSent, setTestSent] = useState(false);
+  const [activeTab, setActiveTab] = useState<'whatsapp' | 'google' | 'status'>('whatsapp');
 
   // WhatsApp Templates state
   const [selectedTemplateKey, setSelectedTemplateKey] = useState<'8h_reminder' | 'confirmation' | 'post_class'>('8h_reminder');
@@ -74,8 +63,7 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
     startTime: '14:00',
     endTime: '15:00',
     modality: 'Online (Google Meet)',
-    status: 'confirmed' as const,
-    meetLink: 'https://meet.google.com/abc-defg-hij'
+    status: 'confirmado' as const,
   };
 
   const renderedPreview = applyTemplateVariables(templates[selectedTemplateKey], {
@@ -85,7 +73,7 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
     horario: sampleAppointment.startTime,
     professor_nome: currentTeacher.name,
     modalidade: sampleAppointment.modality,
-    link_aula: sampleAppointment.meetLink || 'https://meet.google.com/abc-defg-hij',
+    link_aula: 'https://meet.google.com/abc-defg-hij',
   });
 
   const icalFeedUrl = `https://agendaprofessor.com.br/api/ical/${currentTeacher.id}.ics`;
@@ -94,32 +82,6 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
     navigator.clipboard.writeText(text);
     setCopiedItem(id);
     setTimeout(() => setCopiedItem(null), 2500);
-  };
-
-  const handleSendTestWebhook = () => {
-    setTestSent(true);
-    setTimeout(() => setTestSent(false), 3000);
-  };
-
-  const samplePayload = {
-    event: "appointment.created",
-    source: "agenda_professor",
-    teacherId: currentTeacher.id,
-    teacherName: currentTeacher.name,
-    timestamp: new Date().toISOString(),
-    appointment: {
-      id: "apt-101",
-      studentName: students[0]?.name || "Mariana Costa",
-      studentPhone: students[0]?.phone || "+55 11 98765-4321",
-      studentEmail: students[0]?.email || "mariana.costa@email.com",
-      serviceName: services[0]?.name || "Mentoria Executiva",
-      date: new Date().toISOString().split('T')[0],
-      startTime: "14:00",
-      endTime: "15:00",
-      modality: "Online (Google Meet)",
-      price: services[0]?.price || 180,
-      whatsapp8hDispatchTime: "06:00:00"
-    }
   };
 
   return (
@@ -131,17 +93,17 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-[#091426] tracking-tight flex items-center gap-2.5">
               <Zap className="w-7 h-7 text-[#00687a]" />
-              <span>Automações & Central de Integrações</span>
+              <span>Automações & Notificações</span>
             </h1>
             <p className="text-sm text-[#45474c] mt-1">
-              Conecte sua agenda com <strong>n8n</strong>, Google Calendar e motor de confirmações automáticas de WhatsApp.
+              Personalize suas mensagens automáticas de WhatsApp e sincronize sua agenda com o Google Calendar.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              n8n & Webhooks Ativos
+              Envio Automático Ativo
             </span>
           </div>
         </div>
@@ -149,15 +111,15 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
         {/* Tab Navigation */}
         <div className="flex border-b border-slate-200 gap-2 overflow-x-auto">
           <button
-            onClick={() => setActiveTab('n8n')}
+            onClick={() => setActiveTab('whatsapp')}
             className={`flex items-center gap-2 pb-3 px-4 text-sm font-semibold border-b-2 transition-all shrink-0 ${
-              activeTab === 'n8n'
+              activeTab === 'whatsapp'
                 ? 'border-[#00687a] text-[#00687a]'
                 : 'border-transparent text-slate-500 hover:text-slate-900'
             }`}
           >
-            <Workflow className="w-4 h-4" />
-            <span>Automações n8n & Webhooks</span>
+            <MessageSquare className="w-4 h-4" />
+            <span>WhatsApp (Templates & Avisos 8h)</span>
           </button>
 
           <button
@@ -169,238 +131,23 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
             }`}
           >
             <Calendar className="w-4 h-4" />
-            <span>Google Agenda (2 Vias)</span>
+            <span>Google Agenda (Sincronização)</span>
           </button>
 
           <button
-            onClick={() => setActiveTab('whatsapp')}
+            onClick={() => setActiveTab('status')}
             className={`flex items-center gap-2 pb-3 px-4 text-sm font-semibold border-b-2 transition-all shrink-0 ${
-              activeTab === 'whatsapp'
+              activeTab === 'status'
                 ? 'border-[#00687a] text-[#00687a]'
                 : 'border-transparent text-slate-500 hover:text-slate-900'
             }`}
           >
-            <MessageSquare className="w-4 h-4" />
-            <span>WhatsApp (8h Antes)</span>
+            <ShieldCheck className="w-4 h-4" />
+            <span>Status das Integrações</span>
           </button>
         </div>
 
-        {/* TAB 1: N8N AUTOMATIONS & WEBHOOKS */}
-        {activeTab === 'n8n' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-2xl p-6 md:p-8 shadow-ambient border border-[#eceef0] space-y-6">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-2xl bg-orange-100 text-[#ff6d5a] flex items-center justify-center font-bold text-lg">
-                    <Workflow className="w-6 h-6 text-[#ff6d5a]" />
-                  </div>
-                  <div>
-                    <h2 className="text-base font-bold text-[#091426]">
-                      Integração Oficial com n8n (Workflow Automation)
-                    </h2>
-                    <p className="text-xs text-slate-500">
-                      Dispare fluxos automatizados no n8n instantaneamente a cada novo agendamento ou cancelamento.
-                    </p>
-                  </div>
-                </div>
-
-                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-200">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Self-hosted / n8n Cloud
-                </span>
-              </div>
-
-              {/* Webhook Endpoint Input */}
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Webhook URL do n8n (Node Webhook - POST)
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="url"
-                      value={n8nWebhookUrl}
-                      onChange={(e) => setN8nWebhookUrl(e.target.value)}
-                      className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono text-slate-800 focus:bg-white focus:border-[#00687a] focus:ring-1 focus:ring-[#00687a] transition-all"
-                      placeholder="https://seu-n8n.com/webhook/agenda-aulas"
-                    />
-                    <button
-                      onClick={() => {
-                        setWebhookSaved(true);
-                        setTimeout(() => setWebhookSaved(false), 2500);
-                      }}
-                      className="px-5 bg-[#091426] hover:bg-[#1e293b] text-white rounded-xl text-xs font-bold shrink-0 transition-colors shadow-xs"
-                    >
-                      {webhookSaved ? 'Salvo!' : 'Salvar URL'}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Token de Autenticação (Header X-Webhook-Token)
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={n8nSecretToken}
-                        onChange={(e) => setN8nSecretToken(e.target.value)}
-                        className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono text-slate-700"
-                      />
-                      <button
-                        onClick={() => handleCopy(n8nSecretToken, 'n8n-token')}
-                        className="px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium flex items-center gap-1 shrink-0 transition-colors"
-                      >
-                        {copiedItem === 'n8n-token' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{copiedItem === 'n8n-token' ? 'Copiado' : 'Copiar'}</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col justify-end">
-                    <button
-                      onClick={handleSendTestWebhook}
-                      className="h-10 px-4 bg-[#00687a] hover:bg-[#004e5c] text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors shadow-xs"
-                    >
-                      {testSent ? (
-                        <>
-                          <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                          <span>Payload Enviado para o n8n!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Send className="w-4 h-4 text-cyan-300" />
-                          <span>Enviar Disparo de Teste para o n8n</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* n8n Workflow Guide & Recipes */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-2">
-                <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-xs">
-                  1
-                </div>
-                <h3 className="font-bold text-sm text-[#091426]">Disparo WhatsApp via n8n</h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Conecte o n8n à Evolution API ou Z-API para disparar mensagens no WhatsApp com o template 8 horas antes da aula.
-                </p>
-              </div>
-
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-2">
-                <div className="w-8 h-8 rounded-lg bg-cyan-100 text-[#00687a] flex items-center justify-center font-bold text-xs">
-                  2
-                </div>
-                <h3 className="font-bold text-sm text-[#091426]">Sincronização Google Sheets</h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Insira automaticamente cada novo aluno e histórico de aula em uma planilha organizada de controle financeiro.
-                </p>
-              </div>
-
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-2">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
-                  3
-                </div>
-                <h3 className="font-bold text-sm text-[#091426]">Notificações no Telegram</h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Receba um alerta no seu Telegram toda vez que um aluno agendar uma nova mentoria ou aula online.
-                </p>
-              </div>
-            </div>
-
-            {/* Payload JSON Inspector */}
-            <div className="bg-white rounded-2xl p-6 shadow-ambient border border-[#eceef0] space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Settings2 className="w-4 h-4 text-[#00687a]" />
-                  <span className="text-xs font-bold text-[#091426] uppercase tracking-wider">
-                    Exemplo de Payload JSON Enviado para o Node Webhook do n8n
-                  </span>
-                </div>
-                <button
-                  onClick={() => handleCopy(JSON.stringify(samplePayload, null, 2), 'payload-json')}
-                  className="text-xs text-[#00687a] hover:underline font-semibold flex items-center gap-1"
-                >
-                  {copiedItem === 'payload-json' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copiedItem === 'payload-json' ? 'JSON Copiado' : 'Copiar JSON'}</span>
-                </button>
-              </div>
-              <pre className="p-4 bg-[#091426] text-cyan-300 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed">
-                {JSON.stringify(samplePayload, null, 2)}
-              </pre>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 2: GOOGLE AGENDA */}
-        {activeTab === 'google' && (
-          <div className="bg-white rounded-2xl p-6 md:p-8 shadow-ambient border border-[#eceef0] space-y-6">
-            <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
-              <div className="w-11 h-11 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center">
-                <Calendar className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-[#091426]">
-                  Integração Google Calendário em Tempo Real
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Sincronize sua grade com o Google Calendar em tempo real via WebCal e links diretos.
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Link de Inscrição WebCal (Sincronização 2 Vias no Google Agenda)
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={icalFeedUrl}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono text-slate-700"
-                  />
-                  <button
-                    onClick={() => handleCopy(icalFeedUrl, 'ical-url')}
-                    className="px-4 bg-[#00687a] hover:bg-[#004e5c] text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-colors"
-                  >
-                    {copiedItem === 'ical-url' ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
-                    <span>{copiedItem === 'ical-url' ? 'Copiado!' : 'Copiar Link'}</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="pt-2 flex flex-col sm:flex-row gap-3">
-                <button
-                  type="button"
-                  onClick={() => downloadIcsCalendarFile(appointments, currentTeacher)}
-                  className="flex-1 h-11 bg-[#091426] hover:bg-[#1e293b] text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors shadow-xs"
-                >
-                  <Download className="w-4 h-4 text-cyan-400" />
-                  <span>Baixar Arquivo Completo (.ics)</span>
-                </button>
-
-                <a
-                  href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(icalFeedUrl)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 h-11 bg-white border border-[#00687a] text-[#00687a] hover:bg-cyan-50 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors shadow-xs"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  <span>Inscrever no Google Calendar Web</span>
-                </a>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: WHATSAPP 8H & TEMPLATE EDITOR */}
+        {/* TAB 1: WHATSAPP 8H & TEMPLATE EDITOR */}
         {activeTab === 'whatsapp' && (
           <div className="bg-white rounded-2xl p-6 md:p-8 shadow-ambient border border-[#eceef0] space-y-6">
             <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
@@ -409,21 +156,21 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
               </div>
               <div>
                 <h2 className="text-base font-bold text-[#091426]">
-                  Central de Notificações WhatsApp & Editor de Templates
+                  Central de Notificações WhatsApp & Modelos de Mensagem
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Configure mensagens automáticas personalizadas com variáveis dinâmicas e gatilho de 8 horas.
+                  Edite os textos das notificações automáticas enviadas para seus alunos.
                 </p>
               </div>
             </div>
 
             <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 space-y-2">
               <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-emerald-700" />
+                <Clock className="w-4 h-4 text-emerald-700" />
                 <p className="text-xs font-bold text-emerald-950">Gatilho Automático de 8 Horas Ativo</p>
               </div>
               <p className="text-xs text-emerald-800">
-                Cada aula registrada na agenda é computada com o timestamp exato de <code className="font-mono bg-white px-1 py-0.5 rounded text-[11px] font-bold">início_aula - 8h</code> e enviada pelo n8n ou disparador local.
+                Cada aula registrada na sua agenda é computada com antecedência de 8 horas para envio automático da confirmação e do link de acesso.
               </p>
             </div>
 
@@ -507,7 +254,7 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
                     Prévia em Tempo Real (WhatsApp)
                   </span>
                   <span className="text-[10px] bg-emerald-800/60 text-emerald-300 px-2 py-0.5 rounded">
-                    Exemplo: {students[0]?.name || 'Mariana Costa'}
+                    Exemplo com {sampleStudent.name}
                   </span>
                 </div>
                 <div className="p-4 bg-emerald-900/60 rounded-xl border border-emerald-700/50 text-xs font-sans whitespace-pre-wrap leading-relaxed">
@@ -523,6 +270,142 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: GOOGLE AGENDA */}
+        {activeTab === 'google' && (
+          <div className="bg-white rounded-2xl p-6 md:p-8 shadow-ambient border border-[#eceef0] space-y-6">
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+              <div className="w-11 h-11 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center">
+                <Calendar className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-[#091426]">
+                  Sincronização com Google Agenda & iCalendar
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Exporte suas aulas para o aplicativo de calendário do celular ou Google Agenda.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
+                <h3 className="font-bold text-sm text-slate-900">Baixar Arquivo .ICS da Agenda</h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Gere um arquivo padrão iCalendar contendo todas as {appointments.length} aulas registradas na sua agenda para importar no Outlook, Apple Calendar ou Google Agenda.
+                </p>
+                <button
+                  onClick={() => downloadIcsCalendarFile(appointments, currentTeacher)}
+                  className="w-full py-3 bg-[#00687a] hover:bg-[#004e5c] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-xs"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Baixar Arquivo .ICS ({appointments.length} aulas)</span>
+                </button>
+              </div>
+
+              <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
+                <h3 className="font-bold text-sm text-slate-900">Link de Feed de Calendário</h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Copie o link de inscrição direta para manter o Google Calendar sincronizado em tempo real com novos agendamentos.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={icalFeedUrl}
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-700"
+                  />
+                  <button
+                    onClick={() => handleCopy(icalFeedUrl, 'ical-url')}
+                    className="px-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-semibold flex items-center gap-1 shrink-0 transition-colors"
+                  >
+                    {copiedItem === 'ical-url' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedItem === 'ical-url' ? 'Copiado' : 'Copiar'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: STATUS DAS INTEGRAÇÕES */}
+        {activeTab === 'status' && (
+          <div className="bg-white rounded-2xl p-6 md:p-8 shadow-ambient border border-[#eceef0] space-y-6">
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+              <div className="w-11 h-11 rounded-2xl bg-cyan-100 text-[#00687a] flex items-center justify-center">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-[#091426]">
+                  Status das Integrações do Sistema
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Visão geral das integrações em nuvem e automações conectadas à sua conta.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-5 bg-[#f7f9fb] rounded-2xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                    <MessageSquare className="w-5 h-5" />
+                  </div>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                    Operacional
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">WhatsApp & Avisos 8h</h3>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Envios automáticos de confirmação e lembretes configurados para cada aula.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-5 bg-[#f7f9fb] rounded-2xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+                    <Calendar className="w-6 h-6" />
+                  </div>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                    Sincronizado
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Google Calendar</h3>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Exportação em formato padrão .ics e links de agendamento compatíveis.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-5 bg-[#f7f9fb] rounded-2xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
+                    <Workflow className="w-6 h-6" />
+                  </div>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
+                    Gerenciado
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Webhooks em Nuvem</h3>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Eventos de formulário e agendamentos despachados de forma transparente em background.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3">
+              <Sparkles className="w-5 h-5 text-[#00687a] shrink-0" />
+              <p className="text-xs text-slate-600 leading-relaxed">
+                As integrações técnicas com servidores e APIs são mantidas de forma centralizada pelo desenvolvedor. Os formulários submetidos no painel são transmitidos automaticamente para os canais configurados.
+              </p>
             </div>
           </div>
         )}

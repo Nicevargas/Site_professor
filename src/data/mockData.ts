@@ -64,6 +64,7 @@ export const INITIAL_TEACHER_PROFILES: TeacherProfile[] = [
 export const INITIAL_SERVICES: ServiceItem[] = [
   {
     id: 'serv-1',
+    teacherId: 'prof-roberto',
     name: 'Personal Trainer 1h',
     description: 'Sessão individual focada em hipertrofia e condicionamento físico personalizado.',
     price: 150,
@@ -74,6 +75,7 @@ export const INITIAL_SERVICES: ServiceItem[] = [
   },
   {
     id: 'serv-2',
+    teacherId: 'prof-roberto',
     name: 'Aula de Natação',
     description: 'Turma adulto ou individual. Aperfeiçoamento dos 4 estilos e respiração.',
     price: 120,
@@ -84,6 +86,7 @@ export const INITIAL_SERVICES: ServiceItem[] = [
   },
   {
     id: 'serv-3',
+    teacherId: 'prof-roberto',
     name: 'Avaliação Física',
     description: 'Bioimpedância e medidas antropométricas completas com relatório detalhado.',
     price: 80,
@@ -94,6 +97,7 @@ export const INITIAL_SERVICES: ServiceItem[] = [
   },
   {
     id: 'serv-4',
+    teacherId: 'prof-carlos',
     name: 'Aula Particular - Matemática',
     description: 'Revisão focada nas suas dificuldades específicas. Ideal para acompanhamento contínuo.',
     price: 150,
@@ -104,6 +108,7 @@ export const INITIAL_SERVICES: ServiceItem[] = [
   },
   {
     id: 'serv-5',
+    teacherId: 'prof-carlos',
     name: 'Mentoria Pré-Vestibular',
     description: 'Sessão intensiva focada em resolução de provas anteriores e estratégias de estudo.',
     price: 220,
@@ -114,6 +119,7 @@ export const INITIAL_SERVICES: ServiceItem[] = [
   },
   {
     id: 'serv-6',
+    teacherId: 'prof-carlos',
     name: 'Revisão de Véspera',
     description: 'Revisão expressa dos tópicos mais importantes um dia antes da prova.',
     price: 300,
@@ -128,6 +134,7 @@ export const INITIAL_SERVICES: ServiceItem[] = [
 export const INITIAL_STUDENTS: Student[] = [
   {
     id: 'std-1',
+    teacherId: 'prof-roberto',
     name: 'Mariana Costa',
     email: 'mariana.costa@email.com',
     phone: '(11) 98765-4321',
@@ -140,6 +147,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     id: 'std-2',
+    teacherId: 'prof-roberto',
     name: 'João Pedro',
     email: 'joao.pedro@email.com',
     phone: '(11) 97654-3210',
@@ -152,6 +160,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     id: 'std-3',
+    teacherId: 'prof-roberto',
     name: 'Ana Beatriz',
     email: 'ana.beatriz@email.com',
     phone: '(11) 96543-2109',
@@ -164,6 +173,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     id: 'std-4',
+    teacherId: 'prof-carlos',
     name: 'João Silva',
     email: 'joao.silva@email.com',
     phone: '(11) 95432-1098',
@@ -176,6 +186,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     id: 'std-5',
+    teacherId: 'prof-carlos',
     name: 'Maria Almeida',
     email: 'maria.almeida@email.com',
     phone: '(11) 94321-0987',
@@ -188,6 +199,7 @@ export const INITIAL_STUDENTS: Student[] = [
   },
   {
     id: 'std-6',
+    teacherId: 'prof-carlos',
     name: 'Carlos Pereira',
     email: 'carlos.pereira@email.com',
     phone: '(11) 93210-9876',
@@ -203,6 +215,7 @@ export const INITIAL_STUDENTS: Student[] = [
 export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt-1',
+    teacherId: 'prof-carlos',
     studentName: 'João Silva',
     studentInitials: 'JS',
     studentAvatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80',
@@ -222,6 +235,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   },
   {
     id: 'apt-2',
+    teacherId: 'prof-carlos',
     studentName: 'Maria Almeida',
     studentInitials: 'MA',
     studentAvatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
@@ -241,6 +255,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   },
   {
     id: 'apt-3',
+    teacherId: 'prof-carlos',
     studentName: 'Carlos Pereira',
     studentInitials: 'CP',
     studentAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
@@ -260,58 +275,61 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   },
   {
     id: 'apt-4',
+    teacherId: 'prof-roberto',
     studentName: 'Mariana Costa',
     studentInitials: 'MC',
     studentAvatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBBK4ZdjGlXcYUkNbEPgBCJ2ybOX87uTuhEIW-bh1S_6aUuhw3LbpojczkFt7hLMuVkBrvtmonkTNLYDBnpXnY8VeoyWHUzo9lTl7o4AYZV53TqGGXbGuc3CVUOLKbpGRa80w_0YcCGtnYeuP97M5S1TuGnG5L72vqotjZDwMVDIWF9N7shtJ2fI_9L2OOOUCTYfgP1vQF4Vjms-_6o4t7L90jfsLMghpGEespEMyKNBXoQr7B-RD-cww',
     studentPhone: '(11) 98765-4321',
     serviceId: 'serv-1',
-    serviceName: 'Inglês Avançado',
+    serviceName: 'Personal Trainer 1h',
     date: '2024-11-14',
     dayOfWeek: 2, // Ter
     startTime: '09:00',
-    endTime: '10:30',
-    durationMinutes: 90,
-    modality: 'Online (Zoom)',
+    endTime: '10:00',
+    durationMinutes: 60,
+    modality: 'Presencial',
     status: 'Confirmado',
-    notes: 'Focar em conversação avançada e preparo para entrevista de emprego.',
+    notes: 'Treinamento focado em hipertrofia e fortalecimento postural.',
     clientSince: 'Cliente desde 2023',
     price: 150
   },
   {
     id: 'apt-5',
+    teacherId: 'prof-roberto',
     studentName: 'João Pedro',
     studentInitials: 'JP',
     studentAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
     studentPhone: '(11) 97654-3210',
-    serviceId: 'serv-5',
-    serviceName: 'Mentoria Carreira',
+    serviceId: 'serv-2',
+    serviceName: 'Aula de Natação',
     date: '2024-11-15',
     dayOfWeek: 3, // Qua
     startTime: '10:00',
-    endTime: '11:00',
-    durationMinutes: 60,
-    modality: 'Online (Google Meet)',
+    endTime: '10:45',
+    durationMinutes: 45,
+    modality: 'Presencial',
     status: 'Pendente',
-    notes: 'Análise de currículo e direcionamento de estudos.',
+    notes: 'Aperfeiçoamento de nado crawl e respiração bilateral.',
     clientSince: 'Cliente desde 2023',
-    price: 220
+    price: 120
   },
   {
     id: 'apt-6',
+    teacherId: 'prof-roberto',
     studentName: 'Ana Beatriz',
     studentInitials: 'AB',
     studentAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
     studentPhone: '(11) 96543-2109',
     serviceId: 'serv-1',
-    serviceName: 'Conversação',
+    serviceName: 'Personal Trainer 1h',
     date: '2024-11-16',
     dayOfWeek: 4, // Qui
     startTime: '13:00',
     endTime: '14:00',
     durationMinutes: 60,
-    modality: 'Online',
+    modality: 'Online (Google Meet)',
     status: 'Confirmado',
-    notes: 'Prática de conversação e expressões idiomáticas.',
+    notes: 'Avaliação de mobilidade e treino de pernas.',
     clientSince: 'Cliente desde 2024',
     price: 150
   }
@@ -320,12 +338,14 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
 export const INITIAL_REMEMBERS: Reminder[] = [
   {
     id: 'rem-1',
-    title: 'Enviar material para João S.',
+    teacherId: 'prof-roberto',
+    title: 'Enviar planilha de treino para Mariana C.',
     dueDate: 'Hoje, 13:00',
     completed: false
   },
   {
     id: 'rem-2',
+    teacherId: 'prof-carlos',
     title: 'Revisar simulado de Matemática',
     dueDate: 'Atrasado',
     completed: false,
@@ -333,6 +353,7 @@ export const INITIAL_REMEMBERS: Reminder[] = [
   },
   {
     id: 'rem-3',
+    teacherId: 'prof-roberto',
     title: 'Confirmar lista de presença para turma de Natação',
     dueDate: 'Amanhã, 09:00',
     completed: true
@@ -666,6 +687,7 @@ export const DEFAULT_MESSAGE_TEMPLATES: MessageTemplate[] = [
 export const INITIAL_PAYMENT_INVOICES: PaymentInvoice[] = [
   {
     id: 'inv-101',
+    teacherId: 'prof-roberto',
     studentId: 'std-1',
     studentName: 'Mariana Costa',
     studentPhone: '(11) 98765-4321',
@@ -683,6 +705,7 @@ export const INITIAL_PAYMENT_INVOICES: PaymentInvoice[] = [
   },
   {
     id: 'inv-102',
+    teacherId: 'prof-roberto',
     studentId: 'std-2',
     studentName: 'João Pedro',
     studentPhone: '(11) 97654-3210',
@@ -700,6 +723,7 @@ export const INITIAL_PAYMENT_INVOICES: PaymentInvoice[] = [
   },
   {
     id: 'inv-103',
+    teacherId: 'prof-roberto',
     studentId: 'std-3',
     studentName: 'Ana Beatriz',
     studentPhone: '(11) 96543-2109',
@@ -716,6 +740,7 @@ export const INITIAL_PAYMENT_INVOICES: PaymentInvoice[] = [
   },
   {
     id: 'inv-104',
+    teacherId: 'prof-carlos',
     studentId: 'std-4',
     studentName: 'João Silva',
     studentPhone: '(11) 95432-1098',
@@ -734,6 +759,7 @@ export const INITIAL_PAYMENT_INVOICES: PaymentInvoice[] = [
   },
   {
     id: 'inv-105',
+    teacherId: 'prof-carlos',
     studentId: 'std-5',
     studentName: 'Maria Almeida',
     studentPhone: '(11) 94321-0987',
@@ -751,6 +777,7 @@ export const INITIAL_PAYMENT_INVOICES: PaymentInvoice[] = [
   },
   {
     id: 'inv-106',
+    teacherId: 'prof-carlos',
     studentId: 'std-6',
     studentName: 'Carlos Pereira',
     studentPhone: '(11) 93210-9876',

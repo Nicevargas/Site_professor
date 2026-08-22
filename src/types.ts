@@ -27,6 +27,7 @@ export type PaymentMethod = 'pix' | 'cartao' | 'boleto' | 'transferencia' | 'din
 
 export interface PaymentInvoice {
   id: string;
+  teacherId?: string;
   studentId?: string;
   studentName: string;
   studentPhone?: string;
@@ -105,6 +106,7 @@ export interface MessageTemplate {
 
 export interface Appointment {
   id: string;
+  teacherId?: string;
   studentName: string;
   studentInitials?: string;
   studentAvatar?: string;
@@ -127,6 +129,7 @@ export interface Appointment {
 
 export interface ServiceItem {
   id: string;
+  teacherId?: string;
   name: string;
   description: string;
   price: number;
@@ -139,6 +142,7 @@ export interface ServiceItem {
 
 export interface Student {
   id: string;
+  teacherId?: string;
   name: string;
   email: string;
   phone: string;
@@ -152,6 +156,7 @@ export interface Student {
 
 export interface Reminder {
   id: string;
+  teacherId?: string;
   title: string;
   dueDate: string;
   completed: boolean;

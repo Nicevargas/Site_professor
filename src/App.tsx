@@ -50,6 +50,7 @@ import { GoogleCalendarModal } from './components/GoogleCalendarModal';
 import { WhatsAppConfirmationCenterModal } from './components/WhatsAppConfirmationCenterModal';
 import { supabaseService } from './services/supabaseService';
 import { isSupabaseConfigured, supabase } from './lib/supabase';
+import { dispatchAppointmentWebhook, dispatchFormWebhook } from './utils/webhookDispatcher';
 
 export function App() {
   // Authentication & session state (defaults to null if not logged in)
@@ -79,14 +80,68 @@ export function App() {
 
   // Core domain state
   const [teachers, setTeachers] = useState<TeacherProfile[]>(INITIAL_TEACHER_PROFILES);
-  const [currentTeacher, setCurrentTeacher] = useState<TeacherProfile>(INITIAL_TEACHER_PROFILES[0]);
-  const [services, setServices] = useState<ServiceItem[]>(INITIAL_SERVICES);
-  const [appointments, setAppointments] = useState<Appointment[]>(INITIAL_APPOINTMENTS);
-  const [students, setStudents] = useState<Student[]>(INITIAL_STUDENTS);
-  const [reminders, setReminders] = useState<Reminder[]>(INITIAL_REMEMBERS);
-  const [invoices, setInvoices] = useState<PaymentInvoice[]>(INITIAL_PAYMENT_INVOICES);
+  const [currentTeacher, setCurrentTeacher] = useState<TeacherProfile>(() => {
+    try {
+      const savedUser = localStorage.getItem('agenda_prof_current_user');
+      if (savedUser) {
+        const u = JSON.parse(savedUser);
+        const match = INITIAL_TEACHER_PROFILES.find((t) => t.id === u.id || t.email === u.email);
+        if (match) return match;
+        // User custom teacher profile
+        const savedTeacher = localStorage.getItem(`agenda_prof_teacher_${u.id}`);
+        if (savedTeacher) return JSON.parse(savedTeacher);
+        return {
+          ...INITIAL_TEACHER_PROFILES[0],
+          id: u.id,
+          name: u.name,
+          email: u.email,
+        };
+      }
+    } catch {
+      // ignore
+    }
+    return INITIAL_TEACHER_PROFILES[0];
+  });
 
-  // Compute delinquent / overdue count
+  // All domain entities across teachers
+  const [allServices, setAllServices] = useState<ServiceItem[]>(INITIAL_SERVICES);
+  const [allAppointments, setAllAppointments] = useState<Appointment[]>(INITIAL_APPOINTMENTS);
+  const [allStudents, setAllStudents] = useState<Student[]>(INITIAL_STUDENTS);
+  const [allReminders, setAllReminders] = useState<Reminder[]>(INITIAL_REMEMBERS);
+  const [allInvoices, setAllInvoices] = useState<PaymentInvoice[]>(INITIAL_PAYMENT_INVOICES);
+
+  // User-scoped data: Only show data belonging to the current teacher / active user
+  const services = useMemo(() => {
+    return allServices.filter(
+      (s) => s.teacherId === currentTeacher.id || (!s.teacherId && currentTeacher.id === 'prof-roberto')
+    );
+  }, [allServices, currentTeacher.id]);
+
+  const appointments = useMemo(() => {
+    return allAppointments.filter(
+      (a) => a.teacherId === currentTeacher.id || (!a.teacherId && currentTeacher.id === 'prof-roberto')
+    );
+  }, [allAppointments, currentTeacher.id]);
+
+  const students = useMemo(() => {
+    return allStudents.filter(
+      (st) => st.teacherId === currentTeacher.id || (!st.teacherId && currentTeacher.id === 'prof-roberto')
+    );
+  }, [allStudents, currentTeacher.id]);
+
+  const reminders = useMemo(() => {
+    return allReminders.filter(
+      (r) => r.teacherId === currentTeacher.id || (!r.teacherId && currentTeacher.id === 'prof-roberto')
+    );
+  }, [allReminders, currentTeacher.id]);
+
+  const invoices = useMemo(() => {
+    return allInvoices.filter(
+      (inv) => inv.teacherId === currentTeacher.id || (!inv.teacherId && currentTeacher.id === 'prof-roberto')
+    );
+  }, [allInvoices, currentTeacher.id]);
+
+  // Compute delinquent / overdue count for current teacher
   const overdueCount = useMemo(() => {
     return invoices.filter((i) => i.status === 'vencido').length;
   }, [invoices]);
@@ -113,19 +168,18 @@ export function App() {
 
         if (dbTeachers && dbTeachers.length > 0) {
           setTeachers(dbTeachers);
-          setCurrentTeacher(dbTeachers[0]);
         }
         if (dbServices && dbServices.length > 0) {
-          setServices(dbServices);
+          setAllServices(dbServices);
         }
         if (dbAppointments && dbAppointments.length > 0) {
-          setAppointments(dbAppointments);
+          setAllAppointments(dbAppointments);
         }
         if (dbStudents && dbStudents.length > 0) {
-          setStudents(dbStudents);
+          setAllStudents(dbStudents);
         }
         if (dbReminders && dbReminders.length > 0) {
-          setReminders(dbReminders);
+          setAllReminders(dbReminders);
         }
       } catch (err) {
         console.warn('Fallback para dados locais:', err);
@@ -176,25 +230,25 @@ export function App() {
     setCurrentUser(user);
     localStorage.setItem('agenda_prof_current_user', JSON.stringify(user));
 
-    if (teacherData && teacherData.name) {
-      const updatedProfile: TeacherProfile = {
-        ...currentTeacher,
-        ...teacherData,
-        id: user.id || currentTeacher.id,
-        name: teacherData.name || currentTeacher.name,
-        email: teacherData.email || currentTeacher.email,
-        specialty: teacherData.specialty || currentTeacher.specialty,
-        whatsapp: teacherData.whatsapp || currentTeacher.whatsapp,
-      };
-      setCurrentTeacher(updatedProfile);
-      setTeachers((prev) => {
-        const exists = prev.some((t) => t.id === updatedProfile.id || t.email === updatedProfile.email);
-        if (exists) {
-          return prev.map((t) => (t.id === updatedProfile.id || t.email === updatedProfile.email ? updatedProfile : t));
-        }
-        return [updatedProfile, ...prev];
-      });
-    }
+    const updatedProfile: TeacherProfile = {
+      ...currentTeacher,
+      ...(teacherData || {}),
+      id: user.id || currentTeacher.id,
+      name: teacherData?.name || user.name || currentTeacher.name,
+      email: teacherData?.email || user.email || currentTeacher.email,
+      specialty: teacherData?.specialty || currentTeacher.specialty,
+      whatsapp: teacherData?.whatsapp || currentTeacher.whatsapp,
+    };
+    setCurrentTeacher(updatedProfile);
+    localStorage.setItem(`agenda_prof_teacher_${updatedProfile.id}`, JSON.stringify(updatedProfile));
+
+    setTeachers((prev) => {
+      const exists = prev.some((t) => t.id === updatedProfile.id || t.email === updatedProfile.email);
+      if (exists) {
+        return prev.map((t) => (t.id === updatedProfile.id || t.email === updatedProfile.email ? updatedProfile : t));
+      }
+      return [updatedProfile, ...prev];
+    });
 
     setCurrentView('dashboard');
   };
@@ -220,7 +274,7 @@ export function App() {
 
   // Reminder toggles
   const handleToggleReminder = (id: string) => {
-    setReminders((prev) =>
+    setAllReminders((prev) =>
       prev.map((rem) => {
         if (rem.id === id) {
           const updated = { ...rem, completed: !rem.completed };
@@ -235,49 +289,65 @@ export function App() {
   const handleAddReminder = (title: string, dueDate: string) => {
     const newRem: Reminder = {
       id: `rem-${Date.now()}`,
+      teacherId: currentTeacher.id,
       title,
       dueDate,
       completed: false,
     };
-    setReminders((prev) => [newRem, ...prev]);
+    setAllReminders((prev) => [newRem, ...prev]);
     supabaseService.saveReminder(newRem, currentTeacher.id);
+    dispatchFormWebhook('reminder.created', currentTeacher, newRem);
   };
 
   // Appointment actions
   const handleSaveNewAppointment = (newApt: Appointment) => {
-    setAppointments((prev) => [newApt, ...prev]);
-    supabaseService.saveAppointment(newApt, currentTeacher.id);
+    const scopedApt: Appointment = {
+      ...newApt,
+      teacherId: currentTeacher.id,
+    };
+    setAllAppointments((prev) => [scopedApt, ...prev]);
+    supabaseService.saveAppointment(scopedApt, currentTeacher.id);
+
+    // Background Webhook dispatch to n8n / integration server
+    dispatchAppointmentWebhook(scopedApt, currentTeacher, 'created');
 
     // Also add student if not in list
-    if (!students.some((s) => s.name.toLowerCase() === newApt.studentName.toLowerCase())) {
+    if (!allStudents.some((s) => s.name.toLowerCase() === scopedApt.studentName.toLowerCase() && s.teacherId === currentTeacher.id)) {
       const newStd: Student = {
         id: `std-${Date.now()}`,
-        name: newApt.studentName,
-        email: newApt.studentEmail || `${newApt.studentName.toLowerCase().replace(/\s+/g, '.')}@email.com`,
-        phone: newApt.studentPhone || '(11) 98765-4321',
+        teacherId: currentTeacher.id,
+        name: scopedApt.studentName,
+        email: scopedApt.studentEmail || `${scopedApt.studentName.toLowerCase().replace(/\s+/g, '.')}@email.com`,
+        phone: scopedApt.studentPhone || '(11) 98765-4321',
         avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
         joinedDate: 'Novembro 2024',
         totalClasses: 1,
         status: 'Ativo',
-        notes: newApt.notes,
+        notes: scopedApt.notes,
         lastClass: 'Hoje',
       };
-      setStudents((prev) => [newStd, ...prev]);
+      setAllStudents((prev) => [newStd, ...prev]);
       supabaseService.saveStudent(newStd, currentTeacher.id);
+      dispatchFormWebhook('student.created', currentTeacher, newStd);
     }
   };
 
   const handleBlockTime = (blocked: Appointment) => {
-    setAppointments((prev) => [blocked, ...prev]);
-    supabaseService.saveAppointment(blocked, currentTeacher.id);
+    const scopedBlocked: Appointment = {
+      ...blocked,
+      teacherId: currentTeacher.id,
+    };
+    setAllAppointments((prev) => [scopedBlocked, ...prev]);
+    supabaseService.saveAppointment(scopedBlocked, currentTeacher.id);
   };
 
   const handleUpdateAppointmentNotes = (id: string, notes: string) => {
-    setAppointments((prev) =>
+    setAllAppointments((prev) =>
       prev.map((apt) => {
         if (apt.id === id) {
           const updated = { ...apt, notes };
           supabaseService.saveAppointment(updated, currentTeacher.id);
+          dispatchAppointmentWebhook(updated, currentTeacher, 'updated');
           return updated;
         }
         return apt;
@@ -289,40 +359,49 @@ export function App() {
   };
 
   const handleCancelAppointment = (id: string) => {
-    setAppointments((prev) => prev.filter((apt) => apt.id !== id));
+    const target = allAppointments.find((a) => a.id === id);
+    if (target) {
+      dispatchAppointmentWebhook({ ...target, status: 'Cancelado' }, currentTeacher, 'cancelled');
+    }
+    setAllAppointments((prev) => prev.filter((apt) => apt.id !== id));
     supabaseService.deleteAppointment(id);
     setSelectedAppointment(null);
   };
 
   // Service actions
   const handleSaveService = (savedService: ServiceItem) => {
-    setServices((prev) => {
-      const exists = prev.some((s) => s.id === savedService.id);
+    const scopedService: ServiceItem = {
+      ...savedService,
+      teacherId: currentTeacher.id,
+    };
+    setAllServices((prev) => {
+      const exists = prev.some((s) => s.id === scopedService.id);
       if (exists) {
-        return prev.map((s) => (s.id === savedService.id ? savedService : s));
+        return prev.map((s) => (s.id === scopedService.id ? scopedService : s));
       }
-      return [savedService, ...prev];
+      return [scopedService, ...prev];
     });
-    supabaseService.saveService(savedService, currentTeacher.id);
+    supabaseService.saveService(scopedService, currentTeacher.id);
   };
 
   const handleDuplicateService = (service: ServiceItem) => {
     const duplicated: ServiceItem = {
       ...service,
       id: `serv-${Date.now()}`,
+      teacherId: currentTeacher.id,
       name: `${service.name} (Cópia)`,
     };
-    setServices((prev) => [duplicated, ...prev]);
+    setAllServices((prev) => [duplicated, ...prev]);
     supabaseService.saveService(duplicated, currentTeacher.id);
   };
 
   const handleDeleteService = (id: string) => {
-    setServices((prev) => prev.filter((s) => s.id !== id));
+    setAllServices((prev) => prev.filter((s) => s.id !== id));
     supabaseService.deleteService(id);
   };
 
   const handleToggleServiceActive = (id: string) => {
-    setServices((prev) =>
+    setAllServices((prev) =>
       prev.map((s) => {
         if (s.id === id) {
           const updated = { ...s, active: !s.active };
@@ -339,12 +418,14 @@ export function App() {
     const newStudent: Student = {
       ...newStudentData,
       id: `std-${Date.now()}`,
+      teacherId: currentTeacher.id,
       joinedDate: 'Novembro 2024',
       totalClasses: 0,
       lastClass: 'Sem aulas ainda',
     };
-    setStudents((prev) => [newStudent, ...prev]);
+    setAllStudents((prev) => [newStudent, ...prev]);
     supabaseService.saveStudent(newStudent, currentTeacher.id);
+    dispatchFormWebhook('student.created', currentTeacher, newStudent);
   };
 
   const handleScheduleForStudent = (student: Student) => {
@@ -554,7 +635,7 @@ export function App() {
               students={students}
               services={services}
               currentTeacher={currentTeacher}
-              onUpdateInvoices={setInvoices}
+              onUpdateInvoices={setAllInvoices}
               onUpdateTeacher={(updated) => {
                 setCurrentTeacher(updated);
                 setTeachers((prev) =>

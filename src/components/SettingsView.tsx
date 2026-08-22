@@ -886,35 +886,35 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
 
-          {/* n8n Webhook & WhatsApp 8h Automation Card */}
+          {/* Notificações & Avisos Automáticos WhatsApp (8h Antes) */}
           <div className="bg-white rounded-2xl p-6 md:p-8 shadow-ambient border border-[#eceef0] space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
               <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold shadow-xs">
-                  <Workflow className="w-6 h-6" />
+                <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shadow-xs">
+                  <MessageSquare className="w-6 h-6" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-lg font-bold text-[#091426]">
-                      Automação n8n & Notificações WhatsApp (8h Antes)
+                      Notificações & Avisos Automáticos de WhatsApp (8h Antes)
                     </h2>
                     <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                      whatsappAutoReminder8h && n8nWebhookUrl 
+                      whatsappAutoReminder8h 
                         ? 'bg-emerald-100 text-emerald-800' 
                         : 'bg-slate-100 text-slate-600'
                     }`}>
-                      {whatsappAutoReminder8h && n8nWebhookUrl ? 'Webhook Ativo' : 'Pausado'}
+                      {whatsappAutoReminder8h ? 'Ativo em Segundo Plano' : 'Pausado'}
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Envie automaticamente o aviso de confirmação aos alunos 8 horas antes do início da aula através do seu fluxo n8n.
+                    Envie automaticamente o aviso de confirmação aos alunos 8 horas antes do início de cada aula.
                   </p>
                 </div>
               </div>
 
               {/* Master Toggle */}
               <div className="flex items-center gap-2.5 bg-slate-50 p-2 rounded-xl border border-slate-200">
-                <span className="text-xs font-semibold text-slate-700">Automação Ativa:</span>
+                <span className="text-xs font-semibold text-slate-700">Envio Automático:</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
@@ -927,198 +927,57 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
             </div>
 
-            {/* Explanatory Banner */}
-            <div className="p-4 bg-orange-50/80 rounded-2xl border border-orange-200/80 flex items-start gap-3">
-              <Zap className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
-              <div className="text-xs text-orange-950 space-y-1">
-                <p className="font-bold text-orange-900">Como funciona o disparo de 8 horas com n8n:</p>
-                <p className="leading-relaxed text-orange-800">
-                  Ao agendar uma aula (ex: às <strong>14:00</strong>), o sistema computa o timestamp de disparo para 8 horas antes (às <strong>06:00</strong>). Um HTTP POST é transmitido para o seu Webhook do n8n contendo os dados do aluno, detalhes da aula, link de videoconferência e o texto pronto para WhatsApp.
+            {/* Informational Banner for Teacher */}
+            <div className="p-4 bg-emerald-50/80 rounded-2xl border border-emerald-200/80 flex items-start gap-3">
+              <Zap className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="text-xs text-emerald-950 space-y-1">
+                <p className="font-bold text-emerald-900">Integração Automática & Despacho Direto:</p>
+                <p className="leading-relaxed text-emerald-800">
+                  Todas as aulas agendadas e formulários preenchidos são sincronizados e despachados automaticamente para a central de mensagens e webhooks configurados. O professor só precisa gerenciar a agenda e seus alunos; as integrações técnicas são operadas pelo sistema.
                 </p>
               </div>
             </div>
 
-            {/* Webhook URL Input */}
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between items-center mb-1.5">
-                  <label className="block text-xs font-bold text-slate-700">
-                    URL do Webhook do n8n (HTTP POST) *
-                  </label>
-                  <span className="text-[11px] text-slate-400 font-mono">Suporta n8n Cloud & Self-Hosted</span>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <div className="relative flex-1">
-                    <input
-                      type="url"
-                      required={whatsappAutoReminder8h}
-                      value={n8nWebhookUrl}
-                      onChange={(e) => setN8nWebhookUrl(e.target.value)}
-                      placeholder="https://n8n.seu-dominio.com.br/webhook/whatsapp-8h-confirmacao"
-                      className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono text-slate-900 focus:bg-white focus:border-[#00687a] focus:ring-1 focus:ring-[#00687a] transition-all"
-                    />
+            {/* Notification Preferences */}
+            <div className="space-y-4 pt-1">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                Preferências de Mensagens e Agendamento
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="flex items-start gap-3 p-3.5 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200 cursor-pointer transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={includeMeetLinkInPayload}
+                    onChange={(e) => setIncludeMeetLinkInPayload(e.target.checked)}
+                    className="mt-0.5 rounded text-[#00687a] focus:ring-[#00687a]"
+                  />
+                  <div>
+                    <span className="block text-xs font-semibold text-slate-800">
+                      Incluir Link da Sala Virtual
+                    </span>
+                    <span className="block text-[11px] text-slate-500 mt-0.5">
+                      Insere automaticamente o link do Google Meet ou Zoom na mensagem de lembrete enviada ao aluno.
+                    </span>
                   </div>
+                </label>
 
-                  <button
-                    type="button"
-                    onClick={handleTestN8nWebhook}
-                    disabled={isTestingWebhook}
-                    className="px-5 py-3 bg-[#00687a] hover:bg-[#004e5c] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shrink-0 transition-all shadow-xs disabled:opacity-50"
-                  >
-                    {isTestingWebhook ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Disparando Teste...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4" />
-                        <span>Testar Disparo no n8n</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Test Result Feedback */}
-              {testStatus && (
-                <div className={`p-4 rounded-xl text-xs flex items-start gap-3 border animate-in fade-in duration-200 ${
-                  testStatus.success 
-                    ? 'bg-emerald-50 text-emerald-900 border-emerald-200' 
-                    : 'bg-red-50 text-red-900 border-red-200'
-                }`}>
-                  {testStatus.success ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                  ) : (
-                    <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-                  )}
-                  <div className="flex-1">
-                    <div className="flex justify-between items-center font-bold">
-                      <span>{testStatus.success ? 'Conexão e Disparo Bem-Sucedidos!' : 'Falha no Disparo'}</span>
-                      <span className="text-[10px] font-normal text-slate-500">{testStatus.timestamp}</span>
-                    </div>
-                    <p className="mt-1 text-slate-700 leading-relaxed">{testStatus.message}</p>
+                <label className="flex items-start gap-3 p-3.5 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200 cursor-pointer transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={googleCalendarSync}
+                    onChange={(e) => setGoogleCalendarSync(e.target.checked)}
+                    className="mt-0.5 rounded text-[#00687a] focus:ring-[#00687a]"
+                  />
+                  <div>
+                    <span className="block text-xs font-semibold text-slate-800">
+                      Sincronização com Google Agenda
+                    </span>
+                    <span className="block text-[11px] text-slate-500 mt-0.5">
+                      Gera links diretos e arquivos .ics de calendário para adicionar aos calendários pessoais dos alunos.
+                    </span>
                   </div>
-                </div>
-              )}
-
-              {/* Security Token & Payload options */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Token de Autenticação (Header X-Webhook-Token)
-                    </label>
-                    <button
-                      type="button"
-                      onClick={generateNewToken}
-                      className="text-[10px] text-[#00687a] hover:underline font-semibold"
-                    >
-                      Gerar Novo
-                    </button>
-                  </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={n8nAuthToken}
-                      onChange={(e) => setN8nAuthToken(e.target.value)}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono text-slate-800"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard(n8nAuthToken, 'token-clip')}
-                      className="px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium flex items-center gap-1 shrink-0 transition-colors border border-slate-300"
-                    >
-                      {copiedLink === 'token-clip' ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-2.5 pt-1">
-                  <span className="block text-xs font-semibold text-slate-700">Parâmetros Adicionais do Payload:</span>
-                  <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={includeMeetLinkInPayload}
-                      onChange={(e) => setIncludeMeetLinkInPayload(e.target.checked)}
-                      className="rounded text-[#00687a] focus:ring-[#00687a]"
-                    />
-                    <span>Incluir link da videoconferência (Meet/Zoom)</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={googleCalendarSync}
-                      onChange={(e) => setGoogleCalendarSync(e.target.checked)}
-                      className="rounded text-[#00687a] focus:ring-[#00687a]"
-                    />
-                    <span>Sincronizar eventos também com Google Calendar</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* JSON Payload Inspection Accordion */}
-              <div className="border border-slate-200 rounded-2xl overflow-hidden bg-slate-50 mt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowPayloadDetails(!showPayloadDetails)}
-                  className="w-full p-3.5 flex items-center justify-between text-left hover:bg-slate-100/80 transition-colors"
-                >
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-                    <Code2 className="w-4 h-4 text-[#00687a]" />
-                    <span>Inspecionar Estrutura do Payload JSON transmitido ao n8n</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-slate-500 font-normal">POST JSON (application/json)</span>
-                    {showPayloadDetails ? (
-                      <ChevronUp className="w-4 h-4 text-slate-500" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-slate-500" />
-                    )}
-                  </div>
-                </button>
-
-                {showPayloadDetails && (
-                  <div className="p-4 border-t border-slate-200 bg-slate-900 text-slate-100 rounded-b-2xl font-mono text-[11px] space-y-3">
-                    <div className="flex justify-between items-center pb-2 border-b border-slate-800">
-                      <span className="text-slate-400 font-bold">Exemplo Real de Payload POST:</span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          copyToClipboard(JSON.stringify(sampleDispatchPayload, null, 2), 'payload-json')
-                        }
-                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-md text-[10px] flex items-center gap-1.5 transition-colors border border-slate-700"
-                      >
-                        {copiedLink === 'payload-json' ? (
-                          <>
-                            <Check className="w-3 h-3 text-emerald-400" />
-                            <span className="text-emerald-400">Copiado!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3 h-3" />
-                            <span>Copiar JSON</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    <pre className="overflow-x-auto p-2 bg-slate-950/70 rounded-xl leading-relaxed text-emerald-400">
-                      {JSON.stringify(sampleDispatchPayload, null, 2)}
-                    </pre>
-
-                    <div className="pt-2 text-slate-400 text-[10px] space-y-1">
-                      <p className="font-semibold text-slate-300">Dica para o seu Workflow no n8n:</p>
-                      <p>• Conecte o nó <strong>Webhook (POST)</strong> a um nó de WhatsApp (como Evolution API, Z-API, Baileys ou HTTP Request).</p>
-                      <p>• Mapeie o destinatário para <code className="text-cyan-300 font-bold">{`{{ $json.body.student.phone }}`}</code> e o texto para <code className="text-cyan-300 font-bold">{`{{ $json.body.message_text }}`}</code>.</p>
-                    </div>
-                  </div>
-                )}
+                </label>
               </div>
             </div>
           </div>
