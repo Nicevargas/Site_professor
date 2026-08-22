@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ViewMode, 
   Appointment, 
@@ -10,7 +10,9 @@ import {
   CurriculumItem,
   VideoItem,
   PhotoItem,
-  FaqItem
+  FaqItem,
+  PaymentInvoice,
+  AuthUser
 } from './types';
 import { 
   INITIAL_TEACHER_PROFILES, 
@@ -22,7 +24,8 @@ import {
   INITIAL_CURRICULUM,
   INITIAL_VIDEOS,
   INITIAL_PHOTOS,
-  DEFAULT_SITE_FAQS
+  DEFAULT_SITE_FAQS,
+  INITIAL_PAYMENT_INVOICES
 } from './data/mockData';
 
 import { SideNav } from './components/SideNav';
@@ -31,12 +34,14 @@ import { DashboardView } from './components/DashboardView';
 import { AgendaView } from './components/AgendaView';
 import { ServicesView } from './components/ServicesView';
 import { StudentsView } from './components/StudentsView';
+import { PaymentsView } from './components/PaymentsView';
 import { PricingPlansView } from './components/PricingPlansView';
 import { PublicLandingView } from './components/PublicLandingView';
 import { PublicBookingWizard } from './components/PublicBookingWizard';
 import { SettingsView } from './components/SettingsView';
 import { IntegrationsView } from './components/IntegrationsView';
 import { SiteAdminView } from './components/SiteAdminView';
+import { AuthView } from './components/AuthView';
 
 import { NewAppointmentModal } from './components/NewAppointmentModal';
 import { BlockTimeModal } from './components/BlockTimeModal';
@@ -44,11 +49,32 @@ import { ServiceModal } from './components/ServiceModal';
 import { GoogleCalendarModal } from './components/GoogleCalendarModal';
 import { WhatsAppConfirmationCenterModal } from './components/WhatsAppConfirmationCenterModal';
 import { supabaseService } from './services/supabaseService';
-import { isSupabaseConfigured } from './lib/supabase';
+import { isSupabaseConfigured, supabase } from './lib/supabase';
 
 export function App() {
-  // Navigation & View state
-  const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
+  // Authentication & session state (defaults to null if not logged in)
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
+    try {
+      const saved = localStorage.getItem('agenda_prof_current_user');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  });
+
+  // Navigation & View state - defaults to public-landing for visitors, dashboard for logged in
+  const [currentView, setCurrentView] = useState<ViewMode>(() => {
+    try {
+      const saved = localStorage.getItem('agenda_prof_current_user');
+      if (saved) return 'dashboard';
+    } catch {
+      // ignore
+    }
+    return 'public-landing';
+  });
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Core domain state
@@ -58,6 +84,12 @@ export function App() {
   const [appointments, setAppointments] = useState<Appointment[]>(INITIAL_APPOINTMENTS);
   const [students, setStudents] = useState<Student[]>(INITIAL_STUDENTS);
   const [reminders, setReminders] = useState<Reminder[]>(INITIAL_REMEMBERS);
+  const [invoices, setInvoices] = useState<PaymentInvoice[]>(INITIAL_PAYMENT_INVOICES);
+
+  // Compute delinquent / overdue count
+  const overdueCount = useMemo(() => {
+    return invoices.filter((i) => i.status === 'vencido').length;
+  }, [invoices]);
 
   // Content state for teacher site
   const [testimonials, setTestimonials] = useState<TestimonialItem[]>(INITIAL_TESTIMONIALS);
@@ -102,6 +134,77 @@ export function App() {
 
     loadSupabaseData();
   }, []);
+
+  // Supabase Auth listener & Session restoration
+  useEffect(() => {
+    if (isSupabaseConfigured && supabase) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          const authUser: AuthUser = {
+            id: session.user.id,
+            email: session.user.email || '',
+            name: session.user.user_metadata?.full_name || currentTeacher.name,
+            avatarUrl: currentTeacher.avatarUrl,
+            isDemo: false,
+          };
+          setCurrentUser(authUser);
+          localStorage.setItem('agenda_prof_current_user', JSON.stringify(authUser));
+        }
+      });
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (session?.user) {
+          const authUser: AuthUser = {
+            id: session.user.id,
+            email: session.user.email || '',
+            name: session.user.user_metadata?.full_name || currentTeacher.name,
+            avatarUrl: currentTeacher.avatarUrl,
+            isDemo: false,
+          };
+          setCurrentUser(authUser);
+          localStorage.setItem('agenda_prof_current_user', JSON.stringify(authUser));
+        }
+      });
+
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
+  }, [currentTeacher]);
+
+  const handleLoginSuccess = (user: AuthUser, teacherData?: Partial<TeacherProfile>) => {
+    setCurrentUser(user);
+    localStorage.setItem('agenda_prof_current_user', JSON.stringify(user));
+
+    if (teacherData && teacherData.name) {
+      const updatedProfile: TeacherProfile = {
+        ...currentTeacher,
+        ...teacherData,
+        id: user.id || currentTeacher.id,
+        name: teacherData.name || currentTeacher.name,
+        email: teacherData.email || currentTeacher.email,
+        specialty: teacherData.specialty || currentTeacher.specialty,
+        whatsapp: teacherData.whatsapp || currentTeacher.whatsapp,
+      };
+      setCurrentTeacher(updatedProfile);
+      setTeachers((prev) => {
+        const exists = prev.some((t) => t.id === updatedProfile.id || t.email === updatedProfile.email);
+        if (exists) {
+          return prev.map((t) => (t.id === updatedProfile.id || t.email === updatedProfile.email ? updatedProfile : t));
+        }
+        return [updatedProfile, ...prev];
+      });
+    }
+
+    setCurrentView('dashboard');
+  };
+
+  const handleLogout = async () => {
+    await supabaseService.signOut();
+    setCurrentUser(null);
+    localStorage.removeItem('agenda_prof_current_user');
+    setCurrentView('public-landing');
+  };
 
   // Selected state for modals & drawers
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
@@ -280,6 +383,16 @@ export function App() {
   });
 
   // Public views without admin sidebar layout
+  if (currentView === 'auth') {
+    return (
+      <AuthView
+        currentTeacher={currentTeacher}
+        onLoginSuccess={handleLoginSuccess}
+        onBackToPublicSite={() => setCurrentView('public-landing')}
+      />
+    );
+  }
+
   if (currentView === 'public-landing') {
     return (
       <PublicLandingView
@@ -290,6 +403,8 @@ export function App() {
         videos={videos}
         photos={photos}
         faqs={faqs}
+        isAuthenticated={!!currentUser}
+        onOpenLogin={() => setCurrentView('auth')}
         onStartBooking={handleStartBookingFromLanding}
         onBackToDashboard={() => setCurrentView('dashboard')}
         onOpenSiteAdmin={() => setCurrentView('site-admin')}
@@ -311,6 +426,17 @@ export function App() {
     );
   }
 
+  // Strict route guard: Only authenticated/registered users can access the administrative backoffice
+  if (!currentUser) {
+    return (
+      <AuthView
+        currentTeacher={currentTeacher}
+        onLoginSuccess={handleLoginSuccess}
+        onBackToPublicSite={() => setCurrentView('public-landing')}
+      />
+    );
+  }
+
   return (
     <div className="flex h-screen bg-[#f7f9fb] font-sans antialiased text-[#191c1e] overflow-hidden">
       {/* Side Navigation Bar */}
@@ -321,6 +447,7 @@ export function App() {
           setSelectedAppointment(null);
         }}
         currentTeacher={currentTeacher}
+        overdueCount={overdueCount}
       />
 
       {/* Main Content Area */}
@@ -337,6 +464,8 @@ export function App() {
           teachers={teachers}
           currentTeacher={currentTeacher}
           onSelectTeacher={setCurrentTeacher}
+          currentUser={currentUser}
+          onLogout={handleLogout}
         />
 
         {/* Dynamic Main View */}
@@ -365,6 +494,7 @@ export function App() {
               onOpenWhatsApp8hModal={() => setIsWhatsApp8hModalOpen(true)}
               onNavigateToIntegrations={() => setCurrentView('integracoes')}
               onNavigateToSiteAdmin={() => setCurrentView('site-admin')}
+              onNavigateToPayments={() => setCurrentView('pagamentos')}
             />
           )}
 
@@ -418,6 +548,23 @@ export function App() {
             />
           )}
 
+          {currentView === 'pagamentos' && (
+            <PaymentsView
+              invoices={invoices}
+              students={students}
+              services={services}
+              currentTeacher={currentTeacher}
+              onUpdateInvoices={setInvoices}
+              onUpdateTeacher={(updated) => {
+                setCurrentTeacher(updated);
+                setTeachers((prev) =>
+                  prev.map((t) => (t.id === updated.id ? updated : t))
+                );
+                supabaseService.saveTeacher(updated);
+              }}
+            />
+          )}
+
           {currentView === 'site-admin' && (
             <SiteAdminView
               currentTeacher={currentTeacher}
@@ -431,6 +578,13 @@ export function App() {
               onUpdateVideos={setVideos}
               onUpdatePhotos={setPhotos}
               onUpdateFaqs={setFaqs}
+              onUpdateTeacher={(updated) => {
+                setCurrentTeacher(updated);
+                setTeachers((prev) =>
+                  prev.map((t) => (t.id === updated.id ? updated : t))
+                );
+                supabaseService.saveTeacher(updated);
+              }}
               onOpenPublicSite={() => setCurrentView('public-landing')}
             />
           )}

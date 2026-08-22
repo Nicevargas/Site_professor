@@ -400,4 +400,113 @@ export const supabaseService = {
       };
     }
   },
+
+  /**
+   * ==========================================
+   * SUPABASE AUTHENTICATION METHODS
+   * ==========================================
+   */
+
+  /**
+   * Sign In with Email & Password
+   */
+  async signIn(email: string, password: string):Promise<{ data: any; error: string | null }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { data: null, error: 'Supabase não configurado. Use o modo de teste.' };
+    }
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        let translatedError = error.message;
+        if (error.message.includes('Invalid login credentials')) {
+          translatedError = 'E-mail ou senha incorretos.';
+        } else if (error.message.includes('Email not confirmed')) {
+          translatedError = 'E-mail ainda não confirmado. Verifique sua caixa de entrada.';
+        }
+        return { data: null, error: translatedError };
+      }
+      return { data, error: null };
+    } catch (err: any) {
+      return { data: null, error: err.message || 'Falha ao autenticar usuário.' };
+    }
+  },
+
+  /**
+   * Sign Up with Email & Password & Full Name
+   */
+  async signUp(email: string, password: string, fullName?: string): Promise<{ data: any; error: string | null }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { data: null, error: 'Supabase não configurado. Use o modo de teste.' };
+    }
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName || '',
+          },
+        },
+      });
+      if (error) {
+        let translatedError = error.message;
+        if (error.message.includes('already registered')) {
+          translatedError = 'Este e-mail já está cadastrado. Tente entrar.';
+        } else if (error.message.includes('Password should be at least')) {
+          translatedError = 'A senha deve ter no mínimo 6 caracteres.';
+        }
+        return { data: null, error: translatedError };
+      }
+      return { data, error: null };
+    } catch (err: any) {
+      return { data: null, error: err.message || 'Falha ao cadastrar usuário.' };
+    }
+  },
+
+  /**
+   * Reset password via email
+   */
+  async resetPassword(email: string): Promise<{ error: string | null }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { error: 'Supabase não configurado. Use o modo de teste.' };
+    }
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+      if (error) {
+        return { error: error.message };
+      }
+      return { error: null };
+    } catch (err: any) {
+      return { error: err.message || 'Erro ao enviar e-mail de recuperação.' };
+    }
+  },
+
+  /**
+   * Sign Out
+   */
+  async signOut(): Promise<boolean> {
+    if (!isSupabaseConfigured || !supabase) return true;
+    try {
+      const { error } = await supabase.auth.signOut();
+      return !error;
+    } catch (err) {
+      console.warn('Erro ao deslogar:', err);
+      return false;
+    }
+  },
+
+  /**
+   * Get current session / user
+   */
+  async getCurrentUser() {
+    if (!isSupabaseConfigured || !supabase) return null;
+    try {
+      const { data } = await supabase.auth.getUser();
+      return data.user;
+    } catch {
+      return null;
+    }
+  },
 };

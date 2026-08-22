@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TeacherProfile } from '../types';
+import { TeacherProfile, VacationModeConfig } from '../types';
 import { 
   User, 
   Save, 
@@ -8,22 +8,30 @@ import {
   Calendar, 
   Copy, 
   ExternalLink, 
-  Sparkles,
-  ShieldCheck,
-  Phone,
-  Mail,
-  Image as ImageIcon,
-  Workflow,
-  Zap,
-  Send,
-  Code2,
-  CheckCircle2,
-  AlertCircle,
-  RefreshCw,
-  Clock,
-  ChevronDown,
-  ChevronUp
+  Sparkles, 
+  ShieldCheck, 
+  Phone, 
+  Mail, 
+  Image as ImageIcon, 
+  Workflow, 
+  Zap, 
+  Send, 
+  Code2, 
+  CheckCircle2, 
+  AlertCircle, 
+  RefreshCw, 
+  Clock, 
+  ChevronDown, 
+  ChevronUp, 
+  Palette, 
+  Upload,
+  Palmtree,
+  CalendarCheck,
+  Eye
 } from 'lucide-react';
+import { THEME_PRESETS, DEFAULT_LOGOS } from '../utils/themePresets';
+import { readFileAsDataUrl } from '../utils/mediaAndTextHelpers';
+import { formatVacationDateBR } from '../utils/vacationHelpers';
 
 interface SettingsViewProps {
   currentTeacher: TeacherProfile;
@@ -43,6 +51,32 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [avatarUrl, setAvatarUrl] = useState(currentTeacher.avatarUrl);
   const [heroImageUrl, setHeroImageUrl] = useState(currentTeacher.heroImageUrl);
   
+  // Visual Branding, Colors & Logo
+  const [brandName, setBrandName] = useState(currentTeacher.brandName || currentTeacher.name);
+  const [logoUrl, setLogoUrl] = useState(currentTeacher.logoUrl || DEFAULT_LOGOS[0].url);
+  const [showLogo, setShowLogo] = useState(currentTeacher.showLogo ?? true);
+  const [primaryColor, setPrimaryColor] = useState(currentTeacher.primaryColor || '#00687a');
+  const [secondaryColor, setSecondaryColor] = useState(currentTeacher.secondaryColor || '#57dffe');
+  const [accentColor, setAccentColor] = useState(currentTeacher.accentColor || '#004e5c');
+  const [themePreset, setThemePreset] = useState<string>(currentTeacher.themePreset || 'ocean-teal');
+
+  // Vacation / Out of Office Mode
+  const [vacationEnabled, setVacationEnabled] = useState(currentTeacher.vacationMode?.enabled || false);
+  const [vacationStartDate, setVacationStartDate] = useState(currentTeacher.vacationMode?.startDate || '');
+  const [vacationEndDate, setVacationEndDate] = useState(currentTeacher.vacationMode?.endDate || '');
+  const [vacationReturnDate, setVacationReturnDate] = useState(currentTeacher.vacationMode?.returnDate || '');
+  const [vacationTitle, setVacationTitle] = useState(currentTeacher.vacationMode?.title || 'Recesso Pedagógico / Férias');
+  const [vacationMessage, setVacationMessage] = useState(
+    currentTeacher.vacationMode?.message ||
+      'Estou em período de recesso. O agendamento online está temporariamente pausado. Retornaremos com as aulas em breve!'
+  );
+  const [vacationAllowWaitlist, setVacationAllowWaitlist] = useState(
+    currentTeacher.vacationMode?.allowWaitlistOrContact ?? true
+  );
+  const [vacationCustomButtonText, setVacationCustomButtonText] = useState(
+    currentTeacher.vacationMode?.customButtonText || 'Entrar na Lista de Espera'
+  );
+
   // n8n Webhook & WhatsApp 8h Settings
   const [n8nWebhookUrl, setN8nWebhookUrl] = useState(
     currentTeacher.n8nWebhookUrl || 'https://n8n.seu-dominio.com.br/webhook/whatsapp-8h-confirmacao'
@@ -68,6 +102,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [googleCalendarSync, setGoogleCalendarSync] = useState(true);
 
+  const handleApplyPreset = (preset: typeof THEME_PRESETS[0]) => {
+    setThemePreset(preset.id);
+    setPrimaryColor(preset.primaryColor);
+    setSecondaryColor(preset.secondaryColor);
+    setAccentColor(preset.accentColor);
+  };
+
+  const handleLogoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const dataUrl = await readFileAsDataUrl(file);
+        setLogoUrl(dataUrl);
+      } catch (err) {
+        console.error('Error reading logo file:', err);
+      }
+    }
+  };
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     onUpdateTeacher({
@@ -80,9 +133,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       email,
       avatarUrl,
       heroImageUrl,
+      brandName,
+      logoUrl,
+      showLogo,
+      primaryColor,
+      secondaryColor,
+      accentColor,
+      themePreset,
       n8nWebhookUrl,
       n8nAuthToken,
       whatsappAutoReminder8h,
+      vacationMode: {
+        enabled: vacationEnabled,
+        startDate: vacationStartDate || undefined,
+        endDate: vacationEndDate || undefined,
+        returnDate: vacationReturnDate || undefined,
+        title: vacationTitle.trim() || 'Recesso Pedagógico / Férias',
+        message: vacationMessage.trim() || 'Estou em período de recesso. Agendamentos temporariamente pausados.',
+        allowWaitlistOrContact: vacationAllowWaitlist,
+        customButtonText: vacationCustomButtonText.trim() || 'Entrar na Lista de Espera',
+      }
     });
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
@@ -323,6 +393,496 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 onChange={(e) => setHeroImageUrl(e.target.value)}
                 className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-[#00687a]"
               />
+            </div>
+          </div>
+
+          {/* Visual Identity, Colors & Logo Card */}
+          <div className="bg-white rounded-2xl p-6 md:p-8 shadow-ambient border border-[#eceef0] space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-xs"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  <Palette className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-[#091426]">
+                    Identidade Visual, Cores & Logotipo
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Defina as cores principais, paleta e logo que estilizam o site público e a página de agendamento dos alunos.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div 
+                  className="w-6 h-6 rounded-full border border-slate-300 shadow-xs"
+                  style={{ backgroundColor: primaryColor }}
+                  title={`Cor Primária: ${primaryColor}`}
+                />
+                <div 
+                  className="w-6 h-6 rounded-full border border-slate-300 shadow-xs"
+                  style={{ backgroundColor: secondaryColor }}
+                  title={`Cor Secundária: ${secondaryColor}`}
+                />
+                <div 
+                  className="w-6 h-6 rounded-full border border-slate-300 shadow-xs"
+                  style={{ backgroundColor: accentColor }}
+                  title={`Cor de Destaque: ${accentColor}`}
+                />
+              </div>
+            </div>
+
+            {/* Presets Grid */}
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Paletas de Cores Recomendadas
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {THEME_PRESETS.map((preset) => {
+                  const isSelected = themePreset === preset.id || primaryColor === preset.primaryColor;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => handleApplyPreset(preset)}
+                      className={`p-2.5 rounded-xl border text-left flex flex-col gap-1.5 transition-all ${
+                        isSelected 
+                          ? 'border-[#00687a] bg-cyan-50/60 ring-2 ring-[#00687a]/20' 
+                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-800 truncate">{preset.name}</span>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-[#00687a]" />}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="w-4 h-4 rounded-full border border-slate-300 shadow-xs shrink-0" style={{ backgroundColor: preset.primaryColor }} />
+                        <span className="w-4 h-4 rounded-full border border-slate-300 shadow-xs shrink-0" style={{ backgroundColor: preset.secondaryColor }} />
+                        <span className="w-4 h-4 rounded-full border border-slate-300 shadow-xs shrink-0" style={{ backgroundColor: preset.accentColor }} />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Custom Hex Color Pickers */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-700">Cor Primária (Botões & Títulos)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    className="w-9 h-9 rounded-lg border border-slate-300 cursor-pointer p-0.5"
+                  />
+                  <input
+                    type="text"
+                    value={primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    className="flex-1 text-xs p-2 font-mono bg-[#f7f9fb] border border-slate-300 rounded-lg uppercase"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-700">Cor Secundária (Realces & Badges)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={secondaryColor}
+                    onChange={(e) => setSecondaryColor(e.target.value)}
+                    className="w-9 h-9 rounded-lg border border-slate-300 cursor-pointer p-0.5"
+                  />
+                  <input
+                    type="text"
+                    value={secondaryColor}
+                    onChange={(e) => setSecondaryColor(e.target.value)}
+                    className="flex-1 text-xs p-2 font-mono bg-[#f7f9fb] border border-slate-300 rounded-lg uppercase"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-700">Cor de Destaque (Gradientes & CTA)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={accentColor}
+                    onChange={(e) => setAccentColor(e.target.value)}
+                    className="w-9 h-9 rounded-lg border border-slate-300 cursor-pointer p-0.5"
+                  />
+                  <input
+                    type="text"
+                    value={accentColor}
+                    onChange={(e) => setAccentColor(e.target.value)}
+                    className="flex-1 text-xs p-2 font-mono bg-[#f7f9fb] border border-slate-300 rounded-lg uppercase"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Logo and Brand Name */}
+            <div className="pt-3 border-t border-slate-100 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Nome Comercial / Marca do Site
+                  </label>
+                  <input
+                    type="text"
+                    value={brandName}
+                    onChange={(e) => setBrandName(e.target.value)}
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-[#00687a]"
+                    placeholder="Ex: Prof. Matheus Silva | Aulas de Física"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    URL ou Arquivo do Logotipo
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={logoUrl}
+                      onChange={(e) => setLogoUrl(e.target.value)}
+                      className="flex-1 p-2 bg-white border border-slate-300 rounded-xl text-xs focus:outline-none focus:border-[#00687a]"
+                      placeholder="https://... ou faça upload"
+                    />
+                    <label className="cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1 border border-slate-200 shrink-0">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload</span>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleLogoFileUpload} 
+                        className="hidden" 
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Logo presets selector */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-600">Modelos de Logotipo Prontos:</label>
+                <div className="flex flex-wrap items-center gap-3">
+                  {DEFAULT_LOGOS.map((logo) => (
+                    <button
+                      key={logo.id}
+                      type="button"
+                      onClick={() => setLogoUrl(logo.url)}
+                      className={`flex items-center gap-2 p-1.5 pr-3 rounded-xl border transition-all ${
+                        logoUrl === logo.url 
+                          ? 'border-[#00687a] bg-cyan-50/60 ring-2 ring-[#00687a]/20' 
+                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                      }`}
+                    >
+                      <img 
+                        src={logo.url} 
+                        alt={logo.name} 
+                        referrerPolicy="no-referrer"
+                        className="w-7 h-7 rounded-lg object-contain bg-slate-50 border border-slate-200" 
+                      />
+                      <span className="text-xs text-slate-700 font-medium">{logo.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ================= CARD: MODO DE FÉRIAS & AUSÊNCIA ================= */}
+          <div className="bg-white rounded-2xl p-6 md:p-8 shadow-ambient border border-[#eceef0] space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold shadow-xs">
+                  <Palmtree className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-[#091426]">
+                      Modo de Férias & Recesso Pedagógico
+                    </h2>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                      vacationEnabled 
+                        ? 'bg-amber-100 text-amber-900 border border-amber-300' 
+                        : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {vacationEnabled ? '🌴 FÉRIAS ATIVADAS' : 'DESATIVADO'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Oculte ou pause a disponibilidade de agendamento online no seu site público durante seus períodos de ausência ou descanso.
+                  </p>
+                </div>
+              </div>
+
+              {/* Fast toggle switch */}
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={vacationEnabled}
+                  onChange={(e) => setVacationEnabled(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-amber-500 shadow-inner"></div>
+              </label>
+            </div>
+
+            {/* Quick Presets */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                Atalhos Rápidos de Período
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const y = new Date().getFullYear();
+                    setVacationStartDate(`${y}-12-20`);
+                    setVacationEndDate(`${y + 1}-01-05`);
+                    setVacationReturnDate(`${y + 1}-01-06`);
+                    setVacationTitle('Recesso de Fim de Ano');
+                    setVacationMessage(`Estaremos em recesso de fim de ano de 20/12 a 05/01. As aulas retornam em 06/01/${y + 1}.`);
+                    setVacationEnabled(true);
+                  }}
+                  className="p-3 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 border border-slate-200 rounded-xl text-left transition-all text-xs"
+                >
+                  <p className="font-bold text-slate-800">Fim de Ano</p>
+                  <p className="text-[10px] text-slate-500">20 Dez - 05 Jan</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const y = new Date().getFullYear();
+                    setVacationStartDate(`${y}-07-15`);
+                    setVacationEndDate(`${y}-07-31`);
+                    setVacationReturnDate(`${y}-08-01`);
+                    setVacationTitle('Férias de Inverno / Julho');
+                    setVacationMessage(`Período de férias de 15/07 a 31/07. Novos agendamentos online reabrem em 01/08/${y}.`);
+                    setVacationEnabled(true);
+                  }}
+                  className="p-3 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 border border-slate-200 rounded-xl text-left transition-all text-xs"
+                >
+                  <p className="font-bold text-slate-800">Férias de Julho</p>
+                  <p className="text-[10px] text-slate-500">15 Jul - 31 Jul</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const s = new Date();
+                    const e = new Date();
+                    e.setDate(s.getDate() + 7);
+                    const r = new Date();
+                    r.setDate(s.getDate() + 8);
+                    const sStr = s.toISOString().split('T')[0];
+                    const eStr = e.toISOString().split('T')[0];
+                    const rStr = r.toISOString().split('T')[0];
+                    setVacationStartDate(sStr);
+                    setVacationEndDate(eStr);
+                    setVacationReturnDate(rStr);
+                    setVacationTitle('Pausa Temporária / Ausência');
+                    setVacationMessage(`Estarei ausente entre ${formatVacationDateBR(sStr, false)} e ${formatVacationDateBR(eStr, false)}. Retorno às aulas em ${formatVacationDateBR(rStr, true)}.`);
+                    setVacationEnabled(true);
+                  }}
+                  className="p-3 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 border border-slate-200 rounded-xl text-left transition-all text-xs"
+                >
+                  <p className="font-bold text-slate-800">Pausa de 1 Semana</p>
+                  <p className="text-[10px] text-slate-500">+7 dias de recesso</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const s = new Date();
+                    const e = new Date();
+                    e.setDate(s.getDate() + 14);
+                    const r = new Date();
+                    r.setDate(s.getDate() + 15);
+                    const sStr = s.toISOString().split('T')[0];
+                    const eStr = e.toISOString().split('T')[0];
+                    const rStr = r.toISOString().split('T')[0];
+                    setVacationStartDate(sStr);
+                    setVacationEndDate(eStr);
+                    setVacationReturnDate(rStr);
+                    setVacationTitle('Férias Pedagógicas (15 Dias)');
+                    setVacationMessage(`Período de férias de 15 dias entre ${formatVacationDateBR(sStr, false)} e ${formatVacationDateBR(eStr, false)}. As aulas recomeçam em ${formatVacationDateBR(rStr, true)}.`);
+                    setVacationEnabled(true);
+                  }}
+                  className="p-3 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 border border-slate-200 rounded-xl text-left transition-all text-xs"
+                >
+                  <p className="font-bold text-slate-800">Férias 15 Dias</p>
+                  <p className="text-[10px] text-slate-500">+15 dias de pausa</p>
+                </button>
+              </div>
+            </div>
+
+            {/* Date Pickers */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Início da Ausência</span>
+                </label>
+                <input
+                  type="date"
+                  value={vacationStartDate}
+                  onChange={(e) => setVacationStartDate(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:bg-white focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Término da Ausência</span>
+                </label>
+                <input
+                  type="date"
+                  value={vacationEndDate}
+                  onChange={(e) => {
+                    setVacationEndDate(e.target.value);
+                    if (!vacationReturnDate && e.target.value) {
+                      try {
+                        const d = new Date(e.target.value + 'T12:00:00');
+                        d.setDate(d.getDate() + 1);
+                        setVacationReturnDate(d.toISOString().split('T')[0]);
+                      } catch {
+                        // ignore
+                      }
+                    }
+                  }}
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:bg-white focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5 text-amber-900">
+                  <CalendarCheck className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Data de Retorno das Aulas</span>
+                </label>
+                <input
+                  type="date"
+                  value={vacationReturnDate}
+                  onChange={(e) => setVacationReturnDate(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-amber-50/70 border border-amber-300 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                />
+              </div>
+            </div>
+
+            {/* Title & Message */}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Título do Aviso no Site
+                </label>
+                <input
+                  type="text"
+                  value={vacationTitle}
+                  onChange={(e) => setVacationTitle(e.target.value)}
+                  placeholder="Ex: Recesso Pedagógico / Férias"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:bg-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Mensagem Informativa aos Alunos e Visitantes
+                </label>
+                <textarea
+                  rows={3}
+                  value={vacationMessage}
+                  onChange={(e) => setVacationMessage(e.target.value)}
+                  placeholder="Explique o período de recesso e que novos agendamentos online reabrirão na data de retorno..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:bg-white focus:outline-none focus:border-amber-500 resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Waitlist Toggle */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Permitir que Alunos entrem na Lista de Espera pelo WhatsApp</span>
+                  </span>
+                  <p className="text-[11px] text-slate-500">
+                    O botão de agendamento é substituído por uma chamada para o WhatsApp com mensagem pré-formatada para o retorno.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={vacationAllowWaitlist}
+                  onChange={(e) => setVacationAllowWaitlist(e.target.checked)}
+                  className="rounded text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer"
+                />
+              </div>
+
+              {vacationAllowWaitlist && (
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    Texto do Botão de Contato
+                  </label>
+                  <input
+                    type="text"
+                    value={vacationCustomButtonText}
+                    onChange={(e) => setVacationCustomButtonText(e.target.value)}
+                    placeholder="Ex: Entrar na Lista de Espera"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Public Banner Live Preview */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <Eye className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Pré-visualização do Banner no Site Público:</span>
+                </span>
+                <span className="text-[10px] text-slate-400">Tempo real</span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-50 via-orange-50 to-amber-100/70 border border-amber-300 shadow-xs">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 bg-amber-500 text-white rounded-xl shadow-xs shrink-0 mt-0.5">
+                    <Palmtree className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4 className="text-xs font-bold text-amber-950">
+                        {vacationTitle || 'Período de Recesso / Férias'}
+                      </h4>
+                      {vacationReturnDate && (
+                        <span className="px-2 py-0.5 bg-amber-200/80 text-amber-900 rounded-md text-[10px] font-bold">
+                          Retorno das aulas em {formatVacationDateBR(vacationReturnDate, true)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-amber-900/90 mt-1 leading-relaxed">
+                      {vacationMessage || 'Estou em período de recesso. Agendamentos temporariamente pausados.'}
+                    </p>
+                    {vacationAllowWaitlist && (
+                      <div className="mt-2.5 flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-[10px] font-bold shadow-xs">
+                          <Phone className="w-3 h-3" />
+                          <span>{vacationCustomButtonText || 'Entrar na Lista de Espera'}</span>
+                        </span>
+                        <span className="text-[10px] text-amber-800 font-medium">
+                          Agendamento direto pausado
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 

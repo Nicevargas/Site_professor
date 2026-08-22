@@ -9,21 +9,24 @@ import {
   CreditCard,
   ExternalLink,
   Zap,
-  Globe
+  Globe,
+  DollarSign
 } from 'lucide-react';
 
 interface SideNavProps {
   currentView: ViewMode;
   onNavigate: (view: ViewMode) => void;
   currentTeacher: TeacherProfile;
+  overdueCount?: number;
 }
 
-export const SideNav: React.FC<SideNavProps> = ({ currentView, onNavigate, currentTeacher }) => {
+export const SideNav: React.FC<SideNavProps> = ({ currentView, onNavigate, currentTeacher, overdueCount = 0 }) => {
   const navItems = [
     { id: 'dashboard' as ViewMode, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'agenda' as ViewMode, label: 'Agenda', icon: CalendarIcon },
     { id: 'servicos' as ViewMode, label: 'Serviços', icon: Layers },
     { id: 'alunos' as ViewMode, label: 'Alunos', icon: Users },
+    { id: 'pagamentos' as ViewMode, label: 'Financeiro & Cobranças', icon: DollarSign, badge: overdueCount > 0 ? `${overdueCount}` : undefined },
     { id: 'site-admin' as ViewMode, label: 'Meu Site & Conteúdo', icon: Globe },
     { id: 'planos' as ViewMode, label: 'Planos', icon: CreditCard },
     { id: 'integracoes' as ViewMode, label: 'Automações & n8n', icon: Zap },
@@ -63,14 +66,21 @@ export const SideNav: React.FC<SideNavProps> = ({ currentView, onNavigate, curre
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
-                className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl font-medium text-sm transition-all duration-150 text-left ${
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-medium text-sm transition-all duration-150 text-left ${
                   isActive
                     ? 'bg-[#1e293b] text-[#57dffe] font-semibold border-l-4 border-[#57dffe] shadow-sm pl-3'
                     : 'text-[#8590a6] hover:text-white hover:bg-[#1e293b]/60'
                 }`}
               >
-                <Icon className={`w-5 h-5 ${isActive ? 'text-[#57dffe]' : 'text-[#8590a6]'}`} />
-                <span>{item.label}</span>
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-[#57dffe]' : 'text-[#8590a6]'}`} />
+                  <span className="truncate">{item.label}</span>
+                </div>
+                {item.badge && (
+                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-rose-500 text-white shrink-0">
+                    {item.badge}
+                  </span>
+                )}
               </button>
             );
           })}

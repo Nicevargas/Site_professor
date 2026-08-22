@@ -3,14 +3,46 @@ export type ViewMode =
   | 'agenda'
   | 'servicos'
   | 'alunos'
+  | 'pagamentos'
   | 'site-admin'
   | 'planos'
   | 'integracoes'
   | 'public-landing'
   | 'public-booking'
-  | 'configuracoes';
+  | 'configuracoes'
+  | 'auth';
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name?: string;
+  avatarUrl?: string;
+  isDemo?: boolean;
+}
 
 export type AppointmentStatus = 'Confirmado' | 'Pendente' | 'Concluído' | 'Cancelado' | 'Bloqueado';
+
+export type PaymentStatus = 'pago' | 'pendente' | 'vencido' | 'cancelado';
+export type PaymentMethod = 'pix' | 'cartao' | 'boleto' | 'transferencia' | 'dinheiro';
+
+export interface PaymentInvoice {
+  id: string;
+  studentId?: string;
+  studentName: string;
+  studentPhone?: string;
+  studentEmail?: string;
+  serviceOrPlanName: string;
+  amount: number;
+  dueDate: string; // YYYY-MM-DD
+  paidAt?: string; // YYYY-MM-DD
+  status: PaymentStatus;
+  method: PaymentMethod;
+  pixCode?: string;
+  paymentLinkUrl?: string;
+  notes?: string;
+  createdAt: string;
+  installments?: string; // e.g. "1/3", "Única", "Mensalidade"
+}
 
 export interface TestimonialItem {
   id: string;
@@ -126,6 +158,18 @@ export interface Reminder {
   delayed?: boolean;
 }
 
+export interface VacationModeConfig {
+  enabled: boolean;
+  startDate?: string; // YYYY-MM-DD
+  endDate?: string; // YYYY-MM-DD
+  returnDate?: string; // YYYY-MM-DD
+  title?: string;
+  message?: string;
+  allowWaitlistOrContact?: boolean;
+  customButtonText?: string;
+  notifyExistingAppointments?: boolean;
+}
+
 export interface TeacherProfile {
   id: string;
   name: string;
@@ -142,6 +186,21 @@ export interface TeacherProfile {
   n8nWebhookUrl?: string;
   n8nAuthToken?: string;
   whatsappAutoReminder8h?: boolean;
+  pixKey?: string;
+  pixKeyType?: 'cpf' | 'cnpj' | 'email' | 'phone' | 'random';
+  pixReceiverName?: string;
+  pixBankName?: string;
+  defaultPaymentGateway?: string;
+  // Custom Visual Identity & Branding
+  logoUrl?: string;
+  brandName?: string;
+  showLogo?: boolean;
+  primaryColor?: string; // e.g. '#00687a'
+  secondaryColor?: string; // e.g. '#57dffe'
+  accentColor?: string; // e.g. '#004e5c'
+  themePreset?: 'ocean' | 'emerald' | 'indigo' | 'purple' | 'sunset' | 'slate' | 'rose' | 'custom';
+  // Vacation / Out of Office Mode
+  vacationMode?: VacationModeConfig;
 }
 
 export interface PricingPlan {
