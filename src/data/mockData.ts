@@ -523,33 +523,81 @@ export const INITIAL_CURRICULUM: CurriculumItem[] = [
 export const INITIAL_VIDEOS: VideoItem[] = [
   {
     id: 'vid-1',
-    title: 'Apresentação: Como Funciona Nossa Metodologia Exclusiva',
+    title: 'Apresentação Institucional: Conheça Nossa Metodologia de Mentoria & Aulas',
+    mediaType: 'institucional',
     category: 'Vídeo Institucional',
     videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
     thumbnailUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=80',
     duration: '03:45',
-    description: 'Conheça em detalhes como estruturamos cada aula, o acompanhamento pós-sessão e o material de apoio exclusivo para os alunos.',
-    featured: true
+    description: 'Conheça em detalhes como estruturamos cada aula, o acompanhamento pós-sessão, materiais exclusivos e como ajudamos nossos alunos a alcançarem seus objetivos.',
+    featured: true,
+    speakerOrGuest: 'Prof. Roberto Alencar'
   },
   {
     id: 'vid-2',
-    title: 'Aula Demonstrativa: Resolução Prática e Passo a Passo',
-    category: 'Aula de Amostra',
+    title: 'Vídeo Aula Prática: Resolução Passo a Passo & Raciocínio Estruturado',
+    mediaType: 'videoaula',
+    category: 'Vídeo Aula',
     videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
     thumbnailUrl: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=800&auto=format&fit=crop&q=80',
-    duration: '12:20',
-    description: 'Uma amostra real da didática aplicada em aula: foco no raciocínio rápido, desmistificação de conceitos complexos e resolução guiada.',
-    featured: true
+    duration: '14:20',
+    description: 'Uma demonstração real da didática aplicada em aula: foco no raciocínio rápido, desmistificação de conceitos complexos e resolução guiada de exercícios.',
+    featured: true,
+    episodeNumber: 'Aula #01',
+    speakerOrGuest: 'Prof. Roberto Alencar'
   },
   {
     id: 'vid-3',
-    title: 'Dicas de Ouro para Acelerar seus Resultados no Dia a Dia',
-    category: 'Dica Prática',
+    title: 'Podcast Café com Didática #14 - Como Criar Rotinas de Alta Performance nos Estudos',
+    mediaType: 'podcast',
+    category: 'Podcast & Entrevistas',
+    videoUrl: 'https://open.spotify.com/embed/episode/7777777777777777777777',
+    spotifyUrl: 'https://open.spotify.com/',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=800&auto=format&fit=crop&q=80',
+    duration: '38:15',
+    description: 'Neste episódio discutimos estratégias comprovadas pela neurociência para eliminar a procrastinação, organizar cronogramas e reter 3x mais conteúdo.',
+    featured: true,
+    episodeNumber: 'EP #14',
+    speakerOrGuest: 'Prof. Roberto Alencar & Dra. Camila Sampaio'
+  },
+  {
+    id: 'vid-4',
+    title: 'Vídeo Institucional: Tour pelo Nosso Ambiente e Atendimento Individual',
+    mediaType: 'institucional',
+    category: 'Vídeo Institucional',
+    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&auto=format&fit=crop&q=80',
+    duration: '02:30',
+    description: 'Veja como funciona nossa estrutura presencial e online, equipamentos de transmissão em alta definição e suporte individualizado.',
+    featured: false,
+    speakerOrGuest: 'Prof. Roberto Alencar'
+  },
+  {
+    id: 'vid-5',
+    title: 'Vídeo Aula: 5 Erros Mais Comuns em Provas e Como Evitá-los',
+    mediaType: 'videoaula',
+    category: 'Vídeo Aula',
     videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
     thumbnailUrl: 'https://images.unsplash.com/photo-1571260899304-425eee4c7efc?w=800&auto=format&fit=crop&q=80',
-    duration: '06:10',
-    description: 'Dicas essenciais de organização, rotina de estudos/treinos e consistência para atingir seus objetivos mais rápido.',
-    featured: false
+    duration: '08:50',
+    description: 'Análise detalhada das armadilhas mais recorrentes e técnicas de revisão rápida para garantir máxima precisão nos testes.',
+    featured: false,
+    episodeNumber: 'Aula #02',
+    speakerOrGuest: 'Prof. Roberto Alencar'
+  },
+  {
+    id: 'vid-6',
+    title: 'Podcast Sala de Aula #07 - Preparação Mental e Ansiedade Pré-Exame',
+    mediaType: 'podcast',
+    category: 'Podcast & Entrevistas',
+    videoUrl: 'https://open.spotify.com/embed/episode/7777777777777777777777',
+    spotifyUrl: 'https://open.spotify.com/',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1478737270239-2f02b77fc618?w=800&auto=format&fit=crop&q=80',
+    duration: '42:00',
+    description: 'Conversa franca com dicas de controle emocional, respiração e gerenciamento do tempo durante momentos de grande pressão acadêmica ou profissional.',
+    featured: false,
+    episodeNumber: 'EP #07',
+    speakerOrGuest: 'Prof. Roberto Alencar & Psicóloga Mariana Rios'
   }
 ];
 

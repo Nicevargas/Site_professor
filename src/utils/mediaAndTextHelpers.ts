@@ -35,6 +35,66 @@ export function formatYouTubeEmbedUrl(inputUrl: string): string {
   return trimmed;
 }
 
+export type MediaPlatform = 'youtube' | 'spotify' | 'vimeo' | 'audio' | 'video' | 'other';
+
+/**
+ * Universal media embed formatter that supports:
+ * - YouTube videos / shorts
+ * - Spotify podcast episodes & shows
+ * - Vimeo videos
+ * - Direct MP3/WAV/AAC audio
+ * - Direct MP4/WebM video
+ */
+export function formatAnyMediaEmbedUrl(inputUrl: string): { embedUrl: string; platform: MediaPlatform } {
+  if (!inputUrl) return { embedUrl: '', platform: 'other' };
+  const trimmed = inputUrl.trim();
+
+  // 1. Spotify Episode / Show
+  if (trimmed.includes('spotify.com')) {
+    if (trimmed.includes('/embed/')) {
+      return { embedUrl: trimmed, platform: 'spotify' };
+    }
+    // https://open.spotify.com/episode/xyz -> https://open.spotify.com/embed/episode/xyz
+    const episodeMatch = trimmed.match(/open\.spotify\.com\/episode\/([a-zA-Z0-9]+)/i);
+    if (episodeMatch && episodeMatch[1]) {
+      return { embedUrl: `https://open.spotify.com/embed/episode/${episodeMatch[1]}`, platform: 'spotify' };
+    }
+    const showMatch = trimmed.match(/open\.spotify\.com\/show\/([a-zA-Z0-9]+)/i);
+    if (showMatch && showMatch[1]) {
+      return { embedUrl: `https://open.spotify.com/embed/show/${showMatch[1]}`, platform: 'spotify' };
+    }
+    return { embedUrl: trimmed, platform: 'spotify' };
+  }
+
+  // 2. Vimeo
+  if (trimmed.includes('vimeo.com')) {
+    if (trimmed.includes('player.vimeo.com')) {
+      return { embedUrl: trimmed, platform: 'vimeo' };
+    }
+    const vimeoMatch = trimmed.match(/vimeo\.com\/([0-9]+)/i);
+    if (vimeoMatch && vimeoMatch[1]) {
+      return { embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}`, platform: 'vimeo' };
+    }
+  }
+
+  // 3. YouTube
+  if (trimmed.includes('youtube.com') || trimmed.includes('youtu.be')) {
+    return { embedUrl: formatYouTubeEmbedUrl(trimmed), platform: 'youtube' };
+  }
+
+  // 4. Audio files
+  if (/\.(mp3|wav|ogg|aac|m4a)(\?.*)?$/i.test(trimmed)) {
+    return { embedUrl: trimmed, platform: 'audio' };
+  }
+
+  // 5. Video files
+  if (/\.(mp4|webm|ogv|mov)(\?.*)?$/i.test(trimmed)) {
+    return { embedUrl: trimmed, platform: 'video' };
+  }
+
+  return { embedUrl: trimmed, platform: 'other' };
+}
+
 /**
  * Reads a local browser file and converts it into a Base64 Data URL
  */

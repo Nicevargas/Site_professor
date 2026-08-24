@@ -32,7 +32,12 @@ import {
   Search,
   Laptop,
   Users,
-  Lock
+  Lock,
+  Mic,
+  Tv,
+  Headphones,
+  Radio,
+  Music
 } from 'lucide-react';
 
 interface PublicLandingViewProps {
@@ -73,6 +78,7 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
   const brandTitle = teacher.brandName || teacher.name;
 
   const [selectedPhotoCategory, setSelectedPhotoCategory] = useState<string>('todos');
+  const [selectedVideoCategoryFilter, setSelectedVideoCategoryFilter] = useState<'todos' | 'institucional' | 'videoaula' | 'podcast'>('todos');
   const [activeVideoModal, setActiveVideoModal] = useState<VideoItem | null>(null);
   const [activePhotoModal, setActivePhotoModal] = useState<PhotoItem | null>(null);
 
@@ -658,78 +664,215 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
         </div>
       </section>
 
-      {/* ================= SECTION: VÍDEOS & DEMONSTRAÇÕES ================= */}
+      {/* ================= SECTION: MULTIMÍDIA - VÍDEOS, AULAS & PODCASTS ================= */}
       <section id="videos" className="py-16 md:py-24 max-w-7xl mx-auto px-4 md:px-10 w-full">
-        <div className="text-center max-w-2xl mx-auto mb-14">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-50 rounded-full text-xs font-bold text-rose-700 mb-3">
-            <Video className="w-4 h-4" />
-            <span>Didática em Ação</span>
-          </div>
-          <h2 className="text-2xl md:text-4xl font-extrabold text-[#091426]">
-            Vídeos Demonstrativos & Aulas de Amostra
-          </h2>
-          <p className="text-sm md:text-base text-[#45474c] mt-2">
-            Veja na prática como são ministradas as aulas, o ritmo das explicações e a metodologia aplicada.
-          </p>
-        </div>
+        {(() => {
+          const countInstitucional = videos.filter(v => v.mediaType === 'institucional' || (!v.mediaType && v.category?.toLowerCase().includes('institucional'))).length;
+          const countVideoaula = videos.filter(v => v.mediaType === 'videoaula' || (!v.mediaType && (v.category?.toLowerCase().includes('aula') || v.category?.toLowerCase().includes('amostra')))).length;
+          const countPodcast = videos.filter(v => v.mediaType === 'podcast' || (!v.mediaType && v.category?.toLowerCase().includes('podcast'))).length;
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {videos.map((vid) => (
-            <div
-              key={vid.id}
-              onClick={() => setActiveVideoModal(vid)}
-              className="bg-white rounded-3xl overflow-hidden shadow-ambient border border-[#eceef0] hover:border-rose-400 hover:shadow-elevated transition-all cursor-pointer group flex flex-col justify-between"
-            >
-              <div>
-                {/* Thumbnail with Play Overlay */}
-                <div className="relative aspect-video bg-slate-900 overflow-hidden">
-                  <img
-                    src={vid.thumbnailUrl}
-                    alt={vid.title}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
-                  />
-                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                    <div className="w-14 h-14 rounded-full bg-white/95 text-rose-600 flex items-center justify-center shadow-elevated group-hover:scale-115 transition-transform">
-                      <Play className="w-6 h-6 fill-rose-600 ml-1" />
-                    </div>
-                  </div>
-                  <span className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-xs text-white text-[11px] font-mono font-bold px-2.5 py-1 rounded-md">
-                    {vid.duration}
-                  </span>
+          const filteredVideos = videos.filter(vid => {
+            const currentType = vid.mediaType || (vid.category?.toLowerCase().includes('podcast') ? 'podcast' : vid.category?.toLowerCase().includes('aula') ? 'videoaula' : 'institucional');
+            return selectedVideoCategoryFilter === 'todos' || currentType === selectedVideoCategoryFilter;
+          });
+
+          return (
+            <div>
+              <div className="text-center max-w-3xl mx-auto mb-10">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-cyan-50 border border-cyan-200/60 rounded-full text-xs font-bold text-[#00687a] mb-3">
+                  <Video className="w-4 h-4" />
+                  <span>Conteúdo Multimídia & Didática</span>
                 </div>
+                <h2 className="text-2xl md:text-4xl font-extrabold text-[#091426] tracking-tight">
+                  Vídeos Institucionais, Aulas & Podcasts
+                </h2>
+                <p className="text-sm md:text-base text-[#45474c] mt-2">
+                  Conheça nossa estrutura, assista a aulas de amostra gravadas e ouça podcasts com dicas práticas de aprendizagem.
+                </p>
 
-                <div className="p-6 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 bg-rose-50 px-2.5 py-0.5 rounded-full">
-                      {vid.category}
-                    </span>
-                    {vid.featured && (
-                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full">
-                        Em Destaque
-                      </span>
-                    )}
-                  </div>
+                {/* Filter Pills */}
+                <div className="flex flex-wrap items-center justify-center gap-2 mt-8">
+                  <button
+                    onClick={() => setSelectedVideoCategoryFilter('todos')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                      selectedVideoCategoryFilter === 'todos'
+                        ? 'bg-[#00687a] text-white shadow-ambient'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    Todos ({videos.length})
+                  </button>
 
-                  <h3 className="font-bold text-base text-[#091426] line-clamp-2 group-hover:text-rose-600 transition-colors">
-                    {vid.title}
-                  </h3>
+                  <button
+                    onClick={() => setSelectedVideoCategoryFilter('institucional')}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                      selectedVideoCategoryFilter === 'institucional'
+                        ? 'bg-blue-600 text-white shadow-ambient'
+                        : 'bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700'
+                    }`}
+                  >
+                    <Tv className="w-3.5 h-3.5" />
+                    <span>Institucionais ({countInstitucional})</span>
+                  </button>
 
-                  <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
-                    {vid.description}
-                  </p>
+                  <button
+                    onClick={() => setSelectedVideoCategoryFilter('videoaula')}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                      selectedVideoCategoryFilter === 'videoaula'
+                        ? 'bg-emerald-600 text-white shadow-ambient'
+                        : 'bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700'
+                    }`}
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>Vídeo Aulas ({countVideoaula})</span>
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedVideoCategoryFilter('podcast')}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                      selectedVideoCategoryFilter === 'podcast'
+                        ? 'bg-purple-600 text-white shadow-ambient'
+                        : 'bg-slate-100 text-slate-700 hover:bg-purple-50 hover:text-purple-700'
+                    }`}
+                  >
+                    <Mic className="w-3.5 h-3.5" />
+                    <span>Podcasts ({countPodcast})</span>
+                  </button>
                 </div>
               </div>
 
-              <div className="px-6 pb-6 pt-2">
-                <span className="text-xs font-bold text-rose-600 flex items-center gap-1.5 group-hover:underline">
-                  <Play className="w-3.5 h-3.5 fill-rose-600" />
-                  <span>Assistir Vídeo Demonstrativo</span>
-                </span>
+              {/* Media Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {filteredVideos.map((vid) => {
+                  const resolvedType = vid.mediaType || (vid.category?.toLowerCase().includes('podcast') ? 'podcast' : vid.category?.toLowerCase().includes('aula') ? 'videoaula' : 'institucional');
+
+                  return (
+                    <div
+                      key={vid.id}
+                      onClick={() => setActiveVideoModal(vid)}
+                      className="bg-white rounded-3xl overflow-hidden shadow-ambient border border-[#eceef0] hover:border-[#00687a]/40 hover:shadow-elevated transition-all cursor-pointer group flex flex-col justify-between"
+                    >
+                      <div>
+                        {/* Thumbnail with Play Overlay */}
+                        <div className="relative aspect-video bg-slate-900 overflow-hidden">
+                          <img
+                            src={vid.thumbnailUrl}
+                            alt={vid.title}
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
+                          />
+                          
+                          {/* Type overlay badge on thumbnail */}
+                          <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                            {resolvedType === 'podcast' ? (
+                              <span className="flex items-center gap-1 bg-purple-900/90 backdrop-blur-xs text-purple-200 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-purple-500/30">
+                                <Mic className="w-3 h-3 text-purple-300" />
+                                <span>Podcast</span>
+                              </span>
+                            ) : resolvedType === 'videoaula' ? (
+                              <span className="flex items-center gap-1 bg-emerald-900/90 backdrop-blur-xs text-emerald-200 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-emerald-500/30">
+                                <BookOpen className="w-3 h-3 text-emerald-300" />
+                                <span>Vídeo Aula</span>
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1 bg-blue-900/90 backdrop-blur-xs text-blue-200 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-blue-500/30">
+                                <Tv className="w-3 h-3 text-blue-300" />
+                                <span>Institucional</span>
+                              </span>
+                            )}
+
+                            {vid.episodeNumber && (
+                              <span className="bg-black/70 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-1 rounded-lg">
+                                {vid.episodeNumber}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                            <div className="w-14 h-14 rounded-full bg-white/95 text-[#00687a] flex items-center justify-center shadow-elevated group-hover:scale-115 transition-transform">
+                              {resolvedType === 'podcast' ? (
+                                <Headphones className="w-6 h-6 text-purple-600" />
+                              ) : (
+                                <Play className="w-6 h-6 fill-rose-600 text-rose-600 ml-1" />
+                              )}
+                            </div>
+                          </div>
+
+                          <span className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-xs text-white text-[11px] font-mono font-bold px-2.5 py-1 rounded-md">
+                            {vid.duration}
+                          </span>
+                        </div>
+
+                        <div className="p-6 space-y-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full">
+                              {vid.category}
+                            </span>
+                            {vid.featured && (
+                              <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200/50 px-2.5 py-0.5 rounded-full">
+                                ★ Em Destaque
+                              </span>
+                            )}
+                          </div>
+
+                          <h3 className="font-bold text-base text-[#091426] line-clamp-2 group-hover:text-[#00687a] transition-colors leading-snug">
+                            {vid.title}
+                          </h3>
+
+                          {vid.speakerOrGuest && (
+                            <p className="text-xs font-medium text-slate-600 flex items-center gap-1">
+                              <span className="text-slate-400">Com:</span> {vid.speakerOrGuest}
+                            </p>
+                          )}
+
+                          <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                            {vid.description}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="px-6 pb-6 pt-2 flex items-center justify-between">
+                        <span className={`text-xs font-bold flex items-center gap-1.5 group-hover:underline ${
+                          resolvedType === 'podcast' ? 'text-purple-600' : 'text-[#00687a]'
+                        }`}>
+                          {resolvedType === 'podcast' ? (
+                            <>
+                              <Headphones className="w-3.5 h-3.5" />
+                              <span>Ouvir Episódio</span>
+                            </>
+                          ) : resolvedType === 'videoaula' ? (
+                            <>
+                              <BookOpen className="w-3.5 h-3.5" />
+                              <span>Assistir Aula</span>
+                            </>
+                          ) : (
+                            <>
+                              <Play className="w-3.5 h-3.5 fill-[#00687a]" />
+                              <span>Assistir Apresentação</span>
+                            </>
+                          )}
+                        </span>
+
+                        {vid.spotifyUrl && (
+                          <a
+                            href={vid.spotifyUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg flex items-center gap-1"
+                          >
+                            <Music className="w-3 h-3" />
+                            <span>Spotify</span>
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          ))}
-        </div>
+          );
+        })()}
       </section>
 
       {/* ================= SECTION: GALERIA DE FOTOS ================= */}
@@ -1031,32 +1174,101 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
         </div>
       </footer>
 
-      {/* ================= MODAL VÍDEO REPRODUÇÃO ================= */}
-      {activeVideoModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={() => setActiveVideoModal(null)}>
-          <div className="bg-slate-900 rounded-3xl max-w-3xl w-full p-4 overflow-hidden shadow-elevated border border-slate-700 animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center pb-3 text-white">
-              <div>
-                <span className="text-xs font-bold text-rose-400 uppercase tracking-wider">{activeVideoModal.category}</span>
-                <h4 className="text-sm font-bold text-white">{activeVideoModal.title}</h4>
+      {/* ================= MODAL MULTIMÍDIA REPRODUÇÃO ================= */}
+      {activeVideoModal && (() => {
+        const isSpotify = activeVideoModal.videoUrl.includes('spotify.com');
+        const isAudio = /\.(mp3|wav|ogg|aac|m4a)(\?.*)?$/i.test(activeVideoModal.videoUrl);
+        const isDirectVideo = /\.(mp4|webm|ogv|mov)(\?.*)?$/i.test(activeVideoModal.videoUrl);
+        const resolvedType = activeVideoModal.mediaType || (activeVideoModal.category?.toLowerCase().includes('podcast') ? 'podcast' : activeVideoModal.category?.toLowerCase().includes('aula') ? 'videoaula' : 'institucional');
+
+        return (
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={() => setActiveVideoModal(null)}>
+            <div className={`bg-slate-900 rounded-3xl w-full p-5 overflow-hidden shadow-elevated border border-slate-700 animate-in zoom-in-95 ${isSpotify ? 'max-w-xl' : 'max-w-3xl'}`} onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-start pb-4 text-white border-b border-slate-800">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                      resolvedType === 'podcast' ? 'text-purple-300 bg-purple-900/60 border border-purple-700/40' :
+                      resolvedType === 'videoaula' ? 'text-emerald-300 bg-emerald-900/60 border border-emerald-700/40' :
+                      'text-blue-300 bg-blue-900/60 border border-blue-700/40'
+                    }`}>
+                      {activeVideoModal.category}
+                    </span>
+                    {activeVideoModal.episodeNumber && (
+                      <span className="text-[10px] font-bold bg-slate-800 text-slate-300 px-2 py-0.5 rounded-md">
+                        {activeVideoModal.episodeNumber}
+                      </span>
+                    )}
+                  </div>
+                  <h4 className="text-base font-bold text-white">{activeVideoModal.title}</h4>
+                  {activeVideoModal.speakerOrGuest && (
+                    <p className="text-xs text-slate-400">
+                      Participação / Instrutor: <span className="text-white font-medium">{activeVideoModal.speakerOrGuest}</span>
+                    </p>
+                  )}
+                </div>
+                <button onClick={() => setActiveVideoModal(null)} className="p-1.5 text-slate-400 hover:text-white rounded-full bg-slate-800/80 hover:bg-slate-800">
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-              <button onClick={() => setActiveVideoModal(null)} className="p-1 text-slate-400 hover:text-white rounded-full">
-                <X className="w-5 h-5" />
-              </button>
+
+              <div className="mt-4">
+                {isSpotify ? (
+                  <div className="w-full rounded-2xl overflow-hidden bg-black shadow-inner">
+                    <iframe
+                      src={activeVideoModal.videoUrl}
+                      title={activeVideoModal.title}
+                      className="w-full h-[232px] sm:h-[352px] border-0"
+                      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                      loading="lazy"
+                    />
+                  </div>
+                ) : isAudio ? (
+                  <div className="p-8 bg-slate-800/80 rounded-2xl flex flex-col items-center justify-center gap-4 text-white">
+                    <Headphones className="w-12 h-12 text-[#57dffe]" />
+                    <audio controls className="w-full">
+                      <source src={activeVideoModal.videoUrl} />
+                      Seu navegador não suporta reprodução de áudio.
+                    </audio>
+                  </div>
+                ) : isDirectVideo ? (
+                  <div className="aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-inner">
+                    <video controls className="w-full h-full object-contain">
+                      <source src={activeVideoModal.videoUrl} />
+                      Seu navegador não suporta reprodução de vídeo.
+                    </video>
+                  </div>
+                ) : (
+                  <div className="aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-inner">
+                    <iframe
+                      src={activeVideoModal.videoUrl}
+                      title={activeVideoModal.title}
+                      className="w-full h-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-400 pt-3 border-t border-slate-800">
+                <p className="leading-relaxed flex-1">{activeVideoModal.description}</p>
+                {activeVideoModal.spotifyUrl && (
+                  <a
+                    href={activeVideoModal.spotifyUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all"
+                  >
+                    <Music className="w-3.5 h-3.5" />
+                    <span>Ouvir no App Spotify</span>
+                  </a>
+                )}
+              </div>
             </div>
-            <div className="aspect-video w-full rounded-2xl overflow-hidden bg-black">
-              <iframe
-                src={activeVideoModal.videoUrl}
-                title={activeVideoModal.title}
-                className="w-full h-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            </div>
-            <p className="text-xs text-slate-400 mt-3">{activeVideoModal.description}</p>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ================= MODAL FOTO LIGHTBOX ================= */}
       {activePhotoModal && (

@@ -77,26 +77,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     currentTeacher.vacationMode?.customButtonText || 'Entrar na Lista de Espera'
   );
 
-  // n8n Webhook & WhatsApp 8h Settings
-  const [n8nWebhookUrl, setN8nWebhookUrl] = useState(
+  // WhatsApp 8h Settings & Background Webhook
+  const [n8nWebhookUrl] = useState(
     currentTeacher.n8nWebhookUrl || 'https://n8n.seu-dominio.com.br/webhook/whatsapp-8h-confirmacao'
   );
-  const [n8nAuthToken, setN8nAuthToken] = useState(
+  const [n8nAuthToken] = useState(
     currentTeacher.n8nAuthToken || 'n8n_sec_99a8b7c6d5e4f3a2b1'
   );
   const [whatsappAutoReminder8h, setWhatsappAutoReminder8h] = useState(
     currentTeacher.whatsappAutoReminder8h ?? true
   );
   const [includeMeetLinkInPayload, setIncludeMeetLinkInPayload] = useState(true);
-
-  // Testing & Feedback States
-  const [isTestingWebhook, setIsTestingWebhook] = useState(false);
-  const [testStatus, setTestStatus] = useState<{
-    success: boolean;
-    message: string;
-    timestamp: string;
-  } | null>(null);
-  const [showPayloadDetails, setShowPayloadDetails] = useState(false);
 
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
@@ -162,66 +153,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     navigator.clipboard.writeText(text);
     setCopiedLink(label);
     setTimeout(() => setCopiedLink(null), 2000);
-  };
-
-  const generateNewToken = () => {
-    const randomHex = Array.from({ length: 16 }, () =>
-      Math.floor(Math.random() * 16).toString(16)
-    ).join('');
-    const newToken = `n8n_sec_${randomHex}`;
-    setN8nAuthToken(newToken);
-  };
-
-  const handleTestN8nWebhook = async () => {
-    if (!n8nWebhookUrl.trim()) {
-      setTestStatus({
-        success: false,
-        message: 'Por favor, insira uma URL válida de webhook antes de testar.',
-        timestamp: new Date().toLocaleTimeString('pt-BR'),
-      });
-      return;
-    }
-
-    setIsTestingWebhook(true);
-    setTestStatus(null);
-
-    // Simulate sending mock dispatch payload to n8n webhook
-    setTimeout(() => {
-      setIsTestingWebhook(false);
-      setTestStatus({
-        success: true,
-        message: 'Webhook disparado com sucesso! Payload de teste entregue ao nó n8n (HTTP 200 OK).',
-        timestamp: new Date().toLocaleTimeString('pt-BR'),
-      });
-    }, 1200);
-  };
-
-  const sampleDispatchPayload = {
-    event: 'appointment.reminder_8h',
-    timestamp: new Date().toISOString(),
-    trigger_rule: 'scheduled_8h_before',
-    teacher: {
-      id: currentTeacher.id,
-      name: name,
-      whatsapp: whatsapp,
-      email: email,
-    },
-    student: {
-      name: 'Mariana Costa',
-      phone: '5511987654321',
-      email: 'mariana.costa@email.com',
-    },
-    appointment: {
-      id: 'app-sample-883',
-      serviceName: 'Personal Trainer / Mentoria',
-      date: new Date().toISOString().split('T')[0],
-      startTime: '14:00',
-      endTime: '15:00',
-      dispatchTargetTime: '06:00 (8 horas antes)',
-      modality: 'Online (Google Meet)',
-      meetLink: includeMeetLinkInPayload ? 'https://meet.google.com/abc-defg-hij' : undefined,
-    },
-    message_text: `*CONFIRMAÇÃO DE AULA - 8H ANTES* ⏰\nOlá, Mariana Costa! Tudo bem? 👋\nPassando para confirmar sua aula de Personal Trainer / Mentoria com o(a) ${name} hoje às 14:00 (daqui a ~8 horas).\n\nResponda SIM para confirmar presença.`,
   };
 
   const directImageLinks = [

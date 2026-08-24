@@ -1,6 +1,6 @@
 -- ==========================================================
--- SCHEMA SUPABASE COMPLETO: SISTEMA AGENDA DO PROFESSOR
--- Execute este script no SQL Editor do seu Dashboard Supabase
+-- SUPABASE MIGRATION: 20260824000000_init_complete_schema.sql
+-- SCHEMA COMPLETO E ENDURECIDO: SISTEMA AGÊNDA DO PROFESSOR
 -- ==========================================================
 
 -- Extensões úteis do PostgreSQL

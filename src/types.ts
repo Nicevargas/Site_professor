@@ -67,15 +67,25 @@ export interface CurriculumItem {
   skills?: string[];
 }
 
+export type MediaContentType = 'institucional' | 'videoaula' | 'podcast' | 'demonstrativo';
+
 export interface VideoItem {
   id: string;
+  teacherId?: string;
   title: string;
-  category: string;
-  videoUrl: string;
+  mediaType?: MediaContentType; // 'institucional' | 'videoaula' | 'podcast' | 'demonstrativo'
+  category: string; // e.g. "Vídeo Institucional", "Vídeo Aula", "Podcast", "Amostra Didática"
+  videoUrl: string; // YouTube, Spotify Embed, Vimeo, Apple Podcast or direct media URL
   thumbnailUrl: string;
-  duration: string;
+  duration: string; // e.g. "04:30", "45 min", "1h 15m"
   description: string;
   featured?: boolean;
+  spotifyUrl?: string;
+  audioUrl?: string;
+  episodeNumber?: string; // e.g. "EP #12", "Aula #03"
+  speakerOrGuest?: string; // e.g. "Prof. Roberto & Convidado Dr. Lucas"
+  publishDate?: string;
+  tags?: string[];
 }
 
 export interface PhotoItem {
