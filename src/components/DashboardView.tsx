@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Appointment, Reminder, TeacherProfile } from '../types';
+import { useAccessibility } from '../context/AccessibilityContext';
+import { VoiceReaderButton } from './VoiceReaderButton';
 import { 
   BookOpen, 
   Clock, 
@@ -24,11 +26,16 @@ import {
   BarChart3,
   Users,
   Palmtree,
-  CalendarCheck
+  CalendarCheck,
+  PlayCircle,
+  HelpCircle,
+  Lightbulb,
+  X
 } from 'lucide-react';
 import { calculate8hDispatchTime } from '../utils/calendarAndWhatsapp';
 import { calculateFinancialOverview } from '../utils/mediaAndTextHelpers';
 import { formatVacationDateBR } from '../utils/vacationHelpers';
+
 
 interface DashboardViewProps {
   currentTeacher: TeacherProfile;
@@ -46,6 +53,7 @@ interface DashboardViewProps {
   onNavigateToSiteAdmin?: () => void;
   onNavigateToPayments?: () => void;
   onOpenVacationModal?: () => void;
+  onNavigateToTutorialWizard?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -64,9 +72,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigateToSiteAdmin,
   onNavigateToPayments,
   onOpenVacationModal,
+  onNavigateToTutorialWizard,
 }) => {
   const [newReminderText, setNewReminderText] = useState('');
   const [showAddReminder, setShowAddReminder] = useState(false);
+  const [showOnboardingBanner, setShowOnboardingBanner] = useState(true);
+
+  const { setIsInteractiveTourOpen, setIsTutorialHubOpen } = useAccessibility();
 
   const isVacationActive = currentTeacher.vacationMode?.enabled;
   const vacationReturn = currentTeacher.vacationMode?.returnDate 
@@ -90,16 +102,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     setShowAddReminder(false);
   };
 
+  const dailySummarySpeech = `Olá, ${currentTeacher.name}! Você possui ${appointments.length} aulas agendadas. A próxima aula é com ${nextAppointment ? nextAppointment.studentName : 'nenhum aluno'} às ${nextAppointment ? nextAppointment.startTime : 'horário indefinido'}. Sua receita estimada do período é de ${formattedTotalRevenue}.`;
+
   return (
-    <main className="flex-1 overflow-y-auto bg-[#f7f9fb] p-4 md:p-10 font-sans">
+    <main id="main-content" className="flex-1 overflow-y-auto bg-[#f7f9fb] p-4 md:p-10 font-sans">
       <div className="max-w-7xl mx-auto space-y-8 pb-16">
         
         {/* Welcome & Actions Row */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-[#091426] tracking-tight">
-              Bom dia, {currentTeacher.name.split(' ')[0]}!
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl md:text-3xl font-bold text-[#091426] tracking-tight">
+                Bom dia, {currentTeacher.name.split(' ')[0]}!
+              </h1>
+              <VoiceReaderButton 
+                textToRead={dailySummarySpeech}
+                label="Ouvir Resumo"
+              />
+            </div>
             <p className="text-base text-[#45474c] mt-1">
               Aqui está o resumo do seu dia e seus próximos atendimentos.
             </p>
@@ -135,6 +155,71 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Onboarding & Interactive Tutorial Banner */}
+        {showOnboardingBanner && (
+          <div 
+            id="dashboard-overview-card"
+            className="bg-gradient-to-r from-[#091426] via-[#12243d] to-[#00687a] rounded-3xl p-5 md:p-6 text-white shadow-elevated border border-slate-700 relative overflow-hidden animate-in fade-in"
+          >
+            <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 text-[#57dffe] flex items-center justify-center border border-cyan-500/30 shrink-0">
+                  <PlayCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-[#57dffe] text-[#091426] text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full">
+                      Novo por aqui?
+                    </span>
+                    <h2 className="text-base font-bold text-white">
+                      Aprenda a usar todas as funcionalidades da sua plataforma
+                    </h2>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
+                    Faça um tour interativo passo a passo para dominar o Google Calendar, Lembretes automáticos no WhatsApp 8h antes, Cobranças com Pix e o Portal do Aluno.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5 w-full md:w-auto shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onNavigateToTutorialWizard) {
+                      onNavigateToTutorialWizard();
+                    } else {
+                      setIsInteractiveTourOpen(true);
+                    }
+                  }}
+                  className="flex-1 md:flex-none px-4 py-2.5 bg-[#57dffe] hover:bg-cyan-300 text-[#091426] font-bold text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <PlayCircle className="w-4 h-4" />
+                  <span>Iniciar Tour Interativo</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsTutorialHubOpen(true)}
+                  className="flex-1 md:flex-none px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl border border-white/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <HelpCircle className="w-4 h-4 text-[#57dffe]" />
+                  <span>Central de Ajuda</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowOnboardingBanner(false)}
+                  className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+                  title="Fechar aviso temporariamente"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
 
         {/* Vacation Mode Active Alert Banner */}
         {isVacationActive && (

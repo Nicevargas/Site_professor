@@ -30,7 +30,132 @@
 
   body {
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    transition: font-size 0.2s ease, filter 0.2s ease;
   }
+}
+
+/* ==========================================================
+   ACCESSIBILITY (A11Y) MODIFIERS & STYLES
+   ========================================================== */
+
+/* Font Sizing */
+html.a11y-font-medium {
+  font-size: 112.5% !important; /* ~18px base */
+}
+
+html.a11y-font-large {
+  font-size: 125% !important; /* ~20px base */
+}
+
+html.a11y-font-xlarge {
+  font-size: 137.5% !important; /* ~22px base */
+}
+
+/* Dyslexia / High Legibility Font */
+html.a11y-dyslexia body,
+html.a11y-dyslexia button,
+html.a11y-dyslexia input,
+html.a11y-dyslexia select,
+html.a11y-dyslexia textarea {
+  font-family: 'Lexend', 'Comic Sans MS', 'Trebuchet MS', system-ui, sans-serif !important;
+  letter-spacing: 0.05em !important;
+  line-height: 1.75 !important;
+  word-spacing: 0.1em !important;
+}
+
+/* Enhanced Keyboard Focus Indicator */
+html.a11y-enhanced-focus *:focus-visible {
+  outline: 3px solid #00687a !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 5px rgba(0, 104, 122, 0.3) !important;
+}
+
+/* High Contrast: Dark Mode */
+html.a11y-high-contrast-dark {
+  filter: contrast(120%);
+}
+html.a11y-high-contrast-dark body,
+html.a11y-high-contrast-dark main,
+html.a11y-high-contrast-dark .bg-white,
+html.a11y-high-contrast-dark .bg-slate-50,
+html.a11y-high-contrast-dark .bg-[#f7f9fb],
+html.a11y-high-contrast-dark .bg-[#f2f4f6] {
+  background-color: #0b0f19 !important;
+  color: #ffffff !important;
+}
+html.a11y-high-contrast-dark .text-slate-800,
+html.a11y-high-contrast-dark .text-slate-900,
+html.a11y-high-contrast-dark .text-[#091426],
+html.a11y-high-contrast-dark .text-[#191c1e] {
+  color: #ffffff !important;
+}
+html.a11y-high-contrast-dark .text-slate-500,
+html.a11y-high-contrast-dark .text-slate-600,
+html.a11y-high-contrast-dark .text-[#45474c],
+html.a11y-high-contrast-dark .text-[#75777d] {
+  color: #d1d5db !important;
+}
+html.a11y-high-contrast-dark .border-slate-200,
+html.a11y-high-contrast-dark .border-slate-100,
+html.a11y-high-contrast-dark .border-[#eceef0],
+html.a11y-high-contrast-dark .border-[#c5c6cd] {
+  border-color: #475569 !important;
+}
+
+/* High Contrast: Light Mode */
+html.a11y-high-contrast-light {
+  filter: contrast(135%);
+}
+html.a11y-high-contrast-light * {
+  border-color: #000000 !important;
+}
+html.a11y-high-contrast-light .text-slate-500,
+html.a11y-high-contrast-light .text-slate-600,
+html.a11y-high-contrast-light .text-[#45474c] {
+  color: #000000 !important;
+  font-weight: 600 !important;
+}
+
+/* Monochrome Mode */
+html.a11y-monochrome {
+  filter: grayscale(100%);
+}
+
+/* Reduced Motion */
+html.a11y-reduced-motion *,
+html.a11y-reduced-motion *::before,
+html.a11y-reduced-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Highlight Links & Buttons */
+html.a11y-highlight-links a,
+html.a11y-highlight-links button:not(.btn-unstyled) {
+  text-decoration: underline !important;
+  text-decoration-thickness: 2px !important;
+  text-underline-offset: 3px !important;
+}
+
+/* Skip to Content Button for Screen Readers & Keyboard */
+.a11y-skip-link {
+  position: absolute;
+  top: -100px;
+  left: 16px;
+  background: #091426;
+  color: #ffffff;
+  padding: 12px 20px;
+  z-index: 99999;
+  border-radius: 8px;
+  font-weight: bold;
+  transition: top 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.a11y-skip-link:focus {
+  top: 16px;
+  outline: 3px solid #57dffe;
 }
 
 .shadow-ambient {
@@ -57,3 +182,4 @@
   background-color: #c5c6cd;
   border-radius: 10px;
 }
+

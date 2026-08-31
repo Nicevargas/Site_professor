@@ -4,19 +4,44 @@ export type ViewMode =
   | 'servicos'
   | 'alunos'
   | 'pagamentos'
+  | 'usuarios'
+  | 'portal-aluno'
   | 'site-admin'
   | 'planos'
   | 'integracoes'
   | 'public-landing'
   | 'public-booking'
   | 'configuracoes'
+  | 'tutorial-wizard'
   | 'auth';
+
+export type UserRole = 'admin' | 'professor' | 'assistente' | 'aluno';
+
+export interface SystemUser {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  avatarUrl?: string;
+  phone?: string;
+  teacherId?: string; // If assistant or student is linked to a teacher/school
+  studentId?: string; // If role === 'aluno'
+  status: 'ativo' | 'inativo' | 'pendente';
+  createdAt: string;
+  lastLogin?: string;
+  permissions?: string[];
+  bio?: string;
+}
 
 export interface AuthUser {
   id: string;
   email: string;
   name?: string;
   avatarUrl?: string;
+  role: UserRole;
+  phone?: string;
+  teacherId?: string;
+  studentId?: string;
   isDemo?: boolean;
 }
 
@@ -56,6 +81,8 @@ export interface TestimonialItem {
   verified: boolean;
   featured?: boolean;
 }
+
+export type Testimonial = TestimonialItem;
 
 export interface CurriculumItem {
   id: string;
@@ -228,3 +255,46 @@ export interface PricingPlan {
   features: string[];
   ctaText: string;
 }
+
+// ==========================================
+// ACCESSIBILITY & TUTORIAL TYPES
+// ==========================================
+
+export type AccessibilityFontSize = 'normal' | 'medium' | 'large' | 'xlarge';
+export type AccessibilityContrastMode = 'normal' | 'high-contrast-dark' | 'high-contrast-light' | 'monochrome';
+
+export interface AccessibilitySettings {
+  fontSize: AccessibilityFontSize;
+  contrastMode: AccessibilityContrastMode;
+  dyslexiaFont: boolean;
+  reducedMotion: boolean;
+  enhancedFocus: boolean;
+  highlightLinks: boolean;
+  readingGuide: boolean;
+  voiceSpeed: number; // 0.75, 1, 1.25, 1.5
+  autoNarrateOnTour: boolean;
+}
+
+export interface TutorialStep {
+  id: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  detailedText: string;
+  roleTarget?: UserRole | 'all';
+  targetView: ViewMode;
+  highlightElementSelector?: string;
+  badge: string;
+  iconName: string;
+  tip?: string;
+  audioNarrationText: string;
+  keyFeatures: string[];
+}
+
+export interface FAQItem {
+  id: string;
+  question: string;
+  answer: string;
+  category: 'geral' | 'agenda' | 'pix' | 'whatsapp' | 'alunos' | 'site' | 'acessibilidade';
+}
+

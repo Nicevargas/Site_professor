@@ -1,18 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  ViewMode, 
   Appointment, 
   ServiceItem, 
   Student, 
   Reminder, 
-  TeacherProfile,
-  TestimonialItem,
+  TeacherProfile, 
+  ViewMode, 
+  Testimonial,
   CurriculumItem,
   VideoItem,
   PhotoItem,
-  FaqItem,
   PaymentInvoice,
-  AuthUser
+  AuthUser,
+  SystemUser,
+  UserRole
 } from './types';
 import { 
   INITIAL_TEACHER_PROFILES, 
@@ -25,7 +26,8 @@ import {
   INITIAL_VIDEOS,
   INITIAL_PHOTOS,
   DEFAULT_SITE_FAQS,
-  INITIAL_PAYMENT_INVOICES
+  INITIAL_PAYMENT_INVOICES,
+  INITIAL_SYSTEM_USERS
 } from './data/mockData';
 
 import { SideNav } from './components/SideNav';
@@ -42,17 +44,30 @@ import { SettingsView } from './components/SettingsView';
 import { IntegrationsView } from './components/IntegrationsView';
 import { SiteAdminView } from './components/SiteAdminView';
 import { AuthView } from './components/AuthView';
+import { UsersManagementView } from './components/UsersManagementView';
+import { StudentPortalView } from './components/StudentPortalView';
 
 import { NewAppointmentModal } from './components/NewAppointmentModal';
 import { BlockTimeModal } from './components/BlockTimeModal';
 import { ServiceModal } from './components/ServiceModal';
 import { GoogleCalendarModal } from './components/GoogleCalendarModal';
 import { WhatsAppConfirmationCenterModal } from './components/WhatsAppConfirmationCenterModal';
+
+import { AccessibilityProvider, useAccessibility } from './context/AccessibilityContext';
+import { ReadingGuide } from './components/ReadingGuide';
+import { AccessibilityToolbar } from './components/AccessibilityToolbar';
+import { InteractiveTourModal } from './components/InteractiveTourModal';
+import { OnlineTutorialHubModal } from './components/OnlineTutorialHubModal';
+import { TutorialWizardView } from './components/TutorialWizardView';
+
 import { supabaseService } from './services/supabaseService';
 import { isSupabaseConfigured, supabase } from './lib/supabase';
 import { dispatchAppointmentWebhook, dispatchFormWebhook } from './utils/webhookDispatcher';
 
-export function App() {
+
+function AppInner() {
+  const { isInteractiveTourOpen, setIsInteractiveTourOpen, isTutorialHubOpen, setIsTutorialHubOpen } = useAccessibility();
+
   // Authentication & session state (defaults to null if not logged in)
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
     try {
@@ -66,17 +81,32 @@ export function App() {
     return null;
   });
 
-  // Navigation & View state - defaults to public-landing for visitors, dashboard for logged in
+  // Navigation & View state - defaults to public-landing for visitors, dashboard/portal for logged in
   const [currentView, setCurrentView] = useState<ViewMode>(() => {
     try {
       const saved = localStorage.getItem('agenda_prof_current_user');
-      if (saved) return 'dashboard';
+      if (saved) {
+        const u = JSON.parse(saved);
+        if (u.role === 'aluno') return 'portal-aluno';
+        return 'dashboard';
+      }
     } catch {
       // ignore
     }
     return 'public-landing';
   });
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Multi-user & RBAC System Users State
+  const [systemUsers, setSystemUsers] = useState<SystemUser[]>(() => {
+    try {
+      const saved = localStorage.getItem('agenda_prof_system_users');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
+    return INITIAL_SYSTEM_USERS;
+  });
 
   // Core domain state
   const [teachers, setTeachers] = useState<TeacherProfile[]>(INITIAL_TEACHER_PROFILES);
@@ -85,7 +115,7 @@ export function App() {
       const savedUser = localStorage.getItem('agenda_prof_current_user');
       if (savedUser) {
         const u = JSON.parse(savedUser);
-        const match = INITIAL_TEACHER_PROFILES.find((t) => t.id === u.id || t.email === u.email);
+        const match = INITIAL_TEACHER_PROFILES.find((t) => t.id === u.id || t.email === u.email || t.id === u.teacherId);
         if (match) return match;
         // User custom teacher profile
         const savedTeacher = localStorage.getItem(`agenda_prof_teacher_${u.id}`);
@@ -98,98 +128,111 @@ export function App() {
         };
       }
     } catch {
-      // ignore
+      // fallback
     }
     return INITIAL_TEACHER_PROFILES[0];
   });
 
-  // All domain entities across teachers
+  // Data collections
   const [allServices, setAllServices] = useState<ServiceItem[]>(INITIAL_SERVICES);
   const [allAppointments, setAllAppointments] = useState<Appointment[]>(INITIAL_APPOINTMENTS);
   const [allStudents, setAllStudents] = useState<Student[]>(INITIAL_STUDENTS);
   const [allReminders, setAllReminders] = useState<Reminder[]>(INITIAL_REMEMBERS);
   const [allInvoices, setAllInvoices] = useState<PaymentInvoice[]>(INITIAL_PAYMENT_INVOICES);
 
-  // User-scoped data: Only show data belonging to the current teacher / active user
-  const services = useMemo(() => {
-    return allServices.filter(
-      (s) => s.teacherId === currentTeacher.id || (!s.teacherId && currentTeacher.id === 'prof-roberto')
-    );
-  }, [allServices, currentTeacher.id]);
-
-  const appointments = useMemo(() => {
-    return allAppointments.filter(
-      (a) => a.teacherId === currentTeacher.id || (!a.teacherId && currentTeacher.id === 'prof-roberto')
-    );
-  }, [allAppointments, currentTeacher.id]);
-
-  const students = useMemo(() => {
-    return allStudents.filter(
-      (st) => st.teacherId === currentTeacher.id || (!st.teacherId && currentTeacher.id === 'prof-roberto')
-    );
-  }, [allStudents, currentTeacher.id]);
-
-  const reminders = useMemo(() => {
-    return allReminders.filter(
-      (r) => r.teacherId === currentTeacher.id || (!r.teacherId && currentTeacher.id === 'prof-roberto')
-    );
-  }, [allReminders, currentTeacher.id]);
-
-  const invoices = useMemo(() => {
-    return allInvoices.filter(
-      (inv) => inv.teacherId === currentTeacher.id || (!inv.teacherId && currentTeacher.id === 'prof-roberto')
-    );
-  }, [allInvoices, currentTeacher.id]);
-
-  // Compute delinquent / overdue count for current teacher
-  const overdueCount = useMemo(() => {
-    return invoices.filter((i) => i.status === 'vencido').length;
-  }, [invoices]);
-
-  // Content state for teacher site
-  const [testimonials, setTestimonials] = useState<TestimonialItem[]>(INITIAL_TESTIMONIALS);
+  // Marketing & Public Site Content State
+  const [testimonials, setTestimonials] = useState<Testimonial[]>(INITIAL_TESTIMONIALS);
   const [curriculum, setCurriculum] = useState<CurriculumItem[]>(INITIAL_CURRICULUM);
   const [videos, setVideos] = useState<VideoItem[]>(INITIAL_VIDEOS);
   const [photos, setPhotos] = useState<PhotoItem[]>(INITIAL_PHOTOS);
-  const [faqs, setFaqs] = useState<FaqItem[]>(DEFAULT_SITE_FAQS);
+  const [faqs, setFaqs] = useState(DEFAULT_SITE_FAQS);
 
-  // Initial load from Supabase if configured
+  // Filtered views based on current teacher/tenant
+  const services = useMemo(() => {
+    return allServices.filter(s => !s.teacherId || s.teacherId === currentTeacher.id);
+  }, [allServices, currentTeacher.id]);
+
+  const appointments = useMemo(() => {
+    return allAppointments.filter(a => !a.teacherId || a.teacherId === currentTeacher.id);
+  }, [allAppointments, currentTeacher.id]);
+
+  const students = useMemo(() => {
+    return allStudents.filter(s => !s.teacherId || s.teacherId === currentTeacher.id);
+  }, [allStudents, currentTeacher.id]);
+
+  const reminders = useMemo(() => {
+    return allReminders.filter(r => !r.teacherId || r.teacherId === currentTeacher.id);
+  }, [allReminders, currentTeacher.id]);
+
+  const invoices = useMemo(() => {
+    return allInvoices.filter(inv => !inv.teacherId || inv.teacherId === currentTeacher.id);
+  }, [allInvoices, currentTeacher.id]);
+
+  const overdueCount = useMemo(() => {
+    return invoices.filter(inv => inv.status === 'overdue').length;
+  }, [invoices]);
+
+  // Load from Supabase on startup
   useEffect(() => {
-    async function loadSupabaseData() {
+    async function loadData() {
       if (!isSupabaseConfigured) return;
+
       try {
-        const [dbTeachers, dbServices, dbAppointments, dbStudents, dbReminders] = await Promise.all([
+        const [
+          dbTeachers,
+          dbServices,
+          dbAppointments,
+          dbStudents,
+          dbReminders,
+          dbInvoices,
+          dbTestimonials,
+          dbCurriculum,
+          dbVideos,
+          dbPhotos,
+          dbFaqs
+        ] = await Promise.all([
           supabaseService.getTeachers(),
           supabaseService.getServices(),
           supabaseService.getAppointments(),
           supabaseService.getStudents(),
           supabaseService.getReminders(),
+          supabaseService.getInvoices(),
+          supabaseService.getTestimonials(),
+          supabaseService.getCurriculum(),
+          supabaseService.getVideos(),
+          supabaseService.getPhotos(),
+          supabaseService.getFaqs(),
         ]);
 
         if (dbTeachers && dbTeachers.length > 0) {
           setTeachers(dbTeachers);
+          const currentExists = dbTeachers.find((t: TeacherProfile) => t.id === currentTeacher.id);
+          if (currentExists) {
+            setCurrentTeacher(currentExists);
+          } else {
+            setCurrentTeacher(dbTeachers[0]);
+          }
         }
-        if (dbServices && dbServices.length > 0) {
-          setAllServices(dbServices);
-        }
-        if (dbAppointments && dbAppointments.length > 0) {
-          setAllAppointments(dbAppointments);
-        }
-        if (dbStudents && dbStudents.length > 0) {
-          setAllStudents(dbStudents);
-        }
-        if (dbReminders && dbReminders.length > 0) {
-          setAllReminders(dbReminders);
-        }
+
+        if (dbServices && dbServices.length > 0) setAllServices(dbServices);
+        if (dbAppointments && dbAppointments.length > 0) setAllAppointments(dbAppointments);
+        if (dbStudents && dbStudents.length > 0) setAllStudents(dbStudents);
+        if (dbReminders && dbReminders.length > 0) setAllReminders(dbReminders);
+        if (dbInvoices && dbInvoices.length > 0) setAllInvoices(dbInvoices);
+        if (dbTestimonials && dbTestimonials.length > 0) setTestimonials(dbTestimonials);
+        if (dbCurriculum && dbCurriculum.length > 0) setCurriculum(dbCurriculum);
+        if (dbVideos && dbVideos.length > 0) setVideos(dbVideos);
+        if (dbPhotos && dbPhotos.length > 0) setPhotos(dbPhotos);
+        if (dbFaqs && dbFaqs.length > 0) setFaqs(dbFaqs);
       } catch (err) {
-        console.warn('Fallback para dados locais:', err);
+        console.warn('Could not load from Supabase, using mock local data:', err);
       }
     }
 
-    loadSupabaseData();
+    loadData();
   }, []);
 
-  // Supabase Auth listener & Session restoration
+  // Listen to Supabase Auth State
   useEffect(() => {
     if (isSupabaseConfigured && supabase) {
       supabase.auth.getSession().then(({ data: { session } }) => {
@@ -198,6 +241,7 @@ export function App() {
             id: session.user.id,
             email: session.user.email || '',
             name: session.user.user_metadata?.full_name || currentTeacher.name,
+            role: (session.user.user_metadata?.role as UserRole) || 'professor',
             avatarUrl: currentTeacher.avatarUrl,
             isDemo: false,
           };
@@ -212,6 +256,7 @@ export function App() {
             id: session.user.id,
             email: session.user.email || '',
             name: session.user.user_metadata?.full_name || currentTeacher.name,
+            role: (session.user.user_metadata?.role as UserRole) || 'professor',
             avatarUrl: currentTeacher.avatarUrl,
             isDemo: false,
           };
@@ -250,7 +295,11 @@ export function App() {
       return [updatedProfile, ...prev];
     });
 
-    setCurrentView('dashboard');
+    if (user.role === 'aluno') {
+      setCurrentView('portal-aluno');
+    } else {
+      setCurrentView('dashboard');
+    }
   };
 
   const handleLogout = async () => {
@@ -258,6 +307,63 @@ export function App() {
     setCurrentUser(null);
     localStorage.removeItem('agenda_prof_current_user');
     setCurrentView('public-landing');
+  };
+
+  // RBAC User Management Handlers
+  const handleAddUser = (newUserData: Omit<SystemUser, 'id' | 'createdAt'>) => {
+    const newUser: SystemUser = {
+      ...newUserData,
+      id: `user-${Date.now()}`,
+      createdAt: new Date().toISOString().split('T')[0],
+    };
+    setSystemUsers((prev) => {
+      const updated = [newUser, ...prev];
+      localStorage.setItem('agenda_prof_system_users', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleUpdateUser = (id: string, updates: Partial<SystemUser>) => {
+    setSystemUsers((prev) => {
+      const updated = prev.map((u) => (u.id === id ? { ...u, ...updates } : u));
+      localStorage.setItem('agenda_prof_system_users', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleDeleteUser = (id: string) => {
+    setSystemUsers((prev) => {
+      const updated = prev.filter((u) => u.id !== id);
+      localStorage.setItem('agenda_prof_system_users', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleSwitchUser = (user: SystemUser) => {
+    const authUser: AuthUser = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      avatarUrl: user.avatarUrl,
+      teacherId: user.teacherId,
+      studentId: user.studentId,
+      phone: user.phone,
+      isDemo: true,
+    };
+    setCurrentUser(authUser);
+    localStorage.setItem('agenda_prof_current_user', JSON.stringify(authUser));
+
+    if (user.teacherId) {
+      const matchingTeacher = teachers.find((t) => t.id === user.teacherId);
+      if (matchingTeacher) setCurrentTeacher(matchingTeacher);
+    }
+
+    if (user.role === 'aluno') {
+      setCurrentView('portal-aluno');
+    } else {
+      setCurrentView('dashboard');
+    }
   };
 
   // Selected state for modals & drawers
@@ -487,7 +593,13 @@ export function App() {
         isAuthenticated={!!currentUser}
         onOpenLogin={() => setCurrentView('auth')}
         onStartBooking={handleStartBookingFromLanding}
-        onBackToDashboard={() => setCurrentView('dashboard')}
+        onBackToDashboard={() => {
+          if (currentUser?.role === 'aluno') {
+            setCurrentView('portal-aluno');
+          } else {
+            setCurrentView('dashboard');
+          }
+        }}
         onOpenSiteAdmin={() => setCurrentView('site-admin')}
         onOpenPlans={() => setCurrentView('planos')}
       />
@@ -502,7 +614,28 @@ export function App() {
         preSelectedServiceId={bookingServiceId}
         onBookingComplete={handleBookingCompleted}
         onBackToLanding={() => setCurrentView('public-landing')}
-        onBackToDashboard={() => setCurrentView('dashboard')}
+        onBackToDashboard={() => {
+          if (currentUser?.role === 'aluno') {
+            setCurrentView('portal-aluno');
+          } else {
+            setCurrentView('dashboard');
+          }
+        }}
+      />
+    );
+  }
+
+  if (currentView === 'tutorial-wizard') {
+    return (
+      <TutorialWizardView
+        currentTeacher={currentTeacher}
+        currentUser={currentUser}
+        onNavigate={(view) => {
+          setCurrentView(view);
+          setSelectedAppointment(null);
+        }}
+        appointments={appointments}
+        services={services}
       />
     );
   }
@@ -529,6 +662,7 @@ export function App() {
         }}
         currentTeacher={currentTeacher}
         overdueCount={overdueCount}
+        currentUser={currentUser}
       />
 
       {/* Main Content Area */}
@@ -547,6 +681,8 @@ export function App() {
           onSelectTeacher={setCurrentTeacher}
           currentUser={currentUser}
           onLogout={handleLogout}
+          systemUsers={systemUsers}
+          onSwitchUser={handleSwitchUser}
         />
 
         {/* Dynamic Main View */}
@@ -576,6 +712,7 @@ export function App() {
               onNavigateToIntegrations={() => setCurrentView('integracoes')}
               onNavigateToSiteAdmin={() => setCurrentView('site-admin')}
               onNavigateToPayments={() => setCurrentView('pagamentos')}
+              onNavigateToTutorialWizard={() => setCurrentView('tutorial-wizard')}
             />
           )}
 
@@ -643,6 +780,30 @@ export function App() {
                 );
                 supabaseService.saveTeacher(updated);
               }}
+            />
+          )}
+
+          {currentView === 'usuarios' && (
+            <UsersManagementView
+              users={systemUsers}
+              currentTeacher={currentTeacher}
+              currentUser={currentUser}
+              onAddUser={handleAddUser}
+              onUpdateUser={handleUpdateUser}
+              onDeleteUser={handleDeleteUser}
+              onSwitchSession={handleSwitchUser}
+            />
+          )}
+
+          {currentView === 'portal-aluno' && (
+            <StudentPortalView
+              currentUser={currentUser}
+              currentTeacher={currentTeacher}
+              appointments={appointments}
+              invoices={invoices}
+              videos={videos}
+              onOpenBookingWizard={() => setCurrentView('public-booking')}
+              onOpenPublicSite={() => setCurrentView('public-landing')}
             />
           )}
 
@@ -743,8 +904,36 @@ export function App() {
         appointments={appointments}
         teacher={currentTeacher}
       />
+
+      {/* Accessibility & Reading Assistance */}
+      <ReadingGuide />
+      <AccessibilityToolbar />
+
+      {/* Interactive Tour & Tutorial Hub Modals */}
+      <InteractiveTourModal
+        isOpen={isInteractiveTourOpen}
+        onClose={() => setIsInteractiveTourOpen(false)}
+        currentView={currentView}
+        onNavigate={setCurrentView}
+      />
+
+      <OnlineTutorialHubModal
+        isOpen={isTutorialHubOpen}
+        onClose={() => setIsTutorialHubOpen(false)}
+        onNavigate={setCurrentView}
+        currentTeacher={currentTeacher}
+      />
     </div>
   );
 }
 
+export function App() {
+  return (
+    <AccessibilityProvider>
+      <AppInner />
+    </AccessibilityProvider>
+  );
+}
+
 export default App;
+

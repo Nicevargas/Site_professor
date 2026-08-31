@@ -8,10 +8,11 @@ import {
   TestimonialItem, 
   CurriculumItem, 
   VideoItem, 
-  PhotoItem,
-  FaqItem,
-  MessageTemplate,
-  PaymentInvoice
+  PhotoItem, 
+  FaqItem, 
+  MessageTemplate, 
+  PaymentInvoice,
+  SystemUser
 } from '../types';
 
 export const INITIAL_TEACHER_PROFILES: TeacherProfile[] = [
@@ -839,6 +840,94 @@ export const INITIAL_PAYMENT_INVOICES: PaymentInvoice[] = [
     notes: 'Inadimplente há 11 dias. Boleto não compensado.',
     createdAt: '2026-08-05',
     installments: 'Única'
+  }
+];
+
+export const INITIAL_SYSTEM_USERS: SystemUser[] = [
+  {
+    id: 'user-admin-1',
+    name: 'Admin Geral (Gestão & Diretoria)',
+    email: 'admin@agendaprofessor.com.br',
+    role: 'admin',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    phone: '(11) 99999-0000',
+    status: 'ativo',
+    createdAt: '2026-01-10',
+    lastLogin: 'Hoje às 10:45',
+    permissions: ['all_access', 'manage_users', 'manage_settings', 'view_finances', 'manage_teachers', 'manage_content'],
+    bio: 'Super Administrador com controle global de tenants, professores, permissões e integrações.'
+  },
+  {
+    id: 'prof-roberto',
+    name: 'Prof. Roberto Almeida',
+    email: 'roberto.almeida@agendaprofessor.com.br',
+    role: 'professor',
+    avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBAI63loLl-GarxR8nRCM0QR_UD9OOriq4QTFT68JOsd_926nwPUc3YQ07yVmhVMAAPYJ89Jk-h5GpttNyLMUKD4WJPNozVv5lOrRdBNWMLDFdJiooTvn2t5PA6mb_GGnUILVGezO-aIVc_7VRKB4Y9zIkR4WIpESk7H5VQbPXLr0Yc6P1uJtXayeFWG6nJcZukPp1IRYyxFma22VT0nZr1gy1JyGPPk1usK9JBwJk1dapBCXIb2Nh8Ig',
+    phone: '(11) 99988-7766',
+    teacherId: 'prof-roberto',
+    status: 'ativo',
+    createdAt: '2026-02-01',
+    lastLogin: 'Hoje às 11:20',
+    permissions: ['manage_own_agenda', 'manage_own_services', 'manage_own_students', 'manage_own_finances', 'manage_own_site'],
+    bio: 'Personal Trainer & Especialista em Treinamento Inteligente.'
+  },
+  {
+    id: 'prof-carlos',
+    name: 'Prof. Carlos Silva',
+    email: 'carlos.silva@agendaprofessor.com.br',
+    role: 'professor',
+    avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAzOpE1WBXepMUm3G21XYxME_H53gwFI01_uuNwk9BOF1CTTxYb4qTbeVUbV38GDICoCEU9kpzLs1nDsZxn0yxfFYrS76Dvpzz5yVPLUVK1W4yolwLDAoSUnc8m6Izd8DLb67DRvju6h-eYiJKdwXw4wwOhv8eCGdftyvFgDia9qy7kMHgSs_Yym3aNph20qDJ2S6iB4equOLDfHGfwqs4poutwgneY-qeEJqz9XoSvikiN8bWwky29MQ',
+    phone: '(11) 98877-6655',
+    teacherId: 'prof-carlos',
+    status: 'ativo',
+    createdAt: '2026-03-15',
+    lastLogin: 'Ontem às 18:30',
+    permissions: ['manage_own_agenda', 'manage_own_services', 'manage_own_students', 'manage_own_finances', 'manage_own_site'],
+    bio: 'Instrutor e Educador em Matemática e Física Avançada.'
+  },
+  {
+    id: 'user-assist-1',
+    name: 'Camila Fernandes (Secretaria & Atendimento)',
+    email: 'secretaria@agendaprofessor.com.br',
+    role: 'assistente',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+    phone: '(11) 98111-2233',
+    teacherId: 'prof-roberto',
+    status: 'ativo',
+    createdAt: '2026-04-10',
+    lastLogin: 'Hoje às 09:15',
+    permissions: ['view_agenda', 'create_appointments', 'edit_appointments', 'register_students', 'send_whatsapp_reminders'],
+    bio: 'Assistente administrativa com foco em agendamentos, atendimento e confirmações de presença.'
+  },
+  {
+    id: 'std-1',
+    name: 'Mariana Costa (Aluna)',
+    email: 'mariana.costa@email.com',
+    role: 'aluno',
+    avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBBK4ZdjGlXcYUkNbEPgBCJ2ybOX87uTuhEIW-bh1S_6aUuhw3LbpojczkFt7hLMuVkBrvtmonkTNLYDBnpXnY8VeoyWHUzo9lTl7o4AYZV53TqGGXbGuc3CVUOLKbpGRa80w_0YcCGtnYeuP97M5S1TuGnG5L72vqotjZDwMVDIWF9N7shtJ2fI_9L2OOOUCTYfgP1vQF4Vjms-_6o4t7L90jfsLMghpGEespEMyKNBXoQr7B-RD-cww',
+    phone: '(11) 98765-4321',
+    teacherId: 'prof-roberto',
+    studentId: 'std-1',
+    status: 'ativo',
+    createdAt: '2026-03-01',
+    lastLogin: 'Hoje às 11:50',
+    permissions: ['view_own_classes', 'book_classes', 'view_own_invoices', 'access_multimedia'],
+    bio: 'Aluna assídua de Personal Trainer / Mentoria com o Prof. Roberto.'
+  },
+  {
+    id: 'std-2',
+    name: 'João Pedro (Aluno)',
+    email: 'joao.pedro@email.com',
+    role: 'aluno',
+    avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+    phone: '(11) 97654-3210',
+    teacherId: 'prof-roberto',
+    studentId: 'std-2',
+    status: 'ativo',
+    createdAt: '2026-03-10',
+    lastLogin: '3 dias atrás',
+    permissions: ['view_own_classes', 'book_classes', 'view_own_invoices', 'access_multimedia'],
+    bio: 'Aluno em preparação para vestibulares e condicionamento físico.'
   }
 ];
 

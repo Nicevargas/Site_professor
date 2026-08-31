@@ -402,6 +402,90 @@ export const supabaseService = {
   },
 
   /**
+   * Fetch Invoices
+   */
+  async getInvoices(): Promise<any[] | null> {
+    if (!isSupabaseConfigured || !supabase) return null;
+    try {
+      const { data, error } = await supabase.from('invoices').select('*').order('created_at', { ascending: false });
+      if (error || !data || data.length === 0) return null;
+      return data;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Fetch Testimonials
+   */
+  async getTestimonials(): Promise<any[] | null> {
+    if (!isSupabaseConfigured || !supabase) return null;
+    try {
+      const { data, error } = await supabase.from('testimonials').select('*');
+      if (error || !data || data.length === 0) return null;
+      return data;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Fetch Curriculum
+   */
+  async getCurriculum(): Promise<any[] | null> {
+    if (!isSupabaseConfigured || !supabase) return null;
+    try {
+      const { data, error } = await supabase.from('curriculum').select('*');
+      if (error || !data || data.length === 0) return null;
+      return data;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Fetch Videos
+   */
+  async getVideos(): Promise<any[] | null> {
+    if (!isSupabaseConfigured || !supabase) return null;
+    try {
+      const { data, error } = await supabase.from('videos').select('*');
+      if (error || !data || data.length === 0) return null;
+      return data;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Fetch Photos
+   */
+  async getPhotos(): Promise<any[] | null> {
+    if (!isSupabaseConfigured || !supabase) return null;
+    try {
+      const { data, error } = await supabase.from('photos').select('*');
+      if (error || !data || data.length === 0) return null;
+      return data;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Fetch FAQs
+   */
+  async getFaqs(): Promise<any[] | null> {
+    if (!isSupabaseConfigured || !supabase) return null;
+    try {
+      const { data, error } = await supabase.from('faqs').select('*');
+      if (error || !data || data.length === 0) return null;
+      return data;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
    * ==========================================
    * SUPABASE AUTHENTICATION METHODS
    * ==========================================

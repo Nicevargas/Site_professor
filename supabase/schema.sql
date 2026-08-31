@@ -1,12 +1,13 @@
 -- ==========================================================
--- SCHEMA SUPABASE COMPLETO: SISTEMA AGENDA DO PROFESSOR
+-- SCHEMA SUPABASE COMPLETO & UNIFICADO (COM RBAC & MULTI-USUÁRIO)
+-- SISTEMA: AGENDA DO PROFESSOR (COMPLETO)
 -- Execute este script no SQL Editor do seu Dashboard Supabase
 -- ==========================================================
 
 -- Extensões úteis do PostgreSQL
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 1. TABELA DE PROFESSORES / INSTRUTORES
+-- 1. TABELA DE PROFESSORES / INSTRUTORES (Tenants)
 CREATE TABLE IF NOT EXISTS public.teachers (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -41,23 +42,7 @@ CREATE TABLE IF NOT EXISTS public.teachers (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 2. TABELA DE SERVIÇOS & MODALIDADES
-CREATE TABLE IF NOT EXISTS public.services (
-    id TEXT PRIMARY KEY,
-    teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    description TEXT,
-    price NUMERIC(10, 2) NOT NULL DEFAULT 150.00,
-    duration_minutes INTEGER NOT NULL DEFAULT 60,
-    modality TEXT NOT NULL DEFAULT 'Online / Presencial',
-    badge TEXT,
-    icon_name TEXT DEFAULT 'school',
-    active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 3. TABELA DE ALUNOS (CRM)
+-- 2. TABELA DE ALUNOS (CRM)
 CREATE TABLE IF NOT EXISTS public.students (
     id TEXT PRIMARY KEY,
     teacher_id TEXT REFERENCES public.teachers(id) ON DELETE SET NULL,
@@ -74,10 +59,46 @@ CREATE TABLE IF NOT EXISTS public.students (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 4. TABELA DE AGENDAMENTOS (APPOINTMENTS)
+-- 3. TABELA DE USUÁRIOS DO SISTEMA & RBAC (Multi-usuários)
+CREATE TABLE IF NOT EXISTS public.system_users (
+    id TEXT PRIMARY KEY,
+    auth_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    teacher_id TEXT REFERENCES public.teachers(id) ON DELETE SET NULL,
+    student_id TEXT REFERENCES public.students(id) ON DELETE SET NULL,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    role TEXT NOT NULL DEFAULT 'professor' CHECK (role IN ('admin', 'professor', 'assistente', 'aluno')),
+    avatar_url TEXT,
+    phone TEXT,
+    bio TEXT,
+    status TEXT NOT NULL DEFAULT 'ativo' CHECK (status IN ('ativo', 'inativo', 'pendente')),
+    permissions TEXT[] DEFAULT ARRAY[]::TEXT[],
+    last_login TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 4. TABELA DE SERVIÇOS & MODALIDADES
+CREATE TABLE IF NOT EXISTS public.services (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    description TEXT,
+    price NUMERIC(10, 2) NOT NULL DEFAULT 150.00,
+    duration_minutes INTEGER NOT NULL DEFAULT 60,
+    modality TEXT NOT NULL DEFAULT 'Online / Presencial',
+    badge TEXT,
+    icon_name TEXT DEFAULT 'school',
+    active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 5. TABELA DE AGENDAMENTOS (APPOINTMENTS)
 CREATE TABLE IF NOT EXISTS public.appointments (
     id TEXT PRIMARY KEY,
     teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
+    student_id TEXT REFERENCES public.students(id) ON DELETE SET NULL,
     student_name TEXT NOT NULL,
     student_initials TEXT,
     student_avatar TEXT,
@@ -102,7 +123,7 @@ CREATE TABLE IF NOT EXISTS public.appointments (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 5. TABELA DE COBRANÇAS E FATURAS (PAYMENTS)
+-- 6. TABELA DE COBRANÇAS E FATURAS (PAYMENTS)
 CREATE TABLE IF NOT EXISTS public.payments (
     id TEXT PRIMARY KEY,
     teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
@@ -110,6 +131,7 @@ CREATE TABLE IF NOT EXISTS public.payments (
     student_name TEXT NOT NULL,
     student_phone TEXT,
     student_email TEXT,
+    student_initials TEXT,
     service_or_plan_name TEXT NOT NULL,
     amount NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
     due_date TEXT NOT NULL, -- Formato YYYY-MM-DD
@@ -117,6 +139,7 @@ CREATE TABLE IF NOT EXISTS public.payments (
     status TEXT NOT NULL DEFAULT 'pendente',
     method TEXT NOT NULL DEFAULT 'pix',
     pix_code TEXT,
+    qr_code_base64 TEXT,
     payment_link_url TEXT,
     installments TEXT,
     notes TEXT,
@@ -124,7 +147,7 @@ CREATE TABLE IF NOT EXISTS public.payments (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 6. TABELA DE MULTIMÍDIA (VÍDEOS, AULAS GRAVADAS & PODCASTS)
+-- 7. TABELA DE MULTIMÍDIA (VÍDEOS, AULAS GRAVADAS & PODCASTS)
 CREATE TABLE IF NOT EXISTS public.videos (
     id TEXT PRIMARY KEY,
     teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
@@ -146,7 +169,7 @@ CREATE TABLE IF NOT EXISTS public.videos (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 7. TABELA DE GALERIA DE FOTOS
+-- 8. TABELA DE GALERIA DE FOTOS
 CREATE TABLE IF NOT EXISTS public.photos (
     id TEXT PRIMARY KEY,
     teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
@@ -159,7 +182,7 @@ CREATE TABLE IF NOT EXISTS public.photos (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 8. TABELA DE DEPOIMENTOS E AVALIAÇÕES
+-- 9. TABELA DE DEPOIMENTOS E AVALIAÇÕES
 CREATE TABLE IF NOT EXISTS public.testimonials (
     id TEXT PRIMARY KEY,
     teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
@@ -175,7 +198,7 @@ CREATE TABLE IF NOT EXISTS public.testimonials (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 9. TABELA DE FORMAÇÃO E CURRÍCULO
+-- 10. TABELA DE FORMAÇÃO E CURRÍCULO
 CREATE TABLE IF NOT EXISTS public.curriculum_items (
     id TEXT PRIMARY KEY,
     teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
@@ -189,7 +212,7 @@ CREATE TABLE IF NOT EXISTS public.curriculum_items (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 10. TABELA DE PERGUNTAS FREQUENTES (FAQ)
+-- 11. TABELA DE PERGUNTAS FREQUENTES (FAQ)
 CREATE TABLE IF NOT EXISTS public.faqs (
     id TEXT PRIMARY KEY,
     teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
@@ -201,7 +224,7 @@ CREATE TABLE IF NOT EXISTS public.faqs (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 11. TABELA DE PLANOS & PACOTES
+-- 12. TABELA DE PLANOS & PACOTES
 CREATE TABLE IF NOT EXISTS public.pricing_plans (
     id TEXT PRIMARY KEY,
     teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
@@ -216,7 +239,7 @@ CREATE TABLE IF NOT EXISTS public.pricing_plans (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 12. TABELA DE LEMBRETES & TAREFAS
+-- 13. TABELA DE LEMBRETES & TAREFAS
 CREATE TABLE IF NOT EXISTS public.reminders (
     id TEXT PRIMARY KEY,
     teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
@@ -228,11 +251,11 @@ CREATE TABLE IF NOT EXISTS public.reminders (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 13. TABELA DE MODELOS DE MENSAGENS (WHATSAPP)
+-- 14. TABELA DE MODELOS DE MENSAGENS (WHATSAPP)
 CREATE TABLE IF NOT EXISTS public.message_templates (
     id TEXT PRIMARY KEY,
     teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
-    type TEXT NOT NULL, -- '8h_reminder' | 'immediate_confirm' | '1h_reminder' | 'cancellation'
+    type TEXT NOT NULL,
     title TEXT NOT NULL,
     description TEXT,
     template TEXT NOT NULL,
@@ -241,7 +264,7 @@ CREATE TABLE IF NOT EXISTS public.message_templates (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 14. TABELA DE INTEGRAÇÕES (GOOGLE CALENDAR, WHATSAPP, WEBHOOKS)
+-- 15. TABELA DE INTEGRAÇÕES (GOOGLE CALENDAR, WHATSAPP, WEBHOOKS)
 CREATE TABLE IF NOT EXISTS public.integrations_config (
     id TEXT PRIMARY KEY,
     teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
@@ -252,11 +275,36 @@ CREATE TABLE IF NOT EXISTS public.integrations_config (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- 16. VIEW 'invoices' COMPATÍVEL
+CREATE OR REPLACE VIEW public.invoices AS
+SELECT 
+    id,
+    teacher_id AS "teacherId",
+    student_id AS "studentId",
+    student_name AS "studentName",
+    student_phone AS "studentPhone",
+    student_email AS "studentEmail",
+    service_or_plan_name AS "serviceOrPlanName",
+    amount,
+    due_date AS "dueDate",
+    paid_at AS "paidAt",
+    status,
+    method,
+    pix_code AS "pixCode",
+    payment_link_url AS "paymentLinkUrl",
+    installments,
+    notes,
+    created_at AS "createdAt",
+    updated_at AS "updatedAt"
+FROM public.payments;
+
 -- ==========================================================
--- ÍNDICES DE ALTA PERFORMANCE (PERFORMANCE TUNING)
+-- ÍNDICES DE PERFORMANCE
 -- ==========================================================
 CREATE INDEX IF NOT EXISTS idx_services_teacher ON public.services(teacher_id);
 CREATE INDEX IF NOT EXISTS idx_students_teacher ON public.students(teacher_id);
+CREATE INDEX IF NOT EXISTS idx_system_users_email ON public.system_users(email);
+CREATE INDEX IF NOT EXISTS idx_system_users_role ON public.system_users(role);
 CREATE INDEX IF NOT EXISTS idx_appointments_teacher_date ON public.appointments(teacher_id, date);
 CREATE INDEX IF NOT EXISTS idx_appointments_status ON public.appointments(status);
 CREATE INDEX IF NOT EXISTS idx_payments_teacher_status ON public.payments(teacher_id, status);
@@ -266,11 +314,12 @@ CREATE INDEX IF NOT EXISTS idx_testimonials_teacher ON public.testimonials(teach
 CREATE INDEX IF NOT EXISTS idx_reminders_teacher ON public.reminders(teacher_id, completed);
 
 -- ==========================================================
--- ROW LEVEL SECURITY (RLS) - POLÍTICAS DE SEGURANÇA E ACESSO
+-- ROW LEVEL SECURITY (RLS)
 -- ==========================================================
 ALTER TABLE public.teachers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.services ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.system_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.services ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.appointments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.videos ENABLE ROW LEVEL SECURITY;
@@ -283,72 +332,39 @@ ALTER TABLE public.reminders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.message_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.integrations_config ENABLE ROW LEVEL SECURITY;
 
--- Limpeza de políticas prévias
-DO $$ 
-DECLARE 
-  tbl text;
-BEGIN
-  FOR tbl IN 
-    SELECT tablename FROM pg_tables WHERE schemaname = 'public'
-  LOOP
-    EXECUTE format('DROP POLICY IF EXISTS "Public read %I" ON public.%I', tbl, tbl);
-    EXECUTE format('DROP POLICY IF EXISTS "Public insert %I" ON public.%I', tbl, tbl);
-    EXECUTE format('DROP POLICY IF EXISTS "Authenticated manage %I" ON public.%I', tbl, tbl);
-    EXECUTE format('DROP POLICY IF EXISTS "Anon manage %I" ON public.%I', tbl, tbl);
-  END LOOP;
-END $$;
-
--- 1. TABELAS PÚBLICAS PARA LEITURA (Landing page e Apresentação)
+-- Políticas universais de leitura e gestão com fallback para demo/anon
 CREATE POLICY "Public read teachers" ON public.teachers FOR SELECT USING (true);
-CREATE POLICY "Authenticated manage teachers" ON public.teachers FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Anon manage teachers" ON public.teachers FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "Manage teachers" ON public.teachers FOR ALL USING (true) WITH CHECK (true);
 
 CREATE POLICY "Public read services" ON public.services FOR SELECT USING (true);
-CREATE POLICY "Authenticated manage services" ON public.services FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Anon manage services" ON public.services FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "Manage services" ON public.services FOR ALL USING (true) WITH CHECK (true);
 
 CREATE POLICY "Public read videos" ON public.videos FOR SELECT USING (true);
-CREATE POLICY "Authenticated manage videos" ON public.videos FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Anon manage videos" ON public.videos FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "Manage videos" ON public.videos FOR ALL USING (true) WITH CHECK (true);
 
 CREATE POLICY "Public read photos" ON public.photos FOR SELECT USING (true);
-CREATE POLICY "Authenticated manage photos" ON public.photos FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Anon manage photos" ON public.photos FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "Manage photos" ON public.photos FOR ALL USING (true) WITH CHECK (true);
 
 CREATE POLICY "Public read testimonials" ON public.testimonials FOR SELECT USING (true);
-CREATE POLICY "Authenticated manage testimonials" ON public.testimonials FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Anon manage testimonials" ON public.testimonials FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "Manage testimonials" ON public.testimonials FOR ALL USING (true) WITH CHECK (true);
 
 CREATE POLICY "Public read curriculum_items" ON public.curriculum_items FOR SELECT USING (true);
-CREATE POLICY "Authenticated manage curriculum_items" ON public.curriculum_items FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Anon manage curriculum_items" ON public.curriculum_items FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "Manage curriculum_items" ON public.curriculum_items FOR ALL USING (true) WITH CHECK (true);
 
 CREATE POLICY "Public read faqs" ON public.faqs FOR SELECT USING (true);
-CREATE POLICY "Authenticated manage faqs" ON public.faqs FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Anon manage faqs" ON public.faqs FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "Manage faqs" ON public.faqs FOR ALL USING (true) WITH CHECK (true);
 
 CREATE POLICY "Public read pricing_plans" ON public.pricing_plans FOR SELECT USING (true);
-CREATE POLICY "Authenticated manage pricing_plans" ON public.pricing_plans FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Anon manage pricing_plans" ON public.pricing_plans FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "Manage pricing_plans" ON public.pricing_plans FOR ALL USING (true) WITH CHECK (true);
 
--- 2. TABELAS DE FLUXO DE AGENDAMENTO (Público pode inserir, professor autenticado gerencia tudo)
 CREATE POLICY "Public insert students" ON public.students FOR INSERT WITH CHECK (true);
-CREATE POLICY "Authenticated manage students" ON public.students FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Anon manage students" ON public.students FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "Manage students" ON public.students FOR ALL USING (true) WITH CHECK (true);
 
 CREATE POLICY "Public insert appointments" ON public.appointments FOR INSERT WITH CHECK (true);
-CREATE POLICY "Authenticated manage appointments" ON public.appointments FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Anon manage appointments" ON public.appointments FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "Manage appointments" ON public.appointments FOR ALL USING (true) WITH CHECK (true);
 
--- 3. TABELAS PRIVADAS DO PROFESSOR (Financeiro, Lembretes, Mensagens, Integrações)
-CREATE POLICY "Authenticated manage payments" ON public.payments FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Anon manage payments" ON public.payments FOR ALL TO anon USING (true) WITH CHECK (true);
-
-CREATE POLICY "Authenticated manage reminders" ON public.reminders FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Anon manage reminders" ON public.reminders FOR ALL TO anon USING (true) WITH CHECK (true);
-
-CREATE POLICY "Authenticated manage message_templates" ON public.message_templates FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Anon manage message_templates" ON public.message_templates FOR ALL TO anon USING (true) WITH CHECK (true);
-
-CREATE POLICY "Authenticated manage integrations_config" ON public.integrations_config FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Anon manage integrations_config" ON public.integrations_config FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "Manage payments" ON public.payments FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Manage system_users" ON public.system_users FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Manage reminders" ON public.reminders FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Manage message_templates" ON public.message_templates FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Manage integrations_config" ON public.integrations_config FOR ALL USING (true) WITH CHECK (true);

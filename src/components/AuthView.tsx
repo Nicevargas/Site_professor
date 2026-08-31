@@ -14,11 +14,13 @@ import {
   ArrowRight,
   GraduationCap,
   Phone,
-  Check
+  Check,
+  Headphones,
+  Users
 } from 'lucide-react';
 import { supabaseService } from '../services/supabaseService';
 import { isSupabaseConfigured } from '../lib/supabase';
-import { AuthUser, TeacherProfile } from '../types';
+import { AuthUser, TeacherProfile, UserRole } from '../types';
 
 interface AuthViewProps {
   currentTeacher: TeacherProfile;
@@ -31,6 +33,7 @@ interface LocalRegisteredUser {
   name: string;
   email: string;
   passwordHash: string;
+  role: UserRole;
   specialty?: string;
   whatsapp?: string;
 }
@@ -47,6 +50,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [role, setRole] = useState<UserRole>('professor');
   const [specialty, setSpecialty] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -106,6 +110,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
             id: found.id,
             email: found.email,
             name: found.name,
+            role: found.role || 'professor',
             avatarUrl: currentTeacher.avatarUrl,
             isDemo: false,
           }, {
@@ -117,19 +122,53 @@ export const AuthView: React.FC<AuthViewProps> = ({
           return;
         }
 
-        // Check if matching default demo teacher
-        if (cleanEmail === currentTeacher.email.toLowerCase() || cleanEmail === 'curtatche@gmail.com' || cleanEmail === 'admin@professor.com' || cleanEmail.includes('@')) {
+        // Check if admin or known demo logins
+        if (cleanEmail.includes('admin')) {
           onLoginSuccess({
-            id: currentTeacher.id,
+            id: 'user-admin-1',
             email: cleanEmail,
-            name: currentTeacher.name,
-            avatarUrl: currentTeacher.avatarUrl,
+            name: 'Administrador Geral',
+            role: 'admin',
+            avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
             isDemo: true,
           });
           return;
         }
 
-        setErrorMessage('Nenhuma conta encontrada com este e-mail. Por favor, faça seu cadastro na aba "Criar Conta".');
+        if (cleanEmail.includes('secretaria') || cleanEmail.includes('assist')) {
+          onLoginSuccess({
+            id: 'user-assist-1',
+            email: cleanEmail,
+            name: 'Camila Fernandes (Secretaria)',
+            role: 'assistente',
+            avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+            isDemo: true,
+          });
+          return;
+        }
+
+        if (cleanEmail.includes('mariana') || cleanEmail.includes('aluno')) {
+          onLoginSuccess({
+            id: 'std-1',
+            email: cleanEmail,
+            name: 'Mariana Costa (Aluna)',
+            role: 'aluno',
+            studentId: 'std-1',
+            avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBBK4ZdjGlXcYUkNbEPgBCJ2ybOX87uTuhEIW-bh1S_6aUuhw3LbpojczkFt7hLMuVkBrvtmonkTNLYDBnpXnY8VeoyWHUzo9lTl7o4AYZV53TqGGXbGuc3CVUOLKbpGRa80w_0YcCGtnYeuP97M5S1TuGnG5L72vqotjZDwMVDIWF9N7shtJ2fI_9L2OOOUCTYfgP1vQF4Vjms-_6o4t7L90jfsLMghpGEespEMyKNBXoQr7B-RD-cww',
+            isDemo: true,
+          });
+          return;
+        }
+
+        // Default match teacher
+        onLoginSuccess({
+          id: currentTeacher.id,
+          email: cleanEmail,
+          name: currentTeacher.name,
+          role: 'professor',
+          avatarUrl: currentTeacher.avatarUrl,
+          isDemo: true,
+        });
       }, 500);
       return;
     }
@@ -140,10 +179,12 @@ export const AuthView: React.FC<AuthViewProps> = ({
     if (error) {
       setErrorMessage(error);
     } else if (data?.user) {
+      const userRole = (data.user.user_metadata?.role as UserRole) || 'professor';
       onLoginSuccess({
         id: data.user.id,
         email: data.user.email || cleanEmail,
         name: data.user.user_metadata?.full_name || currentTeacher.name,
+        role: userRole,
         avatarUrl: currentTeacher.avatarUrl,
         isDemo: false,
       });
@@ -184,13 +225,14 @@ export const AuthView: React.FC<AuthViewProps> = ({
       return;
     }
 
-    const newUserId = 'prof-user-' + Date.now();
+    const newUserId = 'user-' + Date.now();
     const newUser: LocalRegisteredUser = {
       id: newUserId,
       name: cleanName,
       email: cleanEmail,
       passwordHash: password,
-      specialty: specialty.trim() || 'Professor Especialista',
+      role: role,
+      specialty: specialty.trim() || (role === 'professor' ? 'Professor Especialista' : undefined),
       whatsapp: whatsapp.trim() || currentTeacher.whatsapp,
     };
     currentUsers.push(newUser);
@@ -199,18 +241,19 @@ export const AuthView: React.FC<AuthViewProps> = ({
     if (!isSupabaseConfigured) {
       setTimeout(() => {
         setIsLoading(false);
-        setSuccessMessage('Cadastro de professor realizado com sucesso! Acessando painel...');
+        setSuccessMessage(`Cadastro de ${role} realizado com sucesso! Acessando painel...`);
         setTimeout(() => {
           onLoginSuccess({
             id: newUserId,
             email: cleanEmail,
             name: cleanName,
+            role: role,
             avatarUrl: currentTeacher.avatarUrl,
             isDemo: false,
           }, {
             name: cleanName,
             email: cleanEmail,
-            specialty: specialty.trim() || 'Professor Especialista',
+            specialty: specialty.trim() || currentTeacher.specialty,
             whatsapp: whatsapp.trim() || currentTeacher.whatsapp,
           });
         }, 800);
@@ -229,6 +272,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
           id: data.user.id,
           email: data.user.email || cleanEmail,
           name: cleanName,
+          role: role,
           avatarUrl: currentTeacher.avatarUrl,
           isDemo: false,
         }, {
@@ -274,12 +318,14 @@ export const AuthView: React.FC<AuthViewProps> = ({
     }
   };
 
-  const handleQuickDemoLogin = () => {
+  const loginAs = (userRole: UserRole, userEmail: string, userName: string, avatar: string, studentId?: string) => {
     onLoginSuccess({
-      id: currentTeacher.id,
-      email: currentTeacher.email,
-      name: currentTeacher.name,
-      avatarUrl: currentTeacher.avatarUrl,
+      id: `demo-${userRole}`,
+      email: userEmail,
+      name: userName,
+      role: userRole,
+      avatarUrl: avatar,
+      studentId: studentId,
       isDemo: true,
     });
   };
@@ -287,7 +333,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#091426] via-[#0d213a] to-[#003844] text-white flex flex-col justify-between p-4 md:p-8">
       {/* Top Header */}
-      <div className="max-w-5xl mx-auto w-full flex flex-col sm:flex-row justify-between items-center gap-3 pb-6">
+      <div className="max-w-5xl mx-auto w-full flex flex-col sm:flex-row justify-between items-center gap-3 pb-4">
         <button
           onClick={onBackToPublicSite}
           className="flex items-center gap-2 text-xs md:text-sm font-medium text-slate-300 hover:text-white bg-white/10 hover:bg-white/15 px-4 py-2 rounded-xl backdrop-blur-md transition-all shadow-xs"
@@ -298,44 +344,33 @@ export const AuthView: React.FC<AuthViewProps> = ({
 
         <div className="flex items-center gap-2 text-xs text-cyan-300 font-semibold bg-cyan-950/70 border border-cyan-800/80 px-3.5 py-1.5 rounded-full shadow-xs">
           <ShieldCheck className="w-4 h-4 text-cyan-400" />
-          <span>Área Administrativa Restrita • Acesso Autenticado</span>
+          <span>Acesso Multi-usuário com RBAC (Supabase + RLS)</span>
         </div>
       </div>
 
       {/* Main Form Container */}
-      <div className="max-w-lg w-full mx-auto bg-white/95 text-slate-900 rounded-3xl p-6 md:p-9 shadow-2xl backdrop-blur-xl border border-white/20 animate-in fade-in zoom-in-95 duration-200 my-auto">
+      <div className="max-w-lg w-full mx-auto bg-white/95 text-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl backdrop-blur-xl border border-white/20 animate-in fade-in zoom-in-95 duration-200 my-auto space-y-5">
         
         {/* Brand Header */}
-        <div className="text-center space-y-2 mb-6">
-          <div className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: primaryColor }}>
-            <Lock className="w-7 h-7" />
+        <div className="text-center space-y-1.5">
+          <div className="w-12 h-12 rounded-2xl mx-auto flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: primaryColor }}>
+            <Lock className="w-6 h-6" />
           </div>
           <h1 className="text-2xl font-black text-[#091426] tracking-tight">
-            {tab === 'login' && 'Entrar na Área do Professor'}
-            {tab === 'signup' && 'Cadastrar Novo Professor'}
-            {tab === 'forgot' && 'Recuperar Senha de Acesso'}
+            {tab === 'login' && 'Entrar no Sistema'}
+            {tab === 'signup' && 'Criar Conta de Acesso'}
+            {tab === 'forgot' && 'Recuperar Senha'}
           </h1>
-          <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
-            {tab === 'login' && 'Área restrita e segura para gerenciar agenda, alunos, relatórios financeiros e configurações do site.'}
-            {tab === 'signup' && 'Crie seu login e senha para gerenciar suas aulas e personalizar seu site oficial de agendamentos.'}
-            {tab === 'forgot' && 'Informe seu e-mail cadastrado para receber o link de redefinição de senha.'}
+          <p className="text-xs text-slate-600 max-w-sm mx-auto">
+            {tab === 'login' && 'Acesse com seu e-mail e senha correspondente ao seu nível de permissão.'}
+            {tab === 'signup' && 'Cadastre-se como Professor, Assistente ou Aluno com painel customizado.'}
+            {tab === 'forgot' && 'Informe seu e-mail cadastrado para redefinir sua senha com segurança.'}
           </p>
         </div>
 
-        {/* Informative Security Banner */}
-        <div className="mb-5 p-3 rounded-2xl bg-cyan-50 border border-cyan-200/80 text-cyan-950 text-xs flex items-center gap-2.5">
-          <div className="p-1 rounded-lg bg-cyan-200/70 text-[#00687a] shrink-0">
-            <Check className="w-3.5 h-3.5 font-bold" />
-          </div>
-          <p className="text-[11px] leading-tight text-cyan-900">
-            <strong>Site do profissional:</strong> Livre e aberto para alunos agendarem. <br />
-            <strong>Painel de Gestão:</strong> Acesso protegido apenas com login e senha.
-          </p>
-        </div>
-
-        {/* Tab Switcher (if not in forgot mode) */}
+        {/* Tab Switcher */}
         {tab !== 'forgot' && (
-          <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
+          <div className="flex bg-slate-100 p-1 rounded-xl">
             <button
               type="button"
               onClick={() => {
@@ -343,7 +378,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                 setErrorMessage(null);
                 setSuccessMessage(null);
               }}
-              className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
                 tab === 'login' 
                   ? 'bg-white text-[#091426] shadow-xs' 
                   : 'text-slate-500 hover:text-slate-800'
@@ -358,7 +393,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                 setErrorMessage(null);
                 setSuccessMessage(null);
               }}
-              className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
                 tab === 'signup' 
                   ? 'bg-white text-[#091426] shadow-xs' 
                   : 'text-slate-500 hover:text-slate-800'
@@ -371,14 +406,14 @@ export const AuthView: React.FC<AuthViewProps> = ({
 
         {/* Notification alerts */}
         {errorMessage && (
-          <div className="mb-5 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2.5">
+          <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2.5">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{errorMessage}</span>
           </div>
         )}
 
         {successMessage && (
-          <div className="mb-5 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-start gap-2.5">
+          <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-start gap-2.5">
             <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
             <span>{successMessage}</span>
           </div>
@@ -386,7 +421,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
 
         {/* TAB 1: LOGIN */}
         {tab === 'login' && (
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-3.5">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">E-mail Cadastrado</label>
               <div className="relative">
@@ -395,9 +430,9 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="seu-email@exemplo.com"
+                  placeholder="admin@... ou roberto@... ou mariana@..."
                   required
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-[#00687a] focus:ring-1 focus:ring-[#00687a]"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:border-[#00687a] focus:ring-1 focus:ring-[#00687a]"
                 />
               </div>
             </div>
@@ -412,7 +447,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                     setErrorMessage(null);
                     setSuccessMessage(null);
                   }}
-                  className="text-xs text-[#00687a] hover:underline font-semibold"
+                  className="text-[11px] text-[#00687a] hover:underline font-semibold"
                 >
                   Esqueci minha senha
                 </button>
@@ -425,7 +460,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-[#00687a] focus:ring-1 focus:ring-[#00687a]"
+                  className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:border-[#00687a] focus:ring-1 focus:ring-[#00687a]"
                 />
                 <button
                   type="button"
@@ -440,14 +475,14 @@ export const AuthView: React.FC<AuthViewProps> = ({
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 text-white font-bold rounded-xl text-sm shadow-md hover:opacity-95 transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-3 text-white font-bold rounded-xl text-xs shadow-md hover:opacity-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               style={{ backgroundColor: primaryColor }}
             >
               {isLoading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  <span>Entrar no Painel Administrativo</span>
+                  <span>Entrar no Sistema</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -455,56 +490,56 @@ export const AuthView: React.FC<AuthViewProps> = ({
           </form>
         )}
 
-        {/* TAB 2: SIGN UP / CADASTRO */}
+        {/* TAB 2: SIGN UP */}
         {tab === 'signup' && (
-          <form onSubmit={handleSignUp} className="space-y-3.5">
+          <form onSubmit={handleSignUp} className="space-y-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Nome Completo do Professor *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Nome Completo *</label>
               <div className="relative">
                 <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Ex: Prof. Matheus Silva"
+                  placeholder="Ex: Dra. Juliana Santos"
                   required
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-[#00687a] focus:ring-1 focus:ring-[#00687a]"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:border-[#00687a]"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Disciplina / Especialidade</label>
-                <div className="relative">
-                  <GraduationCap className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={specialty}
-                    onChange={(e) => setSpecialty(e.target.value)}
-                    placeholder="Ex: Matemática & Física"
-                    className="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-[#00687a] focus:ring-1 focus:ring-[#00687a]"
-                  />
-                </div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Nível de Acesso (Cargo) *</label>
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as UserRole)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none"
+                >
+                  <option value="professor">🎓 Professor / Mentor</option>
+                  <option value="assistente">📋 Secretaria / Assistente</option>
+                  <option value="aluno">🎒 Aluno / Cliente</option>
+                  <option value="admin">👑 Administrador Geral</option>
+                </select>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">WhatsApp de Contato</label>
                 <div className="relative">
-                  <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     value={whatsapp}
                     onChange={(e) => setWhatsapp(e.target.value)}
-                    placeholder="5511999998888"
-                    className="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-[#00687a] focus:ring-1 focus:ring-[#00687a]"
+                    placeholder="11999998888"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:border-[#00687a]"
                   />
                 </div>
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">E-mail Profissional (Login) *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">E-mail de Login *</label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
@@ -513,73 +548,54 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="seu-email@exemplo.com"
                   required
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-[#00687a] focus:ring-1 focus:ring-[#00687a]"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:border-[#00687a]"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Senha (Mín. 6 dígitos) *</label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    minLength={6}
-                    className="w-full pl-10 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-[#00687a] focus:ring-1 focus:ring-[#00687a]"
-                  />
-                </div>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none"
+                />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Confirmar Senha *</label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    minLength={6}
-                    className="w-full pl-10 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-[#00687a] focus:ring-1 focus:ring-[#00687a]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none"
+                />
               </div>
             </div>
 
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 text-white font-bold rounded-xl text-sm shadow-md hover:opacity-95 transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-2.5 text-white font-bold rounded-xl text-xs shadow-md hover:opacity-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-1"
               style={{ backgroundColor: primaryColor }}
             >
-              {isLoading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  <span>Criar Cadastro e Acessar Painel</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
+              <span>Criar Conta e Acessar</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
           </form>
         )}
 
         {/* TAB 3: FORGOT PASSWORD */}
         {tab === 'forgot' && (
-          <form onSubmit={handleResetPassword} className="space-y-4">
+          <form onSubmit={handleResetPassword} className="space-y-3.5">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">E-mail Cadastrado</label>
               <div className="relative">
@@ -590,7 +606,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="seu-email@exemplo.com"
                   required
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:border-[#00687a] focus:ring-1 focus:ring-[#00687a]"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none"
                 />
               </div>
             </div>
@@ -598,54 +614,103 @@ export const AuthView: React.FC<AuthViewProps> = ({
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 text-white font-bold rounded-xl text-sm shadow-md hover:opacity-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-2.5 text-white font-bold rounded-xl text-xs shadow-md hover:opacity-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               style={{ backgroundColor: primaryColor }}
             >
-              {isLoading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  <KeyRound className="w-4 h-4" />
-                  <span>Enviar Link de Redefinição</span>
-                </>
-              )}
+              <KeyRound className="w-4 h-4" />
+              <span>Enviar Link de Redefinição</span>
             </button>
 
             <button
               type="button"
-              onClick={() => {
-                setTab('login');
-                setErrorMessage(null);
-                setSuccessMessage(null);
-              }}
-              className="w-full py-2.5 text-slate-600 hover:text-slate-900 text-xs font-semibold rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors"
+              onClick={() => setTab('login')}
+              className="w-full py-2 text-slate-600 hover:text-slate-900 text-xs font-bold rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors"
             >
               Voltar ao Login
             </button>
           </form>
         )}
 
-        {/* Quick Demo Access Strip */}
-        <div className="mt-6 pt-5 border-t border-slate-100 text-center space-y-2">
-          <p className="text-[11px] text-slate-400">
-            Ambiente de Demonstração / Testes Rápidos:
-          </p>
-          <button
-            type="button"
-            onClick={handleQuickDemoLogin}
-            className="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span>Acessar com Perfil de Demonstração Rápido</span>
-          </button>
+        {/* 1-CLICK QUICK ACCESS BY ROLES (DEMO STRIP) */}
+        <div className="pt-4 border-t border-slate-100 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Acesso Rápido por Perfil (1 Clique)</span>
+            <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Multi-níveis</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-left">
+            <button
+              type="button"
+              onClick={() => loginAs('admin', 'admin@agendaprofessor.com.br', 'Admin Geral (Diretoria)', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80')}
+              className="p-2.5 rounded-xl border border-amber-200 bg-amber-50/60 hover:bg-amber-100/80 transition-all group"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-amber-600 text-white flex items-center justify-center font-bold text-xs">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-bold text-xs text-amber-900 truncate">👑 Admin Geral</p>
+                  <p className="text-[10px] text-amber-700 truncate">Acesso total irrestrito</p>
+                </div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => loginAs('professor', currentTeacher.email, currentTeacher.name, currentTeacher.avatarUrl)}
+              className="p-2.5 rounded-xl border border-cyan-200 bg-cyan-50/60 hover:bg-cyan-100/80 transition-all group"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-[#00687a] text-white flex items-center justify-center font-bold text-xs">
+                  <GraduationCap className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-bold text-xs text-cyan-950 truncate">🎓 Prof. Roberto</p>
+                  <p className="text-[10px] text-cyan-700 truncate">Agenda & Aulas</p>
+                </div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => loginAs('assistente', 'secretaria@agendaprofessor.com.br', 'Camila Fernandes (Secretaria)', 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80')}
+              className="p-2.5 rounded-xl border border-purple-200 bg-purple-50/60 hover:bg-purple-100/80 transition-all group"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-purple-600 text-white flex items-center justify-center font-bold text-xs">
+                  <Headphones className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-bold text-xs text-purple-900 truncate">📋 Secretaria</p>
+                  <p className="text-[10px] text-purple-700 truncate">Agenda & Atendimento</p>
+                </div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => loginAs('aluno', 'mariana.costa@email.com', 'Mariana Costa (Aluna)', 'https://lh3.googleusercontent.com/aida-public/AB6AXuBBK4ZdjGlXcYUkNbEPgBCJ2ybOX87uTuhEIW-bh1S_6aUuhw3LbpojczkFt7hLMuVkBrvtmonkTNLYDBnpXnY8VeoyWHUzo9lTl7o4AYZV53TqGGXbGuc3CVUOLKbpGRa80w_0YcCGtnYeuP97M5S1TuGnG5L72vqotjZDwMVDIWF9N7shtJ2fI_9L2OOOUCTYfgP1vQF4Vjms-_6o4t7L90jfsLMghpGEespEMyKNBXoQr7B-RD-cww', 'std-1')}
+              className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/60 hover:bg-emerald-100/80 transition-all group"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">
+                  <Users className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-bold text-xs text-emerald-900 truncate">🎒 Mariana (Aluna)</p>
+                  <p className="text-[10px] text-emerald-700 truncate">Portal do Aluno & Pix</p>
+                </div>
+              </div>
+            </button>
+          </div>
         </div>
+
       </div>
 
       {/* Footer info */}
-      <div className="max-w-md mx-auto text-center text-xs text-slate-400 pt-4">
-        © {new Date().getFullYear()} Agenda do Professor • Sistema com autenticação protegida via Supabase & RLS
+      <div className="max-w-md mx-auto text-center text-xs text-slate-400 pt-3">
+        © {new Date().getFullYear()} Plataforma Multi-usuários • Proteção com Row Level Security (RLS)
       </div>
     </div>
   );
 };
-
