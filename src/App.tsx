@@ -67,6 +67,7 @@ import { dispatchAppointmentWebhook, dispatchFormWebhook } from './utils/webhook
 import { canAccessView, getDefaultView, canSwitchProfiles, canViewFinances, sanitizeSelfDeclaredRole } from './utils/permissions';
 import { StudentProfileView } from './components/StudentProfileView';
 import { hashFromView, viewFromHash } from './utils/routes';
+import { SyncErrorToast } from './components/SyncErrorToast';
 
 
 function AppInner() {
@@ -1129,6 +1130,8 @@ export function App() {
   return (
     <AccessibilityProvider>
       <AppInner />
+      {/* Aviso global quando uma gravação no Supabase falha (qualquer tela) */}
+      <SyncErrorToast />
     </AccessibilityProvider>
   );
 }

@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { syncResult, reportSyncError } from '../utils/syncNotifier';
 import { TeacherProfile, ServiceItem, Appointment, Student, Reminder, PaymentInvoice, TestimonialItem, CurriculumItem, PhotoItem, FaqItem } from '../types';
 
 export const supabaseService = {
@@ -106,10 +107,7 @@ export const supabaseService = {
         vacation_mode: teacher.vacationMode || { enabled: false },
         updated_at: new Date().toISOString(),
       });
-      if (error) {
-        console.warn('Erro ao salvar professor no Supabase:', error.message);
-        return false;
-      }
+      if (!syncResult(error, 'perfil do professor')) return false;
 
       // Segredos do n8n nunca vão para a tabela pública teachers
       if (teacher.n8nWebhookUrl || teacher.n8nAuthToken) {
@@ -126,6 +124,7 @@ export const supabaseService = {
       return true;
     } catch (err) {
       console.warn('Erro ao salvar professor no Supabase:', err);
+      reportSyncError('perfil do professor', err);
       return false;
     }
   },
@@ -172,9 +171,10 @@ export const supabaseService = {
         active: service.active ?? true,
         teacher_id: teacherId || 'prof-roberto',
       });
-      return !error;
+      return syncResult(error, 'serviço');
     } catch (err) {
       console.warn('Erro ao salvar serviço no Supabase:', err);
+      reportSyncError('serviço', err);
       return false;
     }
   },
@@ -186,8 +186,9 @@ export const supabaseService = {
     if (!isSupabaseConfigured || !supabase) return false;
     try {
       const { error } = await supabase.from('services').delete().eq('id', serviceId);
-      return !error;
+      return syncResult(error, 'exclusão do serviço');
     } catch (err) {
+      reportSyncError('exclusão do serviço', err);
       return false;
     }
   },
@@ -250,9 +251,10 @@ export const supabaseService = {
         notes: apt.notes || '',
         price: apt.price || 150,
       });
-      return !error;
+      return syncResult(error, 'agendamento');
     } catch (err) {
       console.warn('Erro ao salvar agendamento no Supabase:', err);
+      reportSyncError('agendamento', err);
       return false;
     }
   },
@@ -264,8 +266,9 @@ export const supabaseService = {
     if (!isSupabaseConfigured || !supabase) return false;
     try {
       const { error } = await supabase.from('appointments').delete().eq('id', appointmentId);
-      return !error;
+      return syncResult(error, 'exclusão do agendamento');
     } catch (err) {
+      reportSyncError('exclusão do agendamento', err);
       return false;
     }
   },
@@ -316,9 +319,10 @@ export const supabaseService = {
         status: student.status || 'Ativo',
         notes: student.notes || '',
       });
-      return !error;
+      return syncResult(error, 'aluno');
     } catch (err) {
       console.warn('Erro ao salvar aluno no Supabase:', err);
+      reportSyncError('aluno', err);
       return false;
     }
   },
@@ -359,8 +363,9 @@ export const supabaseService = {
         completed: Boolean(reminder.completed),
         delayed: Boolean(reminder.delayed),
       });
-      return !error;
+      return syncResult(error, 'lembrete');
     } catch (err) {
+      reportSyncError('lembrete', err);
       return false;
     }
   },
@@ -428,9 +433,10 @@ export const supabaseService = {
         notes: invoice.notes || '',
         updated_at: new Date().toISOString(),
       });
-      return !error;
+      return syncResult(error, 'cobrança');
     } catch (err) {
       console.warn('Erro ao salvar cobrança no Supabase:', err);
+      reportSyncError('cobrança', err);
       return false;
     }
   },
@@ -541,10 +547,10 @@ export const supabaseService = {
         tags: video.tags || [],
         updated_at: new Date().toISOString(),
       });
-      if (error) console.warn('Erro ao salvar vídeo no Supabase:', error.message);
-      return !error;
+      return syncResult(error, 'vídeo');
     } catch (err) {
       console.warn('Erro ao salvar vídeo no Supabase:', err);
+      reportSyncError('vídeo', err);
       return false;
     }
   },
@@ -556,8 +562,9 @@ export const supabaseService = {
     if (!isSupabaseConfigured || !supabase) return false;
     try {
       const { error } = await supabase.from('videos').delete().eq('id', id);
-      return !error;
+      return syncResult(error, 'exclusão do vídeo');
     } catch {
+      reportSyncError('exclusão do vídeo', 'falha de rede ou de conexão');
       return false;
     }
   },
@@ -624,10 +631,10 @@ export const supabaseService = {
         featured: Boolean(item.featured),
         updated_at: new Date().toISOString(),
       });
-      if (error) console.warn('Erro ao salvar depoimento no Supabase:', error.message);
-      return !error;
+      return syncResult(error, 'depoimento');
     } catch (err) {
       console.warn('Erro ao salvar depoimento no Supabase:', err);
+      reportSyncError('depoimento', err);
       return false;
     }
   },
@@ -636,8 +643,9 @@ export const supabaseService = {
     if (!isSupabaseConfigured || !supabase) return false;
     try {
       const { error } = await supabase.from('testimonials').delete().eq('id', id);
-      return !error;
+      return syncResult(error, 'exclusão do depoimento');
     } catch {
+      reportSyncError('exclusão do depoimento', 'falha de rede ou de conexão');
       return false;
     }
   },
@@ -659,10 +667,10 @@ export const supabaseService = {
         skills: item.skills || [],
         updated_at: new Date().toISOString(),
       });
-      if (error) console.warn('Erro ao salvar item do currículo no Supabase:', error.message);
-      return !error;
+      return syncResult(error, 'item do currículo');
     } catch (err) {
       console.warn('Erro ao salvar item do currículo no Supabase:', err);
+      reportSyncError('item do currículo', err);
       return false;
     }
   },
@@ -671,8 +679,9 @@ export const supabaseService = {
     if (!isSupabaseConfigured || !supabase) return false;
     try {
       const { error } = await supabase.from('curriculum_items').delete().eq('id', id);
-      return !error;
+      return syncResult(error, 'exclusão do item do currículo');
     } catch {
+      reportSyncError('exclusão do item do currículo', 'falha de rede ou de conexão');
       return false;
     }
   },
@@ -693,10 +702,10 @@ export const supabaseService = {
         date: item.date || null,
         updated_at: new Date().toISOString(),
       });
-      if (error) console.warn('Erro ao salvar foto no Supabase:', error.message);
-      return !error;
+      return syncResult(error, 'foto');
     } catch (err) {
       console.warn('Erro ao salvar foto no Supabase:', err);
+      reportSyncError('foto', err);
       return false;
     }
   },
@@ -705,8 +714,9 @@ export const supabaseService = {
     if (!isSupabaseConfigured || !supabase) return false;
     try {
       const { error } = await supabase.from('photos').delete().eq('id', id);
-      return !error;
+      return syncResult(error, 'exclusão da foto');
     } catch {
+      reportSyncError('exclusão da foto', 'falha de rede ou de conexão');
       return false;
     }
   },
@@ -726,10 +736,10 @@ export const supabaseService = {
         featured: Boolean(item.featured),
         updated_at: new Date().toISOString(),
       });
-      if (error) console.warn('Erro ao salvar pergunta no Supabase:', error.message);
-      return !error;
+      return syncResult(error, 'pergunta do FAQ');
     } catch (err) {
       console.warn('Erro ao salvar pergunta no Supabase:', err);
+      reportSyncError('pergunta do FAQ', err);
       return false;
     }
   },
@@ -738,8 +748,9 @@ export const supabaseService = {
     if (!isSupabaseConfigured || !supabase) return false;
     try {
       const { error } = await supabase.from('faqs').delete().eq('id', id);
-      return !error;
+      return syncResult(error, 'exclusão da pergunta do FAQ');
     } catch {
+      reportSyncError('exclusão da pergunta do FAQ', 'falha de rede ou de conexão');
       return false;
     }
   },
@@ -957,9 +968,10 @@ export const supabaseService = {
         ],
         updated_at: new Date().toISOString(),
       });
-      return !error;
+      return syncResult(error, 'usuário');
     } catch (err) {
       console.warn('Erro ao salvar usuário no sistema:', err);
+      reportSyncError('usuário', err);
       return false;
     }
   },
