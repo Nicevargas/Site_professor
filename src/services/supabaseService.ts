@@ -612,6 +612,17 @@ export const supabaseService = {
     }
   },
 
+  async deleteInvoice(id: string): Promise<boolean> {
+    if (!isSupabaseConfigured || !supabase) return false;
+    try {
+      const { error } = await supabase.from('payments').delete().eq('id', id);
+      return syncResult(error, 'exclusão da cobrança');
+    } catch (err) {
+      reportSyncError('exclusão da cobrança', err);
+      return false;
+    }
+  },
+
   /**
    * Depoimentos: gravar / remover
    */

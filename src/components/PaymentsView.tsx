@@ -35,7 +35,8 @@ import {
   TrendingUp,
   Receipt,
   ArrowUpRight,
-  RefreshCw
+  RefreshCw,
+  Trash2
 } from 'lucide-react';
 
 interface PaymentsViewProps {
@@ -717,6 +718,16 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
                               Reabrir
                             </button>
                           )}
+
+                          {/* Excluir cobrança (pede confirmação) */}
+                          <button
+                            onClick={() => handleDeleteInvoice(inv.id)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            title="Excluir cobrança"
+                            aria-label={`Excluir cobrança de ${inv.studentName}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>

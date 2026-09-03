@@ -94,6 +94,22 @@ describe('financeiro', () => {
     expect(reopened.paidAt).toBeUndefined();
   });
 
+  it('excluir pede confirmação e remove só a cobrança escolhida', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const { onUpdateInvoices } = renderPayments();
+    fireEvent.click(screen.getByRole('button', { name: /excluir cobrança de ana lima/i }));
+    expect(window.confirm).toHaveBeenCalledTimes(1);
+    const updated: PaymentInvoice[] = onUpdateInvoices.mock.calls[0][0];
+    expect(updated.map((inv) => inv.id)).toEqual(['inv-pago', 'inv-pend']);
+  });
+
+  it('excluir cancelado não altera nada', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const { onUpdateInvoices } = renderPayments();
+    fireEvent.click(screen.getByRole('button', { name: /excluir cobrança de ana lima/i }));
+    expect(onUpdateInvoices).not.toHaveBeenCalled();
+  });
+
   it('filtrar por vencidas mostra só a cobrança em atraso', () => {
     renderPayments();
     fireEvent.click(screen.getByText(/vencidas \(1\)/i));

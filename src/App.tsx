@@ -700,6 +700,30 @@ function AppInner() {
     setIsNewAppointmentOpen(true);
   };
 
+  // Cobranças: a tela financeira devolve a lista do professor atual; aqui ela é
+  // mesclada com as dos outros professores e as diferenças são gravadas no banco
+  const handleUpdateInvoices = (nextForTeacher: PaymentInvoice[]) => {
+    const scoped = nextForTeacher.map((inv) => ({ ...inv, teacherId: inv.teacherId || currentTeacher.id }));
+    const previous = allInvoices.filter((inv) => !inv.teacherId || inv.teacherId === currentTeacher.id);
+    const nextIds = new Set(scoped.map((inv) => inv.id));
+
+    previous
+      .filter((inv) => !nextIds.has(inv.id))
+      .forEach((inv) => supabaseService.deleteInvoice(inv.id));
+
+    scoped
+      .filter((inv) => {
+        const before = previous.find((p) => p.id === inv.id);
+        return !before || JSON.stringify(before) !== JSON.stringify(inv);
+      })
+      .forEach((inv) => supabaseService.saveInvoice(inv, currentTeacher.id));
+
+    setAllInvoices((prev) => [
+      ...scoped,
+      ...prev.filter((inv) => inv.teacherId && inv.teacherId !== currentTeacher.id),
+    ]);
+  };
+
   // Public Booking Flow
   const handleStartBookingFromLanding = (serviceId?: string) => {
     setBookingServiceId(serviceId);
@@ -961,7 +985,7 @@ function AppInner() {
               students={students}
               services={services}
               currentTeacher={currentTeacher}
-              onUpdateInvoices={setAllInvoices}
+              onUpdateInvoices={handleUpdateInvoices}
               onUpdateTeacher={(updated) => {
                 setCurrentTeacher(updated);
                 setTeachers((prev) =>
