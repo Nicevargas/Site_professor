@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ServiceItem, Student, Appointment } from '../types';
-import { X, Calendar, Clock, Video, MapPin, Check } from 'lucide-react';
+import { X, AlertTriangle, CalendarClock } from 'lucide-react';
+import { toLocalDateKey } from '../utils/dates';
 
 interface NewAppointmentModalProps {
   isOpen: boolean;
@@ -9,7 +10,45 @@ interface NewAppointmentModalProps {
   students: Student[];
   onSave: (appointment: Appointment) => void;
   preSelectedStudent?: Student | null;
+  /** Agenda atual do professor, usada para impedir dois compromissos no mesmo horário */
+  existingAppointments?: Appointment[];
+  /** Quando informado, o formulário reagenda esta aula mantendo o mesmo id */
+  editingAppointment?: Appointment | null;
 }
+
+type Modality = 'Online (Zoom)' | 'Online (Google Meet)' | 'Presencial';
+
+export function toMinutes(time: string): number {
+  const [h, m] = time.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+export function addMinutes(time: string, minutes: number): string {
+  const total = toMinutes(time) + minutes;
+  return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
+/** Primeiro compromisso (aula ou bloqueio) que se sobrepõe ao candidato no mesmo dia. */
+export function findConflict(
+  candidate: { id?: string; date: string; startTime: string; endTime: string },
+  appointments: Appointment[]
+): Appointment | null {
+  const start = toMinutes(candidate.startTime);
+  const end = toMinutes(candidate.endTime);
+  return (
+    appointments.find(
+      (apt) =>
+        apt.id !== candidate.id &&
+        apt.date === candidate.date &&
+        apt.status !== 'Cancelado' &&
+        toMinutes(apt.startTime) < end &&
+        toMinutes(apt.endTime) > start
+    ) || null
+  );
+}
+
+const normalizeModality = (value?: string): Modality =>
+  value === 'Presencial' || value === 'Online (Google Meet)' ? value : 'Online (Zoom)';
 
 export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
   isOpen,
@@ -18,90 +57,143 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
   students,
   onSave,
   preSelectedStudent,
+  existingAppointments = [],
+  editingAppointment = null,
 }) => {
+  const [studentName, setStudentName] = useState('');
+  const [studentPhone, setStudentPhone] = useState('');
+  const [selectedServiceId, setSelectedServiceId] = useState(services[0]?.id || '');
+  const [date, setDate] = useState(toLocalDateKey(new Date()));
+  const [startTime, setStartTime] = useState('14:00');
+  const [modality, setModality] = useState<Modality>('Online (Zoom)');
+  const [notes, setNotes] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  // Ao abrir, carrega a aula em reagendamento ou o aluno pré-selecionado
+  useEffect(() => {
+    if (!isOpen) return;
+    setError(null);
+    if (editingAppointment) {
+      setStudentName(editingAppointment.studentName);
+      setStudentPhone(editingAppointment.studentPhone || '');
+      setSelectedServiceId(editingAppointment.serviceId || services[0]?.id || '');
+      setDate(editingAppointment.date);
+      setStartTime(editingAppointment.startTime);
+      setModality(normalizeModality(editingAppointment.modality));
+      setNotes(editingAppointment.notes || '');
+      return;
+    }
+    setStudentName(preSelectedStudent?.name || '');
+    setStudentPhone(preSelectedStudent?.phone || '');
+    setSelectedServiceId(services[0]?.id || '');
+    setDate(toLocalDateKey(new Date()));
+    setStartTime('14:00');
+    setModality('Online (Zoom)');
+    setNotes('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, editingAppointment?.id, preSelectedStudent?.id]);
+
   if (!isOpen) return null;
 
-  const [studentName, setStudentName] = useState(preSelectedStudent?.name || '');
-  const [studentPhone, setStudentPhone] = useState(preSelectedStudent?.phone || '');
-  const [selectedServiceId, setSelectedServiceId] = useState(services[0]?.id || '');
-  const [date, setDate] = useState('2024-11-15');
-  const [startTime, setStartTime] = useState('14:00');
-  const [modality, setModality] = useState<'Online (Zoom)' | 'Online (Google Meet)' | 'Presencial'>('Online (Zoom)');
-  const [notes, setNotes] = useState('');
-
   const selectedService = services.find((s) => s.id === selectedServiceId) || services[0];
+  const isReschedule = Boolean(editingAppointment);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!studentName.trim()) return;
+    if (!studentName.trim() || !selectedService) return;
 
-    const [h, m] = startTime.split(':').map(Number);
-    const duration = selectedService?.durationMinutes || 60;
-    const totalMinutes = h * 60 + m + duration;
-    const endH = String(Math.floor(totalMinutes / 60)).padStart(2, '0');
-    const endM = String(totalMinutes % 60).padStart(2, '0');
-    const endTime = `${endH}:${endM}`;
+    const duration = editingAppointment?.durationMinutes || selectedService.durationMinutes || 60;
+    const endTime = addMinutes(startTime, duration);
 
-    // Get day of week
-    const dayOfWeek = new Date(date).getDay();
+    const conflict = findConflict({ id: editingAppointment?.id, date, startTime, endTime }, existingAppointments);
+    if (conflict) {
+      const who = conflict.status === 'Bloqueado' ? 'um horário bloqueado' : `a aula de ${conflict.studentName}`;
+      setError(`Este horário choca com ${who} (${conflict.startTime} às ${conflict.endTime}). Escolha outro horário.`);
+      return;
+    }
 
-    const newApt: Appointment = {
-      id: `apt-${Date.now()}`,
+    // "T00:00:00" evita que a data volte um dia por causa do fuso horário
+    const dayOfWeek = new Date(`${date}T00:00:00`).getDay();
+    const knownStudent = students.find((s) => s.name.trim().toLowerCase() === studentName.trim().toLowerCase());
+
+    const appointment: Appointment = {
+      ...(editingAppointment || {}),
+      id: editingAppointment?.id || `apt-${Date.now()}`,
       studentName: studentName.trim(),
-      studentInitials: studentName.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase(),
-      studentPhone: studentPhone.trim() || '(11) 98765-4321',
+      studentInitials: studentName.trim().split(/\s+/).map((n) => n[0]).join('').slice(0, 2).toUpperCase(),
+      studentPhone: studentPhone.trim() || knownStudent?.phone || undefined,
+      studentEmail: editingAppointment?.studentEmail || knownStudent?.email || undefined,
+      studentAvatar: editingAppointment?.studentAvatar || knownStudent?.avatar || undefined,
       serviceId: selectedService.id,
       serviceName: selectedService.name,
       date,
-      dayOfWeek: isNaN(dayOfWeek) ? 3 : dayOfWeek,
+      dayOfWeek: isNaN(dayOfWeek) ? 1 : dayOfWeek,
       startTime,
       endTime,
       durationMinutes: duration,
       modality,
-      status: 'Confirmado',
-      notes: notes.trim() || 'Aula agendada pelo painel.',
-      clientSince: 'Cliente desde 2024',
-      price: selectedService.price,
+      status: editingAppointment?.status && editingAppointment.status !== 'Cancelado' ? editingAppointment.status : 'Confirmado',
+      notes: notes.trim() || undefined,
+      clientSince: editingAppointment?.clientSince || (knownStudent ? `Cliente desde ${knownStudent.joinedDate}` : undefined),
+      price: editingAppointment?.price ?? selectedService.price,
     };
 
-    onSave(newApt);
+    onSave(appointment);
     onClose();
   };
+
+  const inputClass = 'w-full p-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-[#00687a]';
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in">
       <div className="bg-white rounded-2xl max-w-lg w-full p-6 md:p-8 shadow-2xl border border-slate-200 relative">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-[#091426]">Novo Agendamento</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700">
+          <div>
+            <h2 className="text-xl font-bold text-[#091426]">{isReschedule ? 'Reagendar Aula' : 'Novo Agendamento'}</h2>
+            {isReschedule && editingAppointment && (
+              <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
+                <CalendarClock className="w-3.5 h-3.5" />
+                Antes: {editingAppointment.date.split('-').reverse().join('/')} às {editingAppointment.startTime}
+              </p>
+            )}
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700" aria-label="Fechar">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label htmlFor="apt-student" className="block text-xs font-semibold text-slate-700 mb-1">
               Nome do Aluno *
             </label>
             <input
+              id="apt-student"
               type="text"
               required
               value={studentName}
               onChange={(e) => setStudentName(e.target.value)}
               placeholder="Digite o nome do aluno"
-              className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-[#00687a]"
+              className={inputClass}
+              list="apt-student-options"
             />
+            <datalist id="apt-student-options">
+              {students.map((s) => (
+                <option key={s.id} value={s.name} />
+              ))}
+            </datalist>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor="apt-service" className="block text-xs font-semibold text-slate-700 mb-1">
                 Serviço / Modalidade *
               </label>
               <select
+                id="apt-service"
                 value={selectedServiceId}
                 onChange={(e) => setSelectedServiceId(e.target.value)}
-                className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-[#00687a]"
+                className={inputClass}
               >
                 {services.map((svc) => (
                   <option key={svc.id} value={svc.id}>
@@ -112,13 +204,14 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor="apt-modality" className="block text-xs font-semibold text-slate-700 mb-1">
                 Formato da Aula
               </label>
               <select
+                id="apt-modality"
                 value={modality}
-                onChange={(e) => setModality(e.target.value as any)}
-                className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-[#00687a]"
+                onChange={(e) => setModality(e.target.value as Modality)}
+                className={inputClass}
               >
                 <option value="Online (Zoom)">Online (Zoom)</option>
                 <option value="Online (Google Meet)">Online (Google Meet)</option>
@@ -129,38 +222,62 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Data</label>
+              <label htmlFor="apt-date" className="block text-xs font-semibold text-slate-700 mb-1">Data</label>
               <input
+                id="apt-date"
                 type="date"
+                required
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-[#00687a]"
+                onChange={(e) => { setDate(e.target.value); setError(null); }}
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Horário de Início</label>
+              <label htmlFor="apt-time" className="block text-xs font-semibold text-slate-700 mb-1">Horário de Início</label>
               <input
+                id="apt-time"
                 type="time"
+                required
                 value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-[#00687a]"
+                onChange={(e) => { setStartTime(e.target.value); setError(null); }}
+                className={inputClass}
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label htmlFor="apt-phone" className="block text-xs font-semibold text-slate-700 mb-1">WhatsApp do aluno</label>
+            <input
+              id="apt-phone"
+              type="tel"
+              value={studentPhone}
+              onChange={(e) => setStudentPhone(e.target.value)}
+              placeholder="(11) 90000-0000"
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="apt-notes" className="block text-xs font-semibold text-slate-700 mb-1">
               Observações / Metas
             </label>
             <textarea
+              id="apt-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
               placeholder="Notas da aula..."
-              className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-[#00687a]"
+              className={inputClass}
             />
           </div>
+
+          {error && (
+            <div role="alert" className="flex items-start gap-2 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
             <button
@@ -174,7 +291,7 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
               type="submit"
               className="px-6 py-2.5 bg-[#00687a] hover:bg-[#004e5c] text-white text-xs font-semibold rounded-xl shadow-xs"
             >
-              Confirmar Agendamento
+              {isReschedule ? 'Confirmar Reagendamento' : 'Confirmar Agendamento'}
             </button>
           </div>
         </form>

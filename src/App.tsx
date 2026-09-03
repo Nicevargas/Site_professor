@@ -67,8 +67,11 @@ import { dispatchAppointmentWebhook, dispatchFormWebhook } from './utils/webhook
 import { canAccessView, getDefaultView, canSwitchProfiles, canViewFinances, sanitizeSelfDeclaredRole } from './utils/permissions';
 import { StudentProfileView } from './components/StudentProfileView';
 import { hashFromView, viewFromHash } from './utils/routes';
+import { formatMonthYearPtBR } from './utils/dates';
 import { SyncErrorToast } from './components/SyncErrorToast';
 
+
+const DEFAULT_STUDENT_AVATAR = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80';
 
 function AppInner() {
   const { isInteractiveTourOpen, setIsInteractiveTourOpen, isTutorialHubOpen, setIsTutorialHubOpen } = useAccessibility();
@@ -537,20 +540,16 @@ function AppInner() {
   const [isWhatsApp8hModalOpen, setIsWhatsApp8hModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<ServiceItem | null>(null);
   const [preSelectedStudent, setPreSelectedStudent] = useState<Student | null>(null);
+  const [reschedulingAppointment, setReschedulingAppointment] = useState<Appointment | null>(null);
   const [bookingServiceId, setBookingServiceId] = useState<string | undefined>(undefined);
 
   // Reminder toggles
   const handleToggleReminder = (id: string) => {
-    setAllReminders((prev) =>
-      prev.map((rem) => {
-        if (rem.id === id) {
-          const updated = { ...rem, completed: !rem.completed };
-          supabaseService.saveReminder(updated, currentTeacher.id);
-          return updated;
-        }
-        return rem;
-      })
-    );
+    const target = allReminders.find((rem) => rem.id === id);
+    if (!target) return;
+    const updated = { ...target, completed: !target.completed };
+    setAllReminders((prev) => prev.map((rem) => (rem.id === id ? updated : rem)));
+    supabaseService.saveReminder(updated, currentTeacher.id);
   };
 
   const handleAddReminder = (title: string, dueDate: string) => {
@@ -572,26 +571,33 @@ function AppInner() {
       ...newApt,
       teacherId: currentTeacher.id,
     };
-    setAllAppointments((prev) => [scopedApt, ...prev]);
+    // Mesmo id = reagendamento: substitui em vez de duplicar
+    const isReschedule = allAppointments.some((apt) => apt.id === scopedApt.id);
+    setAllAppointments((prev) =>
+      isReschedule ? prev.map((apt) => (apt.id === scopedApt.id ? scopedApt : apt)) : [scopedApt, ...prev]
+    );
     supabaseService.saveAppointment(scopedApt, currentTeacher.id);
+    dispatchAppointmentWebhook(scopedApt, currentTeacher, isReschedule ? 'updated' : 'created');
+    setReschedulingAppointment(null);
+    if (isReschedule || scopedApt.status === 'Bloqueado') return;
 
-    // Background Webhook dispatch to n8n / integration server
-    dispatchAppointmentWebhook(scopedApt, currentTeacher, 'created');
-
-    // Also add student if not in list
-    if (!allStudents.some((s) => s.name.toLowerCase() === scopedApt.studentName.toLowerCase() && s.teacherId === currentTeacher.id)) {
+    // Aluno novo entra no CRM só com os dados reais informados, sem valores inventados
+    const alreadyKnown = allStudents.some(
+      (s) => s.name.trim().toLowerCase() === scopedApt.studentName.trim().toLowerCase() && (!s.teacherId || s.teacherId === currentTeacher.id)
+    );
+    if (!alreadyKnown) {
       const newStd: Student = {
         id: `std-${Date.now()}`,
         teacherId: currentTeacher.id,
         name: scopedApt.studentName,
-        email: scopedApt.studentEmail || `${scopedApt.studentName.toLowerCase().replace(/\s+/g, '.')}@email.com`,
-        phone: scopedApt.studentPhone || '(11) 98765-4321',
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-        joinedDate: 'Novembro 2024',
+        email: scopedApt.studentEmail || '',
+        phone: scopedApt.studentPhone || '',
+        avatar: DEFAULT_STUDENT_AVATAR,
+        joinedDate: formatMonthYearPtBR(new Date()),
         totalClasses: 1,
         status: 'Ativo',
         notes: scopedApt.notes,
-        lastClass: 'Hoje',
+        lastClass: scopedApt.date,
       };
       setAllStudents((prev) => [newStd, ...prev]);
       supabaseService.saveStudent(newStd, currentTeacher.id);
@@ -609,17 +615,12 @@ function AppInner() {
   };
 
   const handleUpdateAppointmentNotes = (id: string, notes: string) => {
-    setAllAppointments((prev) =>
-      prev.map((apt) => {
-        if (apt.id === id) {
-          const updated = { ...apt, notes };
-          supabaseService.saveAppointment(updated, currentTeacher.id);
-          dispatchAppointmentWebhook(updated, currentTeacher, 'updated');
-          return updated;
-        }
-        return apt;
-      })
-    );
+    const target = allAppointments.find((apt) => apt.id === id);
+    if (!target) return;
+    const updated = { ...target, notes };
+    setAllAppointments((prev) => prev.map((apt) => (apt.id === id ? updated : apt)));
+    supabaseService.saveAppointment(updated, currentTeacher.id);
+    dispatchAppointmentWebhook(updated, currentTeacher, 'updated');
     if (selectedAppointment && selectedAppointment.id === id) {
       setSelectedAppointment({ ...selectedAppointment, notes });
     }
@@ -686,7 +687,7 @@ function AppInner() {
       ...newStudentData,
       id: `std-${Date.now()}`,
       teacherId: currentTeacher.id,
-      joinedDate: 'Novembro 2024',
+      joinedDate: formatMonthYearPtBR(new Date()),
       totalClasses: 0,
       lastClass: 'Sem aulas ainda',
     };
@@ -939,6 +940,8 @@ function AppInner() {
               onUpdateAppointmentNotes={handleUpdateAppointmentNotes}
               onCancelAppointment={handleCancelAppointment}
               onRescheduleAppointment={(apt) => {
+                setReschedulingAppointment(apt);
+                setPreSelectedStudent(null);
                 setSelectedAppointment(null);
                 setIsNewAppointmentOpen(true);
               }}
@@ -1087,11 +1090,14 @@ function AppInner() {
         onClose={() => {
           setIsNewAppointmentOpen(false);
           setPreSelectedStudent(null);
+          setReschedulingAppointment(null);
         }}
         services={services}
         students={students}
         onSave={handleSaveNewAppointment}
         preSelectedStudent={preSelectedStudent}
+        existingAppointments={appointments}
+        editingAppointment={reschedulingAppointment}
       />
 
       <BlockTimeModal

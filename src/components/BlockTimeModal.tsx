@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Ban, Calendar, Clock } from 'lucide-react';
 import { Appointment } from '../types';
+import { toLocalDateKey } from '../utils/dates';
 
 interface BlockTimeModalProps {
   isOpen: boolean;
@@ -13,12 +14,13 @@ export const BlockTimeModal: React.FC<BlockTimeModalProps> = ({
   onClose,
   onBlock,
 }) => {
-  if (!isOpen) return null;
-
-  const [date, setDate] = useState('2024-11-15');
+  // Hooks sempre antes de qualquer retorno condicional
+  const [date, setDate] = useState(toLocalDateKey(new Date()));
   const [startTime, setStartTime] = useState('11:00');
   const [endTime, setEndTime] = useState('12:00');
   const [reason, setReason] = useState('Compromisso Pessoal / Almoço');
+
+  if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +29,8 @@ export const BlockTimeModal: React.FC<BlockTimeModalProps> = ({
     const [eh, em] = endTime.split(':').map(Number);
     const duration = (eh * 60 + em) - (sh * 60 + sm);
 
-    const dayOfWeek = new Date(date).getDay();
+    // "T00:00:00" evita que a data volte um dia por causa do fuso horário
+    const dayOfWeek = new Date(`${date}T00:00:00`).getDay();
 
     const blocked: Appointment = {
       id: `block-${Date.now()}`,
