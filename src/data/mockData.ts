@@ -14,6 +14,7 @@ import {
   PaymentInvoice,
   SystemUser
 } from '../types';
+import { relativeDate } from '../utils/dates';
 
 export const INITIAL_TEACHER_PROFILES: TeacherProfile[] = [
   {
@@ -227,8 +228,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     studentPhone: '(11) 95432-1098',
     serviceId: 'serv-4',
     serviceName: 'Matemática Avançada',
-    date: '2024-11-15',
-    dayOfWeek: 3, // Qua
+    ...relativeDate(0),
     startTime: '14:00',
     endTime: '15:00',
     durationMinutes: 60,
@@ -247,8 +247,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     studentPhone: '(11) 94321-0987',
     serviceId: 'serv-4',
     serviceName: 'Física Básica',
-    date: '2024-11-15',
-    dayOfWeek: 3, // Qua
+    ...relativeDate(0),
     startTime: '15:30',
     endTime: '16:30',
     durationMinutes: 60,
@@ -267,8 +266,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     studentPhone: '(11) 93210-9876',
     serviceId: 'serv-5',
     serviceName: 'Dúvidas - Química',
-    date: '2024-11-15',
-    dayOfWeek: 3, // Qua
+    ...relativeDate(1),
     startTime: '17:00',
     endTime: '18:00',
     durationMinutes: 60,
@@ -287,8 +285,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     studentPhone: '(11) 98765-4321',
     serviceId: 'serv-1',
     serviceName: 'Personal Trainer 1h',
-    date: '2024-11-14',
-    dayOfWeek: 2, // Ter
+    ...relativeDate(0),
     startTime: '09:00',
     endTime: '10:00',
     durationMinutes: 60,
@@ -307,8 +304,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     studentPhone: '(11) 97654-3210',
     serviceId: 'serv-2',
     serviceName: 'Aula de Natação',
-    date: '2024-11-15',
-    dayOfWeek: 3, // Qua
+    ...relativeDate(1),
     startTime: '10:00',
     endTime: '10:45',
     durationMinutes: 45,
@@ -327,8 +323,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     studentPhone: '(11) 96543-2109',
     serviceId: 'serv-1',
     serviceName: 'Personal Trainer 1h',
-    date: '2024-11-16',
-    dayOfWeek: 4, // Qui
+    ...relativeDate(2),
     startTime: '13:00',
     endTime: '14:00',
     durationMinutes: 60,

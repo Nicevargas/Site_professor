@@ -3,6 +3,7 @@ import { ViewMode, TeacherProfile, AuthUser, SystemUser, UserRole } from '../typ
 import { useAccessibility } from '../context/AccessibilityContext';
 import { AquagendaIcon } from './AquagendaLogo';
 import { SidebarMode } from './SideNav';
+import { VIEW_TITLES } from '../utils/routes';
 import { 
   Search, 
   Menu, 
@@ -133,93 +134,10 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
           </button>
         )}
 
-        {/* Desktop Quick Nav Tabs */}
-        {userRole !== 'aluno' ? (
-          <div className="hidden md:flex items-center gap-6">
-            <button 
-              onClick={() => onNavigate('dashboard')}
-              className={`text-sm font-semibold transition-colors pb-1 ${
-                currentView === 'dashboard'
-                  ? 'text-[#091426] border-b-2 border-[#091426]'
-                  : 'text-[#45474c] hover:text-[#091426]'
-              }`}
-            >
-              Dashboard
-            </button>
-            <button 
-              onClick={() => onNavigate('agenda')}
-              className={`text-sm font-semibold transition-colors pb-1 ${
-                currentView === 'agenda'
-                  ? 'text-[#091426] border-b-2 border-[#091426]'
-                  : 'text-[#45474c] hover:text-[#091426]'
-              }`}
-            >
-              Agenda
-            </button>
-            <button 
-              onClick={() => onNavigate('servicos')}
-              className={`text-sm font-semibold transition-colors pb-1 ${
-                currentView === 'servicos'
-                  ? 'text-[#091426] border-b-2 border-[#091426]'
-                  : 'text-[#45474c] hover:text-[#091426]'
-              }`}
-            >
-              Serviços
-            </button>
-            {userRole === 'admin' && (
-              <button 
-                onClick={() => onNavigate('usuarios')}
-                className={`text-sm font-semibold transition-colors pb-1 ${
-                  currentView === 'usuarios'
-                    ? 'text-[#091426] border-b-2 border-[#091426]'
-                    : 'text-[#45474c] hover:text-[#091426]'
-                }`}
-              >
-                Usuários & RBAC
-              </button>
-            )}
-            {(userRole === 'admin' || userRole === 'professor') && (
-            <button
-              onClick={() => onNavigate('pagamentos')}
-              className={`text-sm font-semibold transition-colors pb-1 ${
-                currentView === 'pagamentos'
-                  ? 'text-[#091426] border-b-2 border-[#091426]'
-                  : 'text-[#45474c] hover:text-[#091426]'
-              }`}
-            >
-              Financeiro
-            </button>
-            )}          </div>
-        ) : (
-          <div className="hidden md:flex items-center gap-6">
-            <button 
-              onClick={() => onNavigate('portal-aluno')}
-              className={`text-sm font-semibold transition-colors pb-1 ${
-                currentView === 'portal-aluno'
-                  ? 'text-[#00687a] border-b-2 border-[#00687a]'
-                  : 'text-[#45474c] hover:text-[#091426]'
-              }`}
-            >
-              Portal do Aluno
-            </button>
-            <button 
-              onClick={() => onNavigate('public-booking')}
-              className={`text-sm font-semibold transition-colors pb-1 ${
-                currentView === 'public-booking'
-                  ? 'text-[#00687a] border-b-2 border-[#00687a]'
-                  : 'text-[#45474c] hover:text-[#091426]'
-              }`}
-            >
-              Agendar Aula
-            </button>
-            <button 
-              onClick={() => onNavigate('public-landing')}
-              className="text-sm font-semibold text-[#45474c] hover:text-[#091426]"
-            >
-              Vitrine do Professor
-            </button>
-          </div>
-        )}
+        {/* Título da tela atual: a navegação fica só na barra lateral */}
+        <h1 className="hidden md:block text-sm font-bold text-[#091426] truncate">
+          {VIEW_TITLES[currentView] || 'Aquagenda'}
+        </h1>
       </div>
 
       {/* Right side: Search, Role Switcher, Tenant Switcher, Profile */}
@@ -356,26 +274,6 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
             )}
           </div>
         )}
-
-        {/* Tutorial & Help Hub Button */}
-        <button
-          onClick={() => setIsTutorialHubOpen(true)}
-          className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-cyan-50 hover:bg-cyan-100 text-[#00687a] border border-cyan-200 rounded-full text-xs font-semibold transition-colors"
-          title="Abrir Central de Tutoriais e Ajuda Online"
-        >
-          <HelpCircle className="w-3.5 h-3.5 text-[#00687a]" />
-          <span>Tutorial</span>
-        </button>
-
-        {/* Public Site preview button */}
-        <button
-          onClick={() => onNavigate('public-landing')}
-          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-[#f2f4f6] hover:bg-[#e0e3e5] text-[#091426] rounded-full text-xs font-medium transition-colors"
-          title="Ver Landing Page Pública"
-        >
-          <Globe className="w-3.5 h-3.5 text-[#00687a]" />
-          <span>Site</span>
-        </button>
 
         {/* Profile Avatar & Menu */}
         <div className="relative">

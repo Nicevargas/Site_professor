@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { TeacherProfile, TestimonialItem, CurriculumItem, VideoItem, PhotoItem, FaqItem } from '../types';
+import React, { useState, useEffect } from 'react';
+import { TeacherProfile, TestimonialItem, CurriculumItem, VideoItem, PhotoItem, FaqItem, SiteAdminTab } from '../types';
 import { 
   Globe, 
   MessageSquare, 
@@ -62,6 +62,9 @@ interface SiteAdminViewProps {
   onUpdateFaqs?: (items: FaqItem[]) => void;
   onUpdateTeacher?: (updated: TeacherProfile) => void;
   onOpenPublicSite: () => void;
+  /** Seção pedida pela barra lateral (sub-itens de "Meu Site") */
+  activeTab?: SiteAdminTab;
+  onTabChange?: (tab: SiteAdminTab) => void;
 }
 
 export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
@@ -78,8 +81,20 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
   onUpdateFaqs = (_items: FaqItem[]) => {},
   onUpdateTeacher = (_updated: TeacherProfile) => {},
   onOpenPublicSite,
+  activeTab: requestedTab,
+  onTabChange,
 }) => {
-  const [activeTab, setActiveTab] = useState<'branding' | 'testimonials' | 'curriculum' | 'videos' | 'photos' | 'faqs'>('branding');
+  const [activeTab, setActiveTabState] = useState<SiteAdminTab>(requestedTab || 'branding');
+
+  useEffect(() => {
+    if (requestedTab && requestedTab !== activeTab) setActiveTabState(requestedTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedTab]);
+
+  const setActiveTab = (tab: SiteAdminTab) => {
+    setActiveTabState(tab);
+    onTabChange?.(tab);
+  };
 
   // Testimonial Modal State
   const [isTestimonialModalOpen, setIsTestimonialModalOpen] = useState(false);

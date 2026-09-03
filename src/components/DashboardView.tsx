@@ -35,6 +35,8 @@ import {
 import { calculate8hDispatchTime } from '../utils/calendarAndWhatsapp';
 import { calculateFinancialOverview } from '../utils/mediaAndTextHelpers';
 import { formatVacationDateBR } from '../utils/vacationHelpers';
+import { getFirstName, getGreeting } from '../utils/names';
+import { toLocalDateKey } from '../utils/dates';
 
 
 interface DashboardViewProps {
@@ -93,9 +95,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const formattedTotalRevenue = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(financial.totalRevenue);
   const formattedAverageTicket = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(financial.averageTicket);
 
-  // Today's appointments (first 3)
-  const todayAppointments = appointments.slice(0, 3);
-  const nextAppointment = appointments[0] || null;
+  // Agenda real: só o que ainda vai acontecer, em ordem cronológica
+  const todayKey = toLocalDateKey(new Date());
+  const isLive = (apt: Appointment) => apt.status !== 'Cancelado' && apt.status !== 'Bloqueado';
+  const upcomingAppointments = [...appointments]
+    .filter((apt) => isLive(apt) && apt.date >= todayKey)
+    .sort((a, b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`));
+  const todayAppointments = upcomingAppointments.slice(0, 3);
+  const nextAppointment = upcomingAppointments[0] || null;
+  const todayCount = appointments.filter((apt) => isLive(apt) && apt.date === todayKey).length;
 
   const handleCreateReminder = (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,7 +113,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     setShowAddReminder(false);
   };
 
-  const dailySummarySpeech = `Olá, ${currentTeacher.name}! Você possui ${appointments.length} aulas agendadas. A próxima aula é com ${nextAppointment ? nextAppointment.studentName : 'nenhum aluno'} às ${nextAppointment ? nextAppointment.startTime : 'horário indefinido'}. Sua receita estimada do período é de ${formattedTotalRevenue}.`;
+  const dailySummarySpeech = `Olá, ${currentTeacher.name}! Você possui ${upcomingAppointments.length} aulas agendadas. A próxima aula é com ${nextAppointment ? nextAppointment.studentName : 'nenhum aluno'} às ${nextAppointment ? nextAppointment.startTime : 'horário indefinido'}. Sua receita estimada do período é de ${formattedTotalRevenue}.`;
 
   return (
     <main id="main-content" className="flex-1 overflow-y-auto bg-[#f7f9fb] p-4 md:p-10 font-sans">
@@ -116,7 +124,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl md:text-3xl font-bold text-[#091426] tracking-tight">
-                Bom dia, {currentTeacher.name.split(' ')[0]}!
+                {getGreeting()}, {getFirstName(currentTeacher.name)}!
               </h1>
               <VoiceReaderButton 
                 textToRead={dailySummarySpeech}
@@ -296,9 +304,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </span>
             </div>
             <div>
-              <p className="text-xs font-semibold text-[#45474c]">Aulas Marcadas</p>
-              <p className="text-2xl font-bold text-[#091426] tracking-tight mt-0.5">{appointments.length}</p>
-              <p className="text-[11px] text-slate-500 font-medium mt-1">{financial.onlineClassesCount} online • {financial.inPersonClassesCount} presencial</p>
+              <p className="text-xs font-semibold text-[#45474c]">Aulas Hoje</p>
+              <p className="text-2xl font-bold text-[#091426] tracking-tight mt-0.5">{todayCount}</p>
+              <p className="text-[11px] text-slate-500 font-medium mt-1">
+                {upcomingAppointments.length === 0
+                  ? 'Nenhuma aula futura marcada'
+                  : `${upcomingAppointments.length} ${upcomingAppointments.length === 1 ? 'aula futura' : 'aulas futuras'} • ${financial.onlineClassesCount} online • ${financial.inPersonClassesCount} presencial`}
+              </p>
             </div>
           </div>
 
@@ -309,15 +321,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <Clock className="w-5 h-5" />
               </div>
               <span className="bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-full text-[11px] font-bold">
-                Confirmado
+                {nextAppointment ? nextAppointment.status : 'Livre'}
               </span>
             </div>
             <div>
               <p className="text-xs font-semibold text-[#45474c]">Próximo Atendimento</p>
               <p className="text-lg font-bold text-[#091426] truncate mt-0.5">
-                {nextAppointment ? `${nextAppointment.startTime} - ${nextAppointment.studentName.split(' ')[0]} ${nextAppointment.studentName.split(' ')[1]?.[0] || ''}.` : '14:00 - João S.'}
+                {nextAppointment ? `${nextAppointment.startTime} - ${nextAppointment.studentName.split(' ')[0]} ${nextAppointment.studentName.split(' ')[1]?.[0] || ''}.` : 'Nenhum agendado'}
               </p>
-              <p className="text-[11px] text-amber-700 font-semibold mt-1 truncate">{nextAppointment?.serviceName || 'Mentoria de Estudos'}</p>
+              <p className="text-[11px] text-amber-700 font-semibold mt-1 truncate">
+                {nextAppointment ? `${nextAppointment.date === todayKey ? 'Hoje' : nextAppointment.date.split('-').reverse().slice(0, 2).join('/')} • ${nextAppointment.serviceName}` : 'Sua agenda está livre'}
+              </p>
             </div>
           </div>
 
@@ -447,6 +461,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
 
             <div className="space-y-3.5">
+              {todayAppointments.length === 0 && (
+                <div className="flex flex-col items-center justify-center text-center py-10 px-4 rounded-xl border border-dashed border-slate-300 bg-[#f7f9fb]">
+                  <CalendarIcon className="w-8 h-8 text-slate-400 mb-3" />
+                  <p className="text-sm font-semibold text-[#191c1e]">Nenhuma aula marcada a partir de hoje</p>
+                  <p className="text-xs text-[#45474c] mt-1 max-w-xs">
+                    Crie o primeiro agendamento ou compartilhe o link do seu site para os alunos marcarem sozinhos.
+                  </p>
+                  <button
+                    onClick={onOpenNewAppointmentModal}
+                    className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#00687a] hover:bg-[#004e5c] text-white text-xs font-bold transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Novo agendamento
+                  </button>
+                </div>
+              )}
               {todayAppointments.map((apt, index) => {
                 const colors = [
                   { bg: 'bg-[#bcc7de]', text: 'text-[#091426]' },

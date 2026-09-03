@@ -1,6 +1,7 @@
 import React from 'react';
-import { ViewMode, TeacherProfile, AuthUser, UserRole } from '../types';
+import { ViewMode, TeacherProfile, AuthUser, UserRole, SiteAdminTab } from '../types';
 import { useAccessibility } from '../context/AccessibilityContext';
+import { SITE_ADMIN_SECTIONS } from '../utils/routes';
 import { AquagendaIcon } from './AquagendaLogo';
 import { 
   LayoutDashboard, 
@@ -43,6 +44,8 @@ interface SideNavProps {
   onOpen?: () => void;
   sidebarMode: SidebarMode;
   onChangeSidebarMode: (mode: SidebarMode) => void;
+  siteAdminTab?: SiteAdminTab;
+  onSelectSiteAdminTab?: (tab: SiteAdminTab) => void;
 }
 
 export const SideNav: React.FC<SideNavProps> = ({ 
@@ -55,7 +58,9 @@ export const SideNav: React.FC<SideNavProps> = ({
   onClose,
   onOpen,
   sidebarMode,
-  onChangeSidebarMode
+  onChangeSidebarMode,
+  siteAdminTab,
+  onSelectSiteAdminTab,
 }) => {
   const userRole: UserRole = currentUser?.role || 'professor';
   const { setIsTutorialHubOpen, setIsInteractiveTourOpen, setIsA11yModalOpen } = useAccessibility();
@@ -75,6 +80,7 @@ export const SideNav: React.FC<SideNavProps> = ({
           { id: 'planos' as ViewMode, label: 'Planos & Assinatura', icon: CreditCard },
           { id: 'integracoes' as ViewMode, label: 'Automações & n8n', icon: Zap },
           { id: 'configuracoes' as ViewMode, label: 'Configurações', icon: Settings },
+          { id: 'public-landing' as ViewMode, label: 'Ver meu site', icon: Globe },
         ];
 
       case 'professor':
@@ -87,6 +93,7 @@ export const SideNav: React.FC<SideNavProps> = ({
           { id: 'site-admin' as ViewMode, label: 'Meu Site & Vitrine', icon: Globe },
           { id: 'planos' as ViewMode, label: 'Planos', icon: CreditCard },
           { id: 'configuracoes' as ViewMode, label: 'Meu Perfil', icon: Settings },
+          { id: 'public-landing' as ViewMode, label: 'Ver meu site', icon: Globe },
         ];
 
       case 'assistente':
@@ -95,6 +102,7 @@ export const SideNav: React.FC<SideNavProps> = ({
           { id: 'agenda' as ViewMode, label: 'Agenda de Aulas', icon: CalendarIcon },
           { id: 'alunos' as ViewMode, label: 'Cadastro de Alunos', icon: Users },
           { id: 'servicos' as ViewMode, label: 'Consulta Serviços', icon: Layers },
+          { id: 'public-landing' as ViewMode, label: 'Ver o site', icon: Globe },
         ];
 
       case 'aluno':
@@ -171,7 +179,7 @@ export const SideNav: React.FC<SideNavProps> = ({
                     Aquagenda
                   </span>
                   <span className="text-[10px] text-[#57dffe] font-semibold tracking-wide uppercase block mt-0.5">
-                    {isDrawer ? 'Barra Móvel' : 'Agenda do Professor'}
+                    {roleMeta.title}
                   </span>
                 </div>
               )}
@@ -179,6 +187,19 @@ export const SideNav: React.FC<SideNavProps> = ({
 
             {/* Quick Action Controls in Header (Close / Pin / Mode) */}
             <div className="flex items-center gap-1">
+              {/* Compact (icons only) / expanded toggle on desktop */}
+              {!isDrawer && (
+                <button
+                  type="button"
+                  onClick={() => onChangeSidebarMode(isCompact ? 'pinned' : 'compact')}
+                  className="hidden md:flex p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors cursor-pointer"
+                  title={isCompact ? 'Expandir barra lateral' : 'Mostrar só ícones'}
+                  aria-label={isCompact ? 'Expandir barra lateral' : 'Recolher barra lateral para ícones'}
+                >
+                  {isCompact ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+                </button>
+              )}
+
               {/* Pin / Unpin button on desktop */}
               <button
                 type="button"
@@ -216,29 +237,6 @@ export const SideNav: React.FC<SideNavProps> = ({
             </div>
           </div>
 
-          {/* User Profile Pill in Header (Hidden when compact on desktop) */}
-          {(!isCompact || isOpen) && (
-            <div className="flex items-center gap-2.5 pt-2 border-t border-slate-800/80 animate-in fade-in duration-200">
-              <div className="w-7 h-7 rounded-full overflow-hidden shrink-0 border border-slate-700 shadow-xs">
-                <img 
-                  src={currentUser?.avatarUrl || currentTeacher.avatarUrl} 
-                  alt={currentUser?.name || currentTeacher.name} 
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className={`inline-block px-1.5 py-0.2 text-[9px] font-bold rounded-md border ${roleMeta.color}`}>
-                    {roleMeta.badge}
-                  </span>
-                  <span className="text-[11px] font-medium text-slate-300 truncate">
-                    {currentUser?.name?.split(' ')[0] || 'Usuário'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Navigation Links */}
@@ -278,8 +276,8 @@ export const SideNav: React.FC<SideNavProps> = ({
 
             // Normal / Expanded or Drawer Mode Item
             return (
+              <React.Fragment key={item.id}>
               <button
-                key={item.id}
                 onClick={() => handleItemClick(item.id)}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-medium text-xs transition-all duration-150 text-left cursor-pointer ${
                   isActive
@@ -297,90 +295,32 @@ export const SideNav: React.FC<SideNavProps> = ({
                   </span>
                 )}
               </button>
+
+              {/* Seções de "Meu Site" como sub-itens, para não esconder tudo em abas dentro da tela */}
+              {item.id === 'site-admin' && isActive && onSelectSiteAdminTab && (
+                <div className="ml-6 mt-1 mb-2 pl-3 border-l border-[#1e293b] space-y-0.5">
+                  {SITE_ADMIN_SECTIONS.map((section) => (
+                    <button
+                      key={section.id}
+                      onClick={() => {
+                        onSelectSiteAdminTab(section.id);
+                        if (sidebarMode === 'drawer' || window.innerWidth < 768) onClose();
+                      }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors cursor-pointer ${
+                        siteAdminTab === section.id
+                          ? 'text-[#57dffe] bg-[#1e293b]/70'
+                          : 'text-[#8590a6] hover:text-white hover:bg-[#1e293b]/40'
+                      }`}
+                    >
+                      {section.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              </React.Fragment>
             );
           })}
         </nav>
-
-        {/* Sidebar Mode Switcher (Opcão de Comportamento Móvel / Fixada / Compacta) */}
-        {(!isCompact || isOpen) && (
-          <div className="p-3 mx-3 mb-2 bg-[#101c33] border border-[#1e293b] rounded-xl space-y-1.5 animate-in fade-in duration-200">
-            <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold px-0.5">
-              <span>Modo da Barra</span>
-              <span className="text-[#57dffe] text-[9px] font-bold">
-                {sidebarMode === 'drawer' ? 'Móvel (Sob Demanda)' : sidebarMode === 'compact' ? 'Compacta' : 'Fixada'}
-              </span>
-            </div>
-            
-            <div className="grid grid-cols-3 gap-1 bg-[#091426] p-1 rounded-lg border border-slate-800">
-              <button
-                type="button"
-                onClick={() => onChangeSidebarMode('drawer')}
-                className={`py-1.5 px-1 rounded text-[10px] font-medium flex flex-col items-center gap-0.5 transition-colors cursor-pointer ${
-                  sidebarMode === 'drawer' 
-                    ? 'bg-[#57dffe] text-[#091426] font-bold shadow-xs' 
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                title="Aparece só quando solicitado pelo botão ou atalho Alt+M"
-              >
-                <Smartphone className="w-3 h-3" />
-                <span className="leading-none text-[9px]">Móvel</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onChangeSidebarMode('pinned')}
-                className={`py-1.5 px-1 rounded text-[10px] font-medium flex flex-col items-center gap-0.5 transition-colors cursor-pointer ${
-                  sidebarMode === 'pinned' 
-                    ? 'bg-[#57dffe] text-[#091426] font-bold shadow-xs' 
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                title="Barra fixa sempre visível na lateral da tela"
-              >
-                <Pin className="w-3 h-3" />
-                <span className="leading-none text-[9px]">Fixada</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onChangeSidebarMode('compact')}
-                className={`py-1.5 px-1 rounded text-[10px] font-medium flex flex-col items-center gap-0.5 transition-colors cursor-pointer ${
-                  sidebarMode === 'compact' 
-                    ? 'bg-[#57dffe] text-[#091426] font-bold shadow-xs' 
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                title="Apenas ícones para maximizar o espaço útil de tela"
-              >
-                <PanelLeftClose className="w-3 h-3" />
-                <span className="leading-none text-[9px]">Ícones</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Quick Site Action (For non-student or student) */}
-        {(!isCompact || isOpen) && (
-          <div className="p-3 mx-3 mb-2 bg-[#1e293b]/70 border border-[#1e293b] rounded-xl space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-[#8590a6]">Vitrine Pública</span>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleItemClick('public-landing')}
-                className="flex-1 text-xs py-1.5 px-2 bg-[#00687a] hover:bg-[#00687a]/80 text-white rounded-lg font-medium flex items-center justify-center gap-1 transition-colors cursor-pointer"
-              >
-                <span>Ver Site</span>
-                <ExternalLink className="w-3 h-3" />
-              </button>
-              <button
-                onClick={() => handleItemClick('public-booking')}
-                className="text-xs py-1.5 px-2.5 bg-[#1e293b] hover:bg-slate-700 text-[#acedff] rounded-lg font-medium border border-slate-700 transition-colors cursor-pointer"
-              >
-                Agendar
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Tutorial Navigation Shortcut */}
         <div className={`px-3 pb-2 flex items-center ${isCompact && !isOpen ? 'justify-center px-1' : ''}`}>
@@ -418,7 +358,12 @@ export const SideNav: React.FC<SideNavProps> = ({
                 />
               </div>
               <div className="min-w-0 flex-1">
-                <span className="block font-bold text-xs text-white truncate">{currentUser?.name || currentTeacher.name}</span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="block font-bold text-xs text-white truncate">{currentUser?.name || currentTeacher.name}</span>
+                  <span className={`shrink-0 px-1.5 py-0.5 text-[9px] font-bold rounded-md border ${roleMeta.color}`}>
+                    {roleMeta.badge}
+                  </span>
+                </div>
                 <span className="block text-[10px] text-slate-400 truncate">{currentUser?.email || currentTeacher.email}</span>
               </div>
             </div>

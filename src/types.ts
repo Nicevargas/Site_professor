@@ -17,6 +17,9 @@ export type ViewMode =
 
 export type UserRole = 'admin' | 'professor' | 'assistente' | 'aluno';
 
+/** Seções da tela "Meu Site" (também aparecem como sub-itens na barra lateral). */
+export type SiteAdminTab = 'branding' | 'testimonials' | 'curriculum' | 'videos' | 'photos' | 'faqs';
+
 export interface SystemUser {
   id: string;
   name: string;

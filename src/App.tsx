@@ -13,7 +13,8 @@ import {
   PaymentInvoice,
   AuthUser,
   SystemUser,
-  UserRole
+  UserRole,
+  SiteAdminTab
 } from './types';
 import { 
   INITIAL_TEACHER_PROFILES, 
@@ -65,6 +66,7 @@ import { isSupabaseConfigured, supabase } from './lib/supabase';
 import { dispatchAppointmentWebhook, dispatchFormWebhook } from './utils/webhookDispatcher';
 import { canAccessView, getDefaultView, canSwitchProfiles, canViewFinances, sanitizeSelfDeclaredRole } from './utils/permissions';
 import { StudentProfileView } from './components/StudentProfileView';
+import { hashFromView, viewFromHash } from './utils/routes';
 
 
 function AppInner() {
@@ -85,6 +87,9 @@ function AppInner() {
 
   // Navigation & View state - defaults to public-landing for visitors, dashboard/portal for logged in
   const [currentView, setCurrentView] = useState<ViewMode>(() => {
+    // Link compartilhado ou recarga da página: respeita a rota na URL (#/agenda, #/meu-site...)
+    const fromHash = viewFromHash(window.location.hash);
+    if (fromHash) return fromHash;
     try {
       const saved = localStorage.getItem('agenda_prof_current_user');
       if (saved) {
@@ -98,6 +103,7 @@ function AppInner() {
     return 'public-landing';
   });
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [siteAdminTab, setSiteAdminTab] = useState<SiteAdminTab>('branding');
 
   // Multi-user & RBAC System Users State
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>(() => {
@@ -236,6 +242,27 @@ function AppInner() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isSidebarOpen]);
+
+  // URL: mantém #/rota sincronizada com a tela (botão voltar e links compartilháveis)
+  useEffect(() => {
+    const path = hashFromView(currentView);
+    if (window.location.hash !== `#${path}`) {
+      window.history.pushState(null, '', `#${path}`);
+    }
+  }, [currentView]);
+
+  useEffect(() => {
+    const syncFromUrl = () => {
+      const view = viewFromHash(window.location.hash);
+      if (view) setCurrentView(view);
+    };
+    window.addEventListener('popstate', syncFromUrl);
+    window.addEventListener('hashchange', syncFromUrl);
+    return () => {
+      window.removeEventListener('popstate', syncFromUrl);
+      window.removeEventListener('hashchange', syncFromUrl);
+    };
+  }, []);
 
   // Guarda de rotas por papel: nunca manter aberta uma tela que o papel atual não pode acessar
   useEffect(() => {
@@ -793,6 +820,8 @@ function AppInner() {
         onOpen={() => setIsSidebarOpen(true)}
         sidebarMode={sidebarMode}
         onChangeSidebarMode={handleChangeSidebarMode}
+        siteAdminTab={siteAdminTab}
+        onSelectSiteAdminTab={setSiteAdminTab}
       />
 
       {/* Main Content Area */}
@@ -963,6 +992,8 @@ function AppInner() {
                 supabaseService.saveTeacher(updated);
               }}
               onOpenPublicSite={() => setCurrentView('public-landing')}
+              activeTab={siteAdminTab}
+              onTabChange={setSiteAdminTab}
             />
           )}
 
