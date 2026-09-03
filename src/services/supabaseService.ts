@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { TeacherProfile, ServiceItem, Appointment, Student, Reminder, PaymentInvoice } from '../types';
+import { TeacherProfile, ServiceItem, Appointment, Student, Reminder, PaymentInvoice, TestimonialItem, CurriculumItem, PhotoItem, FaqItem } from '../types';
 
 export const supabaseService = {
   /**
@@ -445,6 +445,7 @@ export const supabaseService = {
       if (error || !data || data.length === 0) return null;
       return data.map((t: any) => ({
         id: t.id,
+        teacherId: t.teacher_id || undefined,
         studentName: t.student_name,
         roleOrCourse: t.role_or_course,
         avatarUrl: t.avatar_url,
@@ -469,6 +470,7 @@ export const supabaseService = {
       if (error || !data || data.length === 0) return null;
       return data.map((c: any) => ({
         id: c.id,
+        teacherId: c.teacher_id || undefined,
         title: c.title,
         institution: c.institution,
         period: c.period,
@@ -570,6 +572,7 @@ export const supabaseService = {
       if (error || !data || data.length === 0) return null;
       return data.map((p: any) => ({
         id: p.id,
+        teacherId: p.teacher_id || undefined,
         title: p.title,
         category: p.category,
         imageUrl: p.image_url,
@@ -591,6 +594,7 @@ export const supabaseService = {
       if (error || !data || data.length === 0) return null;
       return data.map((f: any) => ({
         id: f.id,
+        teacherId: f.teacher_id || undefined,
         question: f.question,
         answer: f.answer,
         category: f.category,
@@ -598,6 +602,145 @@ export const supabaseService = {
       }));
     } catch {
       return null;
+    }
+  },
+
+  /**
+   * Depoimentos: gravar / remover
+   */
+  async saveTestimonial(item: TestimonialItem, teacherId: string): Promise<boolean> {
+    if (!isSupabaseConfigured || !supabase) return false;
+    try {
+      const { error } = await supabase.from('testimonials').upsert({
+        id: item.id,
+        teacher_id: teacherId || item.teacherId || null,
+        student_name: item.studentName,
+        role_or_course: item.roleOrCourse || '',
+        avatar_url: item.avatarUrl || '',
+        rating: item.rating ?? 5,
+        content: item.content,
+        date: item.date || '',
+        verified: item.verified ?? true,
+        featured: Boolean(item.featured),
+        updated_at: new Date().toISOString(),
+      });
+      if (error) console.warn('Erro ao salvar depoimento no Supabase:', error.message);
+      return !error;
+    } catch (err) {
+      console.warn('Erro ao salvar depoimento no Supabase:', err);
+      return false;
+    }
+  },
+
+  async deleteTestimonial(id: string): Promise<boolean> {
+    if (!isSupabaseConfigured || !supabase) return false;
+    try {
+      const { error } = await supabase.from('testimonials').delete().eq('id', id);
+      return !error;
+    } catch {
+      return false;
+    }
+  },
+
+  /**
+   * Currículo: gravar / remover
+   */
+  async saveCurriculumItem(item: CurriculumItem, teacherId: string): Promise<boolean> {
+    if (!isSupabaseConfigured || !supabase) return false;
+    try {
+      const { error } = await supabase.from('curriculum_items').upsert({
+        id: item.id,
+        teacher_id: teacherId || item.teacherId || null,
+        title: item.title,
+        institution: item.institution || '',
+        period: item.period || '',
+        category: item.category || 'education',
+        description: item.description || '',
+        skills: item.skills || [],
+        updated_at: new Date().toISOString(),
+      });
+      if (error) console.warn('Erro ao salvar item do currículo no Supabase:', error.message);
+      return !error;
+    } catch (err) {
+      console.warn('Erro ao salvar item do currículo no Supabase:', err);
+      return false;
+    }
+  },
+
+  async deleteCurriculumItem(id: string): Promise<boolean> {
+    if (!isSupabaseConfigured || !supabase) return false;
+    try {
+      const { error } = await supabase.from('curriculum_items').delete().eq('id', id);
+      return !error;
+    } catch {
+      return false;
+    }
+  },
+
+  /**
+   * Fotos: gravar / remover
+   */
+  async savePhoto(item: PhotoItem, teacherId: string): Promise<boolean> {
+    if (!isSupabaseConfigured || !supabase) return false;
+    try {
+      const { error } = await supabase.from('photos').upsert({
+        id: item.id,
+        teacher_id: teacherId || item.teacherId || null,
+        title: item.title,
+        category: item.category || 'aulas',
+        image_url: item.imageUrl,
+        caption: item.caption || '',
+        date: item.date || null,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) console.warn('Erro ao salvar foto no Supabase:', error.message);
+      return !error;
+    } catch (err) {
+      console.warn('Erro ao salvar foto no Supabase:', err);
+      return false;
+    }
+  },
+
+  async deletePhoto(id: string): Promise<boolean> {
+    if (!isSupabaseConfigured || !supabase) return false;
+    try {
+      const { error } = await supabase.from('photos').delete().eq('id', id);
+      return !error;
+    } catch {
+      return false;
+    }
+  },
+
+  /**
+   * Perguntas frequentes: gravar / remover
+   */
+  async saveFaq(item: FaqItem, teacherId: string): Promise<boolean> {
+    if (!isSupabaseConfigured || !supabase) return false;
+    try {
+      const { error } = await supabase.from('faqs').upsert({
+        id: item.id,
+        teacher_id: teacherId || item.teacherId || null,
+        question: item.question,
+        answer: item.answer,
+        category: item.category || 'geral',
+        featured: Boolean(item.featured),
+        updated_at: new Date().toISOString(),
+      });
+      if (error) console.warn('Erro ao salvar pergunta no Supabase:', error.message);
+      return !error;
+    } catch (err) {
+      console.warn('Erro ao salvar pergunta no Supabase:', err);
+      return false;
+    }
+  },
+
+  async deleteFaq(id: string): Promise<boolean> {
+    if (!isSupabaseConfigured || !supabase) return false;
+    try {
+      const { error } = await supabase.from('faqs').delete().eq('id', id);
+      return !error;
+    } catch {
+      return false;
     }
   },
 

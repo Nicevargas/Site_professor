@@ -181,6 +181,22 @@ function AppInner() {
     return videos.filter(v => !v.teacherId || v.teacherId === currentTeacher.id);
   }, [videos, currentTeacher.id]);
 
+  const teacherTestimonials = useMemo(() => {
+    return testimonials.filter(t => !t.teacherId || t.teacherId === currentTeacher.id);
+  }, [testimonials, currentTeacher.id]);
+
+  const teacherCurriculum = useMemo(() => {
+    return curriculum.filter(c => !c.teacherId || c.teacherId === currentTeacher.id);
+  }, [curriculum, currentTeacher.id]);
+
+  const teacherPhotos = useMemo(() => {
+    return photos.filter(p => !p.teacherId || p.teacherId === currentTeacher.id);
+  }, [photos, currentTeacher.id]);
+
+  const teacherFaqs = useMemo(() => {
+    return faqs.filter(f => !f.teacherId || f.teacherId === currentTeacher.id);
+  }, [faqs, currentTeacher.id]);
+
   const overdueCount = useMemo(() => {
     return invoices.filter(inv => inv.status === 'vencido').length;
   }, [invoices]);
@@ -729,11 +745,11 @@ function AppInner() {
       <PublicLandingView
         teacher={currentTeacher}
         services={services}
-        testimonials={testimonials}
-        curriculum={curriculum}
+        testimonials={teacherTestimonials}
+        curriculum={teacherCurriculum}
         videos={teacherVideos}
-        photos={photos}
-        faqs={faqs}
+        photos={teacherPhotos}
+        faqs={teacherFaqs}
         isAuthenticated={!!currentUser}
         onOpenLogin={() => setCurrentView('auth')}
         onStartBooking={handleStartBookingFromLanding}
@@ -982,11 +998,11 @@ function AppInner() {
           {currentView === 'site-admin' && (
             <SiteAdminView
               currentTeacher={currentTeacher}
-              testimonials={testimonials}
-              curriculum={curriculum}
+              testimonials={teacherTestimonials}
+              curriculum={teacherCurriculum}
               videos={teacherVideos}
-              photos={photos}
-              faqs={faqs}
+              photos={teacherPhotos}
+              faqs={teacherFaqs}
               onUpdateTestimonials={setTestimonials}
               onUpdateCurriculum={setCurriculum}
               onUpdateVideos={setVideos}

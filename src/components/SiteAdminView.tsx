@@ -263,6 +263,8 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
           : t
       );
       onUpdateTestimonials(updated);
+      const savedItem = updated.find((t) => t.id === editingTestimonial.id);
+      if (savedItem) supabaseService.saveTestimonial(savedItem, currentTeacher.id);
       showToast('Depoimento atualizado com sucesso!');
     } else {
       const newItem: TestimonialItem = {
@@ -277,6 +279,7 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
         featured: testFeatured,
       };
       onUpdateTestimonials([newItem, ...testimonials]);
+      supabaseService.saveTestimonial(newItem, currentTeacher.id);
       showToast('Novo depoimento adicionado ao site!');
     }
     setIsTestimonialModalOpen(false);
@@ -284,6 +287,7 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
 
   const handleDeleteTestimonial = (id: string) => {
     onUpdateTestimonials(testimonials.filter((t) => t.id !== id));
+    supabaseService.deleteTestimonial(id);
     showToast('Depoimento removido.');
   };
 
@@ -334,6 +338,8 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
           : c
       );
       onUpdateCurriculum(updated);
+      const savedItem = updated.find((c) => c.id === editingCurriculum.id);
+      if (savedItem) supabaseService.saveCurriculumItem(savedItem, currentTeacher.id);
       showToast('Currículo atualizado com sucesso!');
     } else {
       const newItem: CurriculumItem = {
@@ -346,6 +352,7 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
         skills: skillsArray,
       };
       onUpdateCurriculum([...curriculum, newItem]);
+      supabaseService.saveCurriculumItem(newItem, currentTeacher.id);
       showToast('Item adicionado ao currículo!');
     }
     setIsCurriculumModalOpen(false);
@@ -353,6 +360,7 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
 
   const handleDeleteCurriculum = (id: string) => {
     onUpdateCurriculum(curriculum.filter((c) => c.id !== id));
+    supabaseService.deleteCurriculumItem(id);
     showToast('Item de currículo removido.');
   };
 
@@ -583,6 +591,8 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
           : p
       );
       onUpdatePhotos(updated);
+      const savedItem = updated.find((p) => p.id === editingPhoto.id);
+      if (savedItem) supabaseService.savePhoto(savedItem, currentTeacher.id);
       showToast('Foto atualizada com sucesso!');
     } else {
       const newItem: PhotoItem = {
@@ -594,6 +604,7 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
         date: new Date().getFullYear().toString(),
       };
       onUpdatePhotos([...photos, newItem]);
+      supabaseService.savePhoto(newItem, currentTeacher.id);
       showToast('Nova foto adicionada à galeria!');
     }
     setIsPhotoModalOpen(false);
@@ -601,6 +612,7 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
 
   const handleDeletePhoto = (id: string) => {
     onUpdatePhotos(photos.filter((p) => p.id !== id));
+    supabaseService.deletePhoto(id);
     showToast('Foto removida da galeria.');
   };
 
@@ -640,6 +652,8 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
           : f
       );
       onUpdateFaqs(updated);
+      const savedItem = updated.find((f) => f.id === editingFaq.id);
+      if (savedItem) supabaseService.saveFaq(savedItem, currentTeacher.id);
       showToast('Dúvida (FAQ) atualizada com sucesso!');
     } else {
       const newItem: FaqItem = {
@@ -650,6 +664,7 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
         featured: faqFeatured,
       };
       onUpdateFaqs([...faqs, newItem]);
+      supabaseService.saveFaq(newItem, currentTeacher.id);
       showToast('Nova dúvida adicionada ao FAQ!');
     }
     setIsFaqModalOpen(false);
@@ -657,6 +672,7 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
 
   const handleDeleteFaq = (id: string) => {
     onUpdateFaqs(faqs.filter((f) => f.id !== id));
+    supabaseService.deleteFaq(id);
     showToast('Dúvida removida do FAQ.');
   };
 

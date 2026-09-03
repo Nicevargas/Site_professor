@@ -77,6 +77,7 @@ export interface PaymentInvoice {
 
 export interface TestimonialItem {
   id: string;
+  teacherId?: string;
   studentName: string;
   roleOrCourse: string;
   avatarUrl: string;
@@ -91,6 +92,7 @@ export type Testimonial = TestimonialItem;
 
 export interface CurriculumItem {
   id: string;
+  teacherId?: string;
   title: string;
   institution: string;
   period: string;
@@ -123,6 +125,7 @@ export interface VideoItem {
 
 export interface PhotoItem {
   id: string;
+  teacherId?: string;
   title: string;
   category: 'aulas' | 'espaco' | 'conquistas' | 'bastidores';
   imageUrl: string;
@@ -132,6 +135,7 @@ export interface PhotoItem {
 
 export interface FaqItem {
   id: string;
+  teacherId?: string;
   question: string;
   answer: string;
   category?: 'geral' | 'online' | 'agendamento' | 'pagamento';
