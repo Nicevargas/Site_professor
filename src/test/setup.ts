@@ -1,8 +1,35 @@
 import '@testing-library/jest-dom/vitest';
-import { afterEach } from 'vitest';
+import { afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 
-// Limpa o DOM entre os testes de componente
+// APIs de navegador que o jsdom não implementa e que alguns componentes tocam
+if (!window.matchMedia) {
+  window.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+
+class NoopObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return [];
+  }
+}
+if (!('ResizeObserver' in window)) (window as any).ResizeObserver = NoopObserver;
+if (!('IntersectionObserver' in window)) (window as any).IntersectionObserver = NoopObserver;
+if (!window.scrollTo) window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
+if (!HTMLElement.prototype.scrollIntoView) HTMLElement.prototype.scrollIntoView = vi.fn();
+
+// Limpa o DOM, o armazenamento e a URL entre os testes
 afterEach(() => {
   cleanup();
   try {
@@ -10,4 +37,5 @@ afterEach(() => {
   } catch {
     // ambiente sem localStorage
   }
+  window.history.replaceState(null, '', '/');
 });

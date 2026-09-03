@@ -975,12 +975,12 @@ function AppInner() {
           {currentView === 'usuarios' && (
             <UsersManagementView
               users={systemUsers}
-              currentTeacher={currentTeacher}
+              teachers={teachers}
               currentUser={currentUser}
               onAddUser={handleAddUser}
               onUpdateUser={handleUpdateUser}
               onDeleteUser={handleDeleteUser}
-              onSwitchSession={handleSwitchUser}
+              onSwitchUser={handleSwitchUser}
             />
           )}
 
