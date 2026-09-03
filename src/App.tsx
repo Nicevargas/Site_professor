@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Appointment, 
   ServiceItem, 
@@ -30,7 +30,7 @@ import {
   INITIAL_SYSTEM_USERS
 } from './data/mockData';
 
-import { SideNav } from './components/SideNav';
+import { SideNav, SidebarMode } from './components/SideNav';
 import { TopAppBar } from './components/TopAppBar';
 import { DashboardView } from './components/DashboardView';
 import { AgendaView } from './components/AgendaView';
@@ -172,6 +172,69 @@ function AppInner() {
     return invoices.filter(inv => inv.status === 'overdue').length;
   }, [invoices]);
 
+  // Sidebar Display Mode (Móvel / Sob Demanda vs Fixada vs Compacta)
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>(() => {
+    try {
+      const saved = localStorage.getItem('aquagenda_sidebar_mode');
+      if (saved === 'drawer' || saved === 'pinned' || saved === 'compact') {
+        return saved;
+      }
+    } catch {
+      // ignore
+    }
+    return 'pinned';
+  });
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+
+  const handleToggleSidebar = useCallback(() => {
+    if (sidebarMode === 'drawer') {
+      setIsSidebarOpen(prev => !prev);
+    } else {
+      if (window.innerWidth < 768) {
+        setIsSidebarOpen(prev => !prev);
+      } else {
+        // On desktop, clicking menu toggle switches to drawer mode (or toggles pin)
+        const nextMode = sidebarMode === 'pinned' ? 'drawer' : 'pinned';
+        setSidebarMode(nextMode);
+        try {
+          localStorage.setItem('aquagenda_sidebar_mode', nextMode);
+        } catch {}
+        if (nextMode === 'drawer') {
+          setIsSidebarOpen(false);
+        }
+      }
+    }
+  }, [sidebarMode]);
+
+  const handleChangeSidebarMode = useCallback((newMode: SidebarMode) => {
+    setSidebarMode(newMode);
+    try {
+      localStorage.setItem('aquagenda_sidebar_mode', newMode);
+    } catch {}
+    if (newMode === 'drawer') {
+      setIsSidebarOpen(false);
+    }
+  }, []);
+
+  // Keyboard shortcut listener: Alt + M or Ctrl + B to toggle sidebar
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+      if ((e.altKey && (e.key === 'm' || e.key === 'M')) || (e.ctrlKey && (e.key === 'b' || e.key === 'B'))) {
+        e.preventDefault();
+        setIsSidebarOpen(prev => !prev);
+      }
+      if (e.key === 'Escape' && isSidebarOpen) {
+        setIsSidebarOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSidebarOpen]);
+
   // Load from Supabase on startup
   useEffect(() => {
     async function loadData() {
@@ -235,14 +298,19 @@ function AppInner() {
   // Listen to Supabase Auth State
   useEffect(() => {
     if (isSupabaseConfigured && supabase) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
+      supabase.auth.getSession().then(async ({ data: { session } }) => {
         if (session?.user) {
+          const email = session.user.email || '';
+          const dbUser = await supabaseService.findUserByEmail(email);
+          const role = (dbUser?.role as UserRole) || (email === 'curtatche@gmail.com' ? 'admin' : (session.user.user_metadata?.role as UserRole) || 'professor');
           const authUser: AuthUser = {
-            id: session.user.id,
-            email: session.user.email || '',
-            name: session.user.user_metadata?.full_name || currentTeacher.name,
-            role: (session.user.user_metadata?.role as UserRole) || 'professor',
-            avatarUrl: currentTeacher.avatarUrl,
+            id: dbUser?.id || session.user.id,
+            email: email,
+            name: dbUser?.name || session.user.user_metadata?.full_name || currentTeacher.name,
+            role: role,
+            avatarUrl: dbUser?.avatar_url || currentTeacher.avatarUrl,
+            teacherId: dbUser?.teacher_id,
+            studentId: dbUser?.student_id,
             isDemo: false,
           };
           setCurrentUser(authUser);
@@ -250,14 +318,19 @@ function AppInner() {
         }
       });
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
         if (session?.user) {
+          const email = session.user.email || '';
+          const dbUser = await supabaseService.findUserByEmail(email);
+          const role = (dbUser?.role as UserRole) || (email === 'curtatche@gmail.com' ? 'admin' : (session.user.user_metadata?.role as UserRole) || 'professor');
           const authUser: AuthUser = {
-            id: session.user.id,
-            email: session.user.email || '',
-            name: session.user.user_metadata?.full_name || currentTeacher.name,
-            role: (session.user.user_metadata?.role as UserRole) || 'professor',
-            avatarUrl: currentTeacher.avatarUrl,
+            id: dbUser?.id || session.user.id,
+            email: email,
+            name: dbUser?.name || session.user.user_metadata?.full_name || currentTeacher.name,
+            role: role,
+            avatarUrl: dbUser?.avatar_url || currentTeacher.avatarUrl,
+            teacherId: dbUser?.teacher_id,
+            studentId: dbUser?.student_id,
             isDemo: false,
           };
           setCurrentUser(authUser);
@@ -651,6 +724,17 @@ function AppInner() {
     );
   }
 
+  // Dynamic left padding based on active sidebar mode:
+  // - 'pinned': 256px (md:pl-64)
+  // - 'compact': 80px (md:pl-20)
+  // - 'drawer': 0px (pl-0, floats as mobile overlay when requested)
+  const contentPadding = 
+    sidebarMode === 'pinned' 
+      ? 'md:pl-64' 
+      : sidebarMode === 'compact' 
+        ? 'md:pl-20' 
+        : 'pl-0';
+
   return (
     <div className="flex h-screen bg-[#f7f9fb] font-sans antialiased text-[#191c1e] overflow-hidden">
       {/* Side Navigation Bar */}
@@ -663,10 +747,14 @@ function AppInner() {
         currentTeacher={currentTeacher}
         overdueCount={overdueCount}
         currentUser={currentUser}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        sidebarMode={sidebarMode}
+        onChangeSidebarMode={handleChangeSidebarMode}
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col md:pl-64 min-w-0 h-screen overflow-hidden">
+      <div className={`flex-1 flex flex-col ${contentPadding} min-w-0 h-screen overflow-hidden transition-[padding] duration-300 ease-in-out`}>
         {/* Top Header */}
         <TopAppBar
           currentView={currentView}
@@ -683,6 +771,10 @@ function AppInner() {
           onLogout={handleLogout}
           systemUsers={systemUsers}
           onSwitchUser={handleSwitchUser}
+          isSidebarOpen={isSidebarOpen}
+          onToggleSidebar={handleToggleSidebar}
+          sidebarMode={sidebarMode}
+          onChangeSidebarMode={handleChangeSidebarMode}
         />
 
         {/* Dynamic Main View */}

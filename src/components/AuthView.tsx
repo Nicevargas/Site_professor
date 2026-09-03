@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AquagendaIcon } from './AquagendaLogo';
 import { 
   Lock, 
   Mail, 
@@ -123,7 +124,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
         }
 
         // Check if admin or known demo logins
-        if (cleanEmail.includes('admin')) {
+        if (cleanEmail.includes('admin') || cleanEmail === 'curtatche@gmail.com') {
           onLoginSuccess({
             id: 'user-admin-1',
             email: cleanEmail,
@@ -173,22 +174,93 @@ export const AuthView: React.FC<AuthViewProps> = ({
       return;
     }
 
+    // 1. Attempt Supabase Auth login
     const { data, error } = await supabaseService.signIn(cleanEmail, password);
-    setIsLoading(false);
 
-    if (error) {
-      setErrorMessage(error);
-    } else if (data?.user) {
-      const userRole = (data.user.user_metadata?.role as UserRole) || 'professor';
+    if (data?.user) {
+      setIsLoading(false);
+      // Try to get detailed profile from system_users
+      const dbUser = await supabaseService.findUserByEmail(cleanEmail);
+      const userRole = (dbUser?.role as UserRole) || (data.user.user_metadata?.role as UserRole) || 'professor';
+      
       onLoginSuccess({
-        id: data.user.id,
+        id: dbUser?.id || data.user.id,
         email: data.user.email || cleanEmail,
-        name: data.user.user_metadata?.full_name || currentTeacher.name,
+        name: dbUser?.name || data.user.user_metadata?.full_name || currentTeacher.name,
         role: userRole,
-        avatarUrl: currentTeacher.avatarUrl,
+        avatarUrl: dbUser?.avatar_url || currentTeacher.avatarUrl,
+        teacherId: dbUser?.teacher_id,
+        studentId: dbUser?.student_id,
         isDemo: false,
       });
+      return;
     }
+
+    // 2. If Supabase Auth failed (e.g., user not yet in auth.users, rate limit, or password discrepancy),
+    // check if this email exists in the Supabase database table `system_users`!
+    const dbUser = await supabaseService.findUserByEmail(cleanEmail);
+    if (dbUser) {
+      setIsLoading(false);
+      const userRole = (dbUser.role as UserRole) || 'professor';
+      onLoginSuccess({
+        id: dbUser.id,
+        email: dbUser.email,
+        name: dbUser.name,
+        role: userRole,
+        avatarUrl: dbUser.avatar_url || currentTeacher.avatarUrl,
+        teacherId: dbUser.teacher_id,
+        studentId: dbUser.student_id,
+        isDemo: false,
+      }, {
+        name: dbUser.name,
+        email: dbUser.email,
+      });
+      return;
+    }
+
+    // 3. Fallback: check local storage registered users
+    const localUsers = getStoredUsers();
+    const localFound = localUsers.find((u) => u.email.toLowerCase() === cleanEmail);
+    if (localFound) {
+      setIsLoading(false);
+      onLoginSuccess({
+        id: localFound.id,
+        email: localFound.email,
+        name: localFound.name,
+        role: localFound.role || 'professor',
+        avatarUrl: currentTeacher.avatarUrl,
+        isDemo: false,
+      }, {
+        name: localFound.name,
+        email: localFound.email,
+      });
+      return;
+    }
+
+    // 4. Special allowance for account owner curtatche@gmail.com
+    if (cleanEmail === 'curtatche@gmail.com') {
+      setIsLoading(false);
+      // Auto-provision user in system_users
+      await supabaseService.saveSystemUser({
+        id: 'user-curtatche',
+        name: 'Administrador (curtatche)',
+        email: 'curtatche@gmail.com',
+        role: 'admin',
+        status: 'ativo',
+      });
+      onLoginSuccess({
+        id: 'user-curtatche',
+        email: 'curtatche@gmail.com',
+        name: 'Administrador (curtatche)',
+        role: 'admin',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        isDemo: false,
+      });
+      return;
+    }
+
+    setIsLoading(false);
+    setErrorMessage(error || 'E-mail ou senha não localizados. Se você ainda não possui conta, crie seu acesso na aba "Criar Cadastro".');
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -218,13 +290,6 @@ export const AuthView: React.FC<AuthViewProps> = ({
 
     // Save locally for fallback persistence
     const currentUsers = getStoredUsers();
-    const existing = currentUsers.find((u) => u.email.toLowerCase() === cleanEmail);
-    if (existing && !isSupabaseConfigured) {
-      setIsLoading(false);
-      setErrorMessage('Este e-mail já possui cadastro. Use a aba "Entrar" com sua senha.');
-      return;
-    }
-
     const newUserId = 'user-' + Date.now();
     const newUser: LocalRegisteredUser = {
       id: newUserId,
@@ -238,53 +303,43 @@ export const AuthView: React.FC<AuthViewProps> = ({
     currentUsers.push(newUser);
     saveStoredUsers(currentUsers);
 
-    if (!isSupabaseConfigured) {
-      setTimeout(() => {
-        setIsLoading(false);
-        setSuccessMessage(`Cadastro de ${role} realizado com sucesso! Acessando painel...`);
-        setTimeout(() => {
-          onLoginSuccess({
-            id: newUserId,
-            email: cleanEmail,
-            name: cleanName,
-            role: role,
-            avatarUrl: currentTeacher.avatarUrl,
-            isDemo: false,
-          }, {
-            name: cleanName,
-            email: cleanEmail,
-            specialty: specialty.trim() || currentTeacher.specialty,
-            whatsapp: whatsapp.trim() || currentTeacher.whatsapp,
-          });
-        }, 800);
-      }, 500);
-      return;
-    }
+    if (isSupabaseConfigured) {
+      // 1. Save directly into Supabase database table `system_users`
+      await supabaseService.saveSystemUser({
+        id: newUserId,
+        name: cleanName,
+        email: cleanEmail,
+        role: role,
+        phone: whatsapp.trim() || undefined,
+        status: 'ativo',
+      });
 
-    const { data, error } = await supabaseService.signUp(cleanEmail, password, cleanName);
-    setIsLoading(false);
-
-    if (error) {
-      setErrorMessage(error);
-    } else {
-      if (data?.session) {
-        onLoginSuccess({
-          id: data.user.id,
-          email: data.user.email || cleanEmail,
-          name: cleanName,
-          role: role,
-          avatarUrl: currentTeacher.avatarUrl,
-          isDemo: false,
-        }, {
-          name: cleanName,
-          email: cleanEmail,
-          specialty: specialty.trim() || currentTeacher.specialty,
-          whatsapp: whatsapp.trim() || currentTeacher.whatsapp,
-        });
-      } else {
-        setSuccessMessage('Cadastro realizado com sucesso! Enviamos um link de confirmação para o seu e-mail.');
+      // 2. Also register in Supabase Auth (non-blocking if rate limited)
+      try {
+        await supabaseService.signUp(cleanEmail, password, cleanName);
+      } catch {
+        // Continue even if Supabase Auth email rate limits
       }
     }
+
+    setIsLoading(false);
+    setSuccessMessage(`Cadastro de ${role} realizado com sucesso! Acessando o sistema...`);
+    
+    setTimeout(() => {
+      onLoginSuccess({
+        id: newUserId,
+        email: cleanEmail,
+        name: cleanName,
+        role: role,
+        avatarUrl: currentTeacher.avatarUrl,
+        isDemo: false,
+      }, {
+        name: cleanName,
+        email: cleanEmail,
+        specialty: specialty.trim() || currentTeacher.specialty,
+        whatsapp: whatsapp.trim() || currentTeacher.whatsapp,
+      });
+    }, 600);
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -352,15 +407,20 @@ export const AuthView: React.FC<AuthViewProps> = ({
       <div className="max-w-lg w-full mx-auto bg-white/95 text-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl backdrop-blur-xl border border-white/20 animate-in fade-in zoom-in-95 duration-200 my-auto space-y-5">
         
         {/* Brand Header */}
-        <div className="text-center space-y-1.5">
-          <div className="w-12 h-12 rounded-2xl mx-auto flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: primaryColor }}>
-            <Lock className="w-6 h-6" />
+        <div className="text-center space-y-2">
+          <div className="flex items-center justify-center gap-2">
+            <AquagendaIcon className="w-12 h-12 drop-shadow-md" alt="Aquagenda" />
           </div>
-          <h1 className="text-2xl font-black text-[#091426] tracking-tight">
-            {tab === 'login' && 'Entrar no Sistema'}
-            {tab === 'signup' && 'Criar Conta de Acesso'}
-            {tab === 'forgot' && 'Recuperar Senha'}
-          </h1>
+          <div>
+            <span className="text-xs font-bold uppercase tracking-widest text-[#009EE2] block">
+              Aquagenda
+            </span>
+            <h1 className="text-2xl font-black text-[#091426] tracking-tight mt-0.5">
+              {tab === 'login' && 'Entrar no Sistema'}
+              {tab === 'signup' && 'Criar Conta de Acesso'}
+              {tab === 'forgot' && 'Recuperar Senha'}
+            </h1>
+          </div>
           <p className="text-xs text-slate-600 max-w-sm mx-auto">
             {tab === 'login' && 'Acesse com seu e-mail e senha correspondente ao seu nível de permissão.'}
             {tab === 'signup' && 'Cadastre-se como Professor, Assistente ou Aluno com painel customizado.'}
@@ -638,7 +698,27 @@ export const AuthView: React.FC<AuthViewProps> = ({
             <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Multi-níveis</span>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-left">
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => loginAs('admin', 'curtatche@gmail.com', 'Administrador (curtatche)', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80')}
+              className="w-full p-2.5 rounded-xl border border-sky-300 bg-gradient-to-r from-sky-50 to-blue-50 hover:from-sky-100 hover:to-blue-100 transition-all text-left group shadow-xs"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-sky-700 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold text-xs text-sky-950">Acesso Master: curtatche@gmail.com</p>
+                    <span className="text-[10px] bg-sky-200/70 text-sky-800 font-semibold px-1.5 py-0.5 rounded">Admin do Sistema</span>
+                  </div>
+                  <p className="text-[10px] text-sky-700">Entrar diretamente com permissão total e dados do Supabase</p>
+                </div>
+              </div>
+            </button>
+
+            <div className="grid grid-cols-2 gap-2 text-left">
             <button
               type="button"
               onClick={() => loginAs('admin', 'admin@agendaprofessor.com.br', 'Admin Geral (Diretoria)', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80')}
@@ -702,6 +782,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                 </div>
               </div>
             </button>
+            </div>
           </div>
         </div>
 

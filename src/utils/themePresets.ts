@@ -113,6 +113,20 @@ export interface PresetLogoOption {
 
 export const PRESET_LOGO_OPTIONS: PresetLogoOption[] = [
   {
+    id: 'aquagenda-official',
+    name: 'Aquagenda Ícone Oficial',
+    niche: 'Gestão Pedagógica & Aulas',
+    iconName: 'Calendar',
+    imageUrl: '/icon.svg',
+  },
+  {
+    id: 'aquagenda-full',
+    name: 'Aquagenda Logo Completo',
+    niche: 'Identidade Visual & Marca',
+    iconName: 'Sparkles',
+    imageUrl: '/logo.svg',
+  },
+  {
     id: 'fitness-pro',
     name: 'Fitness & Treinamento Pro',
     niche: 'Personal Trainer & Performance',

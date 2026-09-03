@@ -37,7 +37,8 @@ import {
   Tv,
   Headphones,
   Radio,
-  Music
+  Music,
+  ShoppingBag
 } from 'lucide-react';
 
 interface PublicLandingViewProps {
@@ -78,7 +79,7 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
   const brandTitle = teacher.brandName || teacher.name;
 
   const [selectedPhotoCategory, setSelectedPhotoCategory] = useState<string>('todos');
-  const [selectedVideoCategoryFilter, setSelectedVideoCategoryFilter] = useState<'todos' | 'institucional' | 'videoaula' | 'podcast'>('todos');
+  const [selectedVideoCategoryFilter, setSelectedVideoCategoryFilter] = useState<'todos' | 'podcast' | 'curso_online' | 'institucional' | 'vendas'>('todos');
   const [activeVideoModal, setActiveVideoModal] = useState<VideoItem | null>(null);
   const [activePhotoModal, setActivePhotoModal] = useState<PhotoItem | null>(null);
 
@@ -667,12 +668,21 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
       {/* ================= SECTION: MULTIMÍDIA - VÍDEOS, AULAS & PODCASTS ================= */}
       <section id="videos" className="py-16 md:py-24 max-w-7xl mx-auto px-4 md:px-10 w-full">
         {(() => {
-          const countInstitucional = videos.filter(v => v.mediaType === 'institucional' || (!v.mediaType && v.category?.toLowerCase().includes('institucional'))).length;
-          const countVideoaula = videos.filter(v => v.mediaType === 'videoaula' || (!v.mediaType && (v.category?.toLowerCase().includes('aula') || v.category?.toLowerCase().includes('amostra')))).length;
-          const countPodcast = videos.filter(v => v.mediaType === 'podcast' || (!v.mediaType && v.category?.toLowerCase().includes('podcast'))).length;
+          // Display only active videos to visitors
+          const activeVideos = videos.filter(v => v.active !== false);
 
-          const filteredVideos = videos.filter(vid => {
-            const currentType = vid.mediaType || (vid.category?.toLowerCase().includes('podcast') ? 'podcast' : vid.category?.toLowerCase().includes('aula') ? 'videoaula' : 'institucional');
+          const countPodcast = activeVideos.filter(v => v.mediaType === 'podcast' || (!v.mediaType && v.category?.toLowerCase().includes('podcast'))).length;
+          const countCursoOnline = activeVideos.filter(v => v.mediaType === 'curso_online' || v.mediaType === 'videoaula' || (!v.mediaType && (v.category?.toLowerCase().includes('curso') || v.category?.toLowerCase().includes('aula')))).length;
+          const countInstitucional = activeVideos.filter(v => v.mediaType === 'institucional' || (!v.mediaType && (v.category?.toLowerCase().includes('institucional') || v.category?.toLowerCase().includes('apresenta')))).length;
+          const countVendas = activeVideos.filter(v => v.mediaType === 'vendas' || (!v.mediaType && (v.category?.toLowerCase().includes('venda') || v.category?.toLowerCase().includes('plano') || v.category?.toLowerCase().includes('oferta')))).length;
+
+          const filteredVideos = activeVideos.filter(vid => {
+            const currentType = vid.mediaType === 'videoaula' ? 'curso_online' : (vid.mediaType || (
+              vid.category?.toLowerCase().includes('podcast') ? 'podcast' : 
+              (vid.category?.toLowerCase().includes('curso') || vid.category?.toLowerCase().includes('aula')) ? 'curso_online' : 
+              (vid.category?.toLowerCase().includes('venda') || vid.category?.toLowerCase().includes('plano')) ? 'vendas' : 'institucional'
+            ));
+
             return selectedVideoCategoryFilter === 'todos' || currentType === selectedVideoCategoryFilter;
           });
 
@@ -684,10 +694,10 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
                   <span>Conteúdo Multimídia & Didática</span>
                 </div>
                 <h2 className="text-2xl md:text-4xl font-extrabold text-[#091426] tracking-tight">
-                  Vídeos Institucionais, Aulas & Podcasts
+                  Vídeos, Podcasts & Aulas Práticas
                 </h2>
                 <p className="text-sm md:text-base text-[#45474c] mt-2">
-                  Conheça nossa estrutura, assista a aulas de amostra gravadas e ouça podcasts com dicas práticas de aprendizagem.
+                  Assista a episódios de podcasts, cursos online, apresentações institucionais e conheça nossos planos e condições.
                 </p>
 
                 {/* Filter Pills */}
@@ -700,7 +710,31 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
-                    Todos ({videos.length})
+                    Todos ({activeVideos.length})
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedVideoCategoryFilter('podcast')}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                      selectedVideoCategoryFilter === 'podcast'
+                        ? 'bg-purple-600 text-white shadow-ambient'
+                        : 'bg-slate-100 text-slate-700 hover:bg-purple-50 hover:text-purple-700'
+                    }`}
+                  >
+                    <Mic className="w-3.5 h-3.5" />
+                    <span>Podcasts ({countPodcast})</span>
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedVideoCategoryFilter('curso_online')}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                      selectedVideoCategoryFilter === 'curso_online'
+                        ? 'bg-emerald-600 text-white shadow-ambient'
+                        : 'bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700'
+                    }`}
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>Cursos Online ({countCursoOnline})</span>
                   </button>
 
                   <button
@@ -716,27 +750,15 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
                   </button>
 
                   <button
-                    onClick={() => setSelectedVideoCategoryFilter('videoaula')}
+                    onClick={() => setSelectedVideoCategoryFilter('vendas')}
                     className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                      selectedVideoCategoryFilter === 'videoaula'
-                        ? 'bg-emerald-600 text-white shadow-ambient'
-                        : 'bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700'
+                      selectedVideoCategoryFilter === 'vendas'
+                        ? 'bg-amber-600 text-white shadow-ambient'
+                        : 'bg-slate-100 text-slate-700 hover:bg-amber-50 hover:text-amber-700'
                     }`}
                   >
-                    <BookOpen className="w-3.5 h-3.5" />
-                    <span>Vídeo Aulas ({countVideoaula})</span>
-                  </button>
-
-                  <button
-                    onClick={() => setSelectedVideoCategoryFilter('podcast')}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                      selectedVideoCategoryFilter === 'podcast'
-                        ? 'bg-purple-600 text-white shadow-ambient'
-                        : 'bg-slate-100 text-slate-700 hover:bg-purple-50 hover:text-purple-700'
-                    }`}
-                  >
-                    <Mic className="w-3.5 h-3.5" />
-                    <span>Podcasts ({countPodcast})</span>
+                    <ShoppingBag className="w-3.5 h-3.5" />
+                    <span>Vendas ({countVendas})</span>
                   </button>
                 </div>
               </div>
@@ -744,7 +766,11 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
               {/* Media Grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {filteredVideos.map((vid) => {
-                  const resolvedType = vid.mediaType || (vid.category?.toLowerCase().includes('podcast') ? 'podcast' : vid.category?.toLowerCase().includes('aula') ? 'videoaula' : 'institucional');
+                  const resolvedType = vid.mediaType === 'videoaula' ? 'curso_online' : (vid.mediaType || (
+                    vid.category?.toLowerCase().includes('podcast') ? 'podcast' : 
+                    (vid.category?.toLowerCase().includes('curso') || vid.category?.toLowerCase().includes('aula')) ? 'curso_online' : 
+                    (vid.category?.toLowerCase().includes('venda') || vid.category?.toLowerCase().includes('plano')) ? 'vendas' : 'institucional'
+                  ));
 
                   return (
                     <div
@@ -769,10 +795,15 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
                                 <Mic className="w-3 h-3 text-purple-300" />
                                 <span>Podcast</span>
                               </span>
-                            ) : resolvedType === 'videoaula' ? (
+                            ) : resolvedType === 'curso_online' ? (
                               <span className="flex items-center gap-1 bg-emerald-900/90 backdrop-blur-xs text-emerald-200 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-emerald-500/30">
                                 <BookOpen className="w-3 h-3 text-emerald-300" />
-                                <span>Vídeo Aula</span>
+                                <span>Curso Online</span>
+                              </span>
+                            ) : resolvedType === 'vendas' ? (
+                              <span className="flex items-center gap-1 bg-amber-900/90 backdrop-blur-xs text-amber-200 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-amber-500/30">
+                                <ShoppingBag className="w-3 h-3 text-amber-300" />
+                                <span>Vendas</span>
                               </span>
                             ) : (
                               <span className="flex items-center gap-1 bg-blue-900/90 backdrop-blur-xs text-blue-200 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-blue-500/30">
@@ -833,17 +864,24 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
 
                       <div className="px-6 pb-6 pt-2 flex items-center justify-between">
                         <span className={`text-xs font-bold flex items-center gap-1.5 group-hover:underline ${
-                          resolvedType === 'podcast' ? 'text-purple-600' : 'text-[#00687a]'
+                          resolvedType === 'podcast' ? 'text-purple-600' : 
+                          resolvedType === 'curso_online' ? 'text-emerald-600' :
+                          resolvedType === 'vendas' ? 'text-amber-700' : 'text-[#00687a]'
                         }`}>
                           {resolvedType === 'podcast' ? (
                             <>
                               <Headphones className="w-3.5 h-3.5" />
                               <span>Ouvir Episódio</span>
                             </>
-                          ) : resolvedType === 'videoaula' ? (
+                          ) : resolvedType === 'curso_online' ? (
                             <>
                               <BookOpen className="w-3.5 h-3.5" />
-                              <span>Assistir Aula</span>
+                              <span>Assistir Curso / Aula</span>
+                            </>
+                          ) : resolvedType === 'vendas' ? (
+                            <>
+                              <ShoppingBag className="w-3.5 h-3.5" />
+                              <span>Ver Oferta</span>
                             </>
                           ) : (
                             <>

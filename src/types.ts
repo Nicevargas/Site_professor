@@ -57,6 +57,7 @@ export interface PaymentInvoice {
   studentName: string;
   studentPhone?: string;
   studentEmail?: string;
+  studentInitials?: string;
   serviceOrPlanName: string;
   amount: number;
   dueDate: string; // YYYY-MM-DD
@@ -64,6 +65,7 @@ export interface PaymentInvoice {
   status: PaymentStatus;
   method: PaymentMethod;
   pixCode?: string;
+  qrCodeBase64?: string;
   paymentLinkUrl?: string;
   notes?: string;
   createdAt: string;
@@ -94,22 +96,23 @@ export interface CurriculumItem {
   skills?: string[];
 }
 
-export type MediaContentType = 'institucional' | 'videoaula' | 'podcast' | 'demonstrativo';
+export type MediaContentType = 'podcast' | 'curso_online' | 'institucional' | 'vendas' | 'videoaula' | 'demonstrativo';
 
 export interface VideoItem {
   id: string;
   teacherId?: string;
   title: string;
-  mediaType?: MediaContentType; // 'institucional' | 'videoaula' | 'podcast' | 'demonstrativo'
-  category: string; // e.g. "Vídeo Institucional", "Vídeo Aula", "Podcast", "Amostra Didática"
+  mediaType?: MediaContentType; // 'podcast' | 'curso_online' | 'institucional' | 'vendas'
+  category: string; // e.g. "Metodologia", "Aulas & Didática", "Treino & Performance", "Lançamentos & Ofertas", "Entrevistas"
   videoUrl: string; // YouTube, Spotify Embed, Vimeo, Apple Podcast or direct media URL
   thumbnailUrl: string;
   duration: string; // e.g. "04:30", "45 min", "1h 15m"
   description: string;
   featured?: boolean;
+  active?: boolean; // true = ativo no site/portal, false = inativo / rascunho
   spotifyUrl?: string;
   audioUrl?: string;
-  episodeNumber?: string; // e.g. "EP #12", "Aula #03"
+  episodeNumber?: string; // e.g. "EP #12", "Aula #03", "Módulo 01"
   speakerOrGuest?: string; // e.g. "Prof. Roberto & Convidado Dr. Lucas"
   publishDate?: string;
   tags?: string[];

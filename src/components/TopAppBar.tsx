@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { ViewMode, TeacherProfile, AuthUser, SystemUser, UserRole } from '../types';
 import { useAccessibility } from '../context/AccessibilityContext';
+import { AquagendaIcon } from './AquagendaLogo';
+import { SidebarMode } from './SideNav';
 import { 
   Search, 
   Menu, 
@@ -19,7 +21,7 @@ import {
   RotateCcw,
   HelpCircle,
   PlayCircle,
-  Accessibility
+  Sliders
 } from 'lucide-react';
 
 
@@ -35,6 +37,10 @@ interface TopAppBarProps {
   onLogout?: () => void;
   systemUsers?: SystemUser[];
   onSwitchUser?: (user: SystemUser) => void;
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
+  sidebarMode?: SidebarMode;
+  onChangeSidebarMode?: (mode: SidebarMode) => void;
 }
 
 export const TopAppBar: React.FC<TopAppBarProps> = ({
@@ -49,6 +55,10 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
   onLogout,
   systemUsers = [],
   onSwitchUser,
+  isSidebarOpen = false,
+  onToggleSidebar,
+  sidebarMode = 'pinned',
+  onChangeSidebarMode,
 }) => {
   const [isTenantOpen, setIsTenantOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -79,20 +89,49 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
 
   return (
     <header className="bg-white border-b border-[#eceef0] flex justify-between items-center w-full px-4 md:px-8 h-16 shrink-0 z-40 sticky top-0">
-      {/* Left side: View title & Breadcrumbs */}
-      <div className="flex items-center gap-4">
-        {/* Mobile quick view indicator */}
+      {/* Left side: View title, Menu Toggle & Breadcrumbs */}
+      <div className="flex items-center gap-3">
+        {/* Toggle Button for Mobile Drawer or Desktop Sidebar Mode */}
+        {onToggleSidebar && (
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            className="p-2 -ml-1 text-slate-700 hover:text-slate-950 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#57dffe]"
+            title={
+              sidebarMode === 'drawer'
+                ? (isSidebarOpen ? 'Fechar barra lateral (Esc)' : 'Abrir barra lateral (Alt + M)')
+                : 'Recolher / Ocultar barra lateral (Modo Móvel)'
+            }
+            aria-label="Alternar Menu Lateral"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
+
+        {/* Mobile quick brand indicator */}
         <div className="flex items-center gap-2 md:hidden">
-          <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-200">
-            <img 
-              src={userAvatar} 
-              alt={displayUserName} 
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-cover" 
-            />
-          </div>
-          <span className="font-semibold text-sm text-[#091426]">Agenda do Professor</span>
+          <AquagendaIcon className="w-7 h-7 shrink-0" alt="Aquagenda" />
+          <span className="font-extrabold text-sm text-[#091426] tracking-tight">Aquagenda</span>
         </div>
+
+        {/* Desktop Brand Tag */}
+        <div className="hidden lg:flex items-center gap-2 pr-3 border-r border-slate-200">
+          <AquagendaIcon className="w-6 h-6 shrink-0" alt="Aquagenda" />
+          <span className="font-extrabold text-sm text-[#091426] tracking-tight">Aquagenda</span>
+        </div>
+
+        {/* Indicator if sidebar is in drawer/mobile mode on desktop */}
+        {sidebarMode === 'drawer' && onToggleSidebar && (
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-cyan-50 text-cyan-800 border border-cyan-200 hover:bg-cyan-100 transition-colors cursor-pointer"
+            title="Menu lateral móvel (sob demanda). Clique ou tecle Alt+M para abrir"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
+            <span>Menu Móvel</span>
+          </button>
+        )}
 
         {/* Desktop Quick Nav Tabs */}
         {userRole !== 'aluno' ? (
@@ -443,8 +482,8 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
                 className="w-full px-4 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 flex items-center justify-between"
               >
                 <span className="flex items-center gap-2">
-                  <Accessibility className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Acessibilidade & Atalhos</span>
+                  <Sliders className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Preferências & Atalhos</span>
                 </span>
                 <span className="text-[10px] text-slate-400 font-mono">Alt+H</span>
               </button>

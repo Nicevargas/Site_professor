@@ -1,6 +1,5 @@
 import React from 'react';
 import { 
-  Accessibility, 
   Eye, 
   Type, 
   Sun, 
@@ -55,52 +54,11 @@ export const AccessibilityToolbar: React.FC = () => {
         Pular para o conteúdo principal (Alt + 1)
       </a>
 
-      {/* Floating Accessibility & Quick Help Launcher */}
-      <div 
-        role="region" 
-        aria-label="Ferramentas de Acessibilidade e Ajuda"
-        className="fixed bottom-5 right-5 z-40 flex items-center gap-2"
-      >
-        {/* Quick Tour Button */}
-        <button
-          type="button"
-          onClick={() => setIsInteractiveTourOpen(true)}
-          title="Iniciar Tour Interativo pelas Funcionalidades (Alt + T)"
-          className="hidden md:flex items-center gap-2 bg-[#091426] text-white px-3.5 py-2.5 rounded-full text-xs font-bold shadow-elevated hover:bg-[#1e293b] transition-all hover:scale-105 border border-slate-700"
-        >
-          <PlayCircle className="w-4 h-4 text-[#57dffe]" />
-          <span>Tour Interativo</span>
-        </button>
-
-        {/* Quick Tutorial Hub Button */}
-        <button
-          type="button"
-          onClick={() => setIsTutorialHubOpen(true)}
-          title="Central de Tutoriais & Ajuda"
-          className="hidden sm:flex items-center gap-1.5 bg-white text-[#00687a] px-3.5 py-2.5 rounded-full text-xs font-bold shadow-elevated hover:bg-cyan-50 transition-all border border-cyan-200"
-        >
-          <HelpCircle className="w-4 h-4" />
-          <span>Guia & Ajuda</span>
-        </button>
-
-        {/* Main Floating Accessibility Button */}
-        <button
-          type="button"
-          onClick={() => setIsA11yModalOpen(!isA11yModalOpen)}
-          aria-expanded={isA11yModalOpen}
-          aria-label="Menu de Acessibilidade e Preferências Visuais (Alt + H)"
-          title="Acessibilidade: Tamanho de fonte, contraste, leitor de voz e atalhos (Alt + H)"
-          className="flex items-center justify-center w-12 h-12 rounded-full bg-[#00687a] hover:bg-[#004e5c] text-white shadow-elevated transition-transform hover:scale-110 focus:outline-none focus:ring-4 focus:ring-cyan-300"
-        >
-          <Accessibility className="w-6 h-6" />
-        </button>
-      </div>
-
       {/* Accessibility Dialog Modal */}
       {isA11yModalOpen && (
         <div 
           role="dialog" 
-          aria-modal="true"
+          aria-modal="true" 
           aria-labelledby="a11y-modal-title"
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in"
           onClick={() => setIsA11yModalOpen(false)}
@@ -113,11 +71,11 @@ export const AccessibilityToolbar: React.FC = () => {
             <div className="bg-[#091426] text-white px-6 py-5 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 text-[#57dffe] flex items-center justify-center border border-cyan-500/30">
-                  <Accessibility className="w-6 h-6" />
+                  <Sliders className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 id="a11y-modal-title" className="text-lg font-bold">Central de Acessibilidade & Inclusão</h2>
-                  <p className="text-xs text-slate-300">Ajuste o sistema para sua melhor experiência visual e de leitura</p>
+                  <h2 id="a11y-modal-title" className="text-lg font-bold">Preferências Visuais & Leitura</h2>
+                  <p className="text-xs text-slate-300">Ajuste o tamanho de fonte, contraste e preferências do sistema</p>
                 </div>
               </div>
               
