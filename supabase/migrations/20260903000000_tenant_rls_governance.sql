@@ -11,16 +11,319 @@
 --   anônimo    -> leitura do site público + criação de agendamento pelo site
 -- ====================================================================
 
+-- 0. COLUNAS E TABELAS QUE AS POLÍTICAS USAM (bancos criados por versões antigas do schema)
+-- Todas as tabelas do sistema (idempotente; não altera tabelas já existentes)
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE IF NOT EXISTS public.teachers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    specialty TEXT,
+    bio TEXT,
+    whatsapp TEXT,
+    email TEXT,
+    avatar_url TEXT,
+    hero_image_url TEXT,
+    rating NUMERIC(3, 2) DEFAULT 5.0,
+    total_students INTEGER DEFAULT 0,
+    review_count INTEGER DEFAULT 128,
+    years_experience INTEGER DEFAULT 8,
+    brand_name TEXT,
+    logo_url TEXT,
+    show_logo BOOLEAN DEFAULT true,
+    primary_color TEXT DEFAULT '#00687a',
+    secondary_color TEXT DEFAULT '#57dffe',
+    accent_color TEXT DEFAULT '#004e5c',
+    theme_preset TEXT DEFAULT 'ocean-teal',
+    pix_key TEXT,
+    pix_key_type TEXT DEFAULT 'email',
+    pix_receiver_name TEXT,
+    pix_bank_name TEXT,
+    default_payment_gateway TEXT DEFAULT 'pix',
+    whatsapp_auto_reminder_8h BOOLEAN DEFAULT true,
+    vacation_mode JSONB DEFAULT '{"enabled": false}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.students (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT REFERENCES public.teachers(id) ON DELETE SET NULL,
+    name TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    avatar TEXT,
+    joined_date TEXT,
+    total_classes INTEGER DEFAULT 0,
+    last_class TEXT,
+    status TEXT DEFAULT 'Ativo',
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.system_users (
+    id TEXT PRIMARY KEY,
+    auth_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    teacher_id TEXT REFERENCES public.teachers(id) ON DELETE SET NULL,
+    student_id TEXT REFERENCES public.students(id) ON DELETE SET NULL,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    role TEXT NOT NULL DEFAULT 'professor' CHECK (role IN ('admin', 'professor', 'assistente', 'aluno')),
+    avatar_url TEXT,
+    phone TEXT,
+    bio TEXT,
+    status TEXT NOT NULL DEFAULT 'ativo' CHECK (status IN ('ativo', 'inativo', 'pendente')),
+    permissions TEXT[] DEFAULT ARRAY[]::TEXT[],
+    last_login TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.services (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    description TEXT,
+    price NUMERIC(10, 2) NOT NULL DEFAULT 150.00,
+    duration_minutes INTEGER NOT NULL DEFAULT 60,
+    modality TEXT NOT NULL DEFAULT 'Online / Presencial',
+    badge TEXT,
+    icon_name TEXT DEFAULT 'school',
+    active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.appointments (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
+    student_id TEXT REFERENCES public.students(id) ON DELETE SET NULL,
+    student_name TEXT NOT NULL,
+    student_initials TEXT,
+    student_avatar TEXT,
+    student_phone TEXT,
+    student_email TEXT,
+    service_id TEXT,
+    service_name TEXT NOT NULL,
+    date TEXT NOT NULL, -- Formato YYYY-MM-DD
+    day_of_week INTEGER NOT NULL DEFAULT 1,
+    start_time TEXT NOT NULL, -- Formato HH:MM
+    end_time TEXT NOT NULL,   -- Formato HH:MM
+    duration_minutes INTEGER NOT NULL DEFAULT 60,
+    modality TEXT NOT NULL DEFAULT 'Online (Google Meet)',
+    meeting_url TEXT,
+    status TEXT NOT NULL DEFAULT 'Confirmado',
+    notes TEXT,
+    client_since TEXT,
+    price NUMERIC(10, 2) DEFAULT 150.00,
+    reminder_8h_sent BOOLEAN DEFAULT false,
+    google_calendar_event_id TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.payments (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
+    student_id TEXT REFERENCES public.students(id) ON DELETE SET NULL,
+    student_name TEXT NOT NULL,
+    student_phone TEXT,
+    student_email TEXT,
+    student_initials TEXT,
+    service_or_plan_name TEXT NOT NULL,
+    amount NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    due_date TEXT NOT NULL, -- Formato YYYY-MM-DD
+    paid_at TEXT,
+    status TEXT NOT NULL DEFAULT 'pendente',
+    method TEXT NOT NULL DEFAULT 'pix',
+    pix_code TEXT,
+    qr_code_base64 TEXT,
+    payment_link_url TEXT,
+    installments TEXT,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.videos (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    media_type TEXT NOT NULL DEFAULT 'institucional', -- 'institucional' | 'videoaula' | 'podcast' | 'demonstrativo'
+    category TEXT NOT NULL DEFAULT 'Geral',
+    video_url TEXT NOT NULL,
+    thumbnail_url TEXT NOT NULL,
+    duration TEXT DEFAULT '05:00',
+    description TEXT,
+    featured BOOLEAN DEFAULT false,
+    spotify_url TEXT,
+    audio_url TEXT,
+    episode_number TEXT,
+    speaker_or_guest TEXT,
+    publish_date TEXT,
+    tags TEXT[] DEFAULT ARRAY[]::TEXT[],
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.photos (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'aulas', -- 'aulas' | 'espaco' | 'conquistas' | 'bastidores'
+    image_url TEXT NOT NULL,
+    caption TEXT,
+    date TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.testimonials (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
+    student_name TEXT NOT NULL,
+    role_or_course TEXT,
+    avatar_url TEXT,
+    rating NUMERIC(2, 1) DEFAULT 5.0,
+    content TEXT NOT NULL,
+    date TEXT,
+    verified BOOLEAN DEFAULT true,
+    featured BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.curriculum_items (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    institution TEXT NOT NULL,
+    period TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'education', -- 'education' | 'experience' | 'certification' | 'award'
+    description TEXT,
+    skills TEXT[] DEFAULT ARRAY[]::TEXT[],
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.faqs (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
+    question TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    category TEXT DEFAULT 'geral',
+    featured BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.pricing_plans (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    price_month NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    description TEXT,
+    is_popular BOOLEAN DEFAULT false,
+    features_header TEXT,
+    features TEXT[] DEFAULT ARRAY[]::TEXT[],
+    cta_text TEXT DEFAULT 'Escolher Plano',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.reminders (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    due_date TEXT NOT NULL,
+    completed BOOLEAN DEFAULT false,
+    delayed BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.message_templates (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    template TEXT NOT NULL,
+    active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.integrations_config (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
+    google_calendar_sync BOOLEAN DEFAULT true,
+    whatsapp_auto_reminder_8h BOOLEAN DEFAULT true,
+    whatsapp_api_token TEXT,
+    webhook_url TEXT,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Colunas que as políticas usam e que podem faltar em bancos antigos
+ALTER TABLE public.integrations_config ADD COLUMN IF NOT EXISTS webhook_url TEXT;
+ALTER TABLE public.integrations_config ADD COLUMN IF NOT EXISTS whatsapp_api_token TEXT;
+ALTER TABLE public.integrations_config ADD COLUMN IF NOT EXISTS whatsapp_auto_reminder_8h BOOLEAN DEFAULT true;
+
+ALTER TABLE public.students ADD COLUMN IF NOT EXISTS teacher_id TEXT REFERENCES public.teachers(id) ON DELETE SET NULL;
+ALTER TABLE public.students ADD COLUMN IF NOT EXISTS email TEXT;
+ALTER TABLE public.appointments ADD COLUMN IF NOT EXISTS teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE;
+ALTER TABLE public.appointments ADD COLUMN IF NOT EXISTS student_id TEXT REFERENCES public.students(id) ON DELETE SET NULL;
+ALTER TABLE public.appointments ADD COLUMN IF NOT EXISTS student_email TEXT;
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE;
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS student_id TEXT REFERENCES public.students(id) ON DELETE SET NULL;
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS student_email TEXT;
+ALTER TABLE public.system_users ADD COLUMN IF NOT EXISTS teacher_id TEXT REFERENCES public.teachers(id) ON DELETE SET NULL;
+ALTER TABLE public.system_users ADD COLUMN IF NOT EXISTS student_id TEXT REFERENCES public.students(id) ON DELETE SET NULL;
+ALTER TABLE public.system_users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ativo';
+ALTER TABLE public.system_users ADD COLUMN IF NOT EXISTS permissions TEXT[] DEFAULT ARRAY[]::TEXT[];
+ALTER TABLE public.system_users ADD COLUMN IF NOT EXISTS auth_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL;
+ALTER TABLE public.system_users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE public.system_users ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE public.system_users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL;
+ALTER TABLE public.system_users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_system_users_auth ON public.system_users(auth_user_id);
+
 -- 1. SEGREDOS DE INTEGRAÇÃO SAEM DA TABELA PÚBLICA teachers
---    (teachers é lida pelo site aberto; token do n8n não pode ficar lá)
-INSERT INTO public.integrations_config (id, teacher_id, webhook_url, whatsapp_api_token, whatsapp_auto_reminder_8h, updated_at)
-SELECT 'integ-' || t.id, t.id, t.n8n_webhook_url, t.n8n_auth_token, COALESCE(t.whatsapp_auto_reminder_8h, true), NOW()
-FROM public.teachers t
-WHERE (t.n8n_webhook_url IS NOT NULL OR t.n8n_auth_token IS NOT NULL)
-ON CONFLICT (id) DO UPDATE SET
-    webhook_url = COALESCE(EXCLUDED.webhook_url, public.integrations_config.webhook_url),
-    whatsapp_api_token = COALESCE(EXCLUDED.whatsapp_api_token, public.integrations_config.whatsapp_api_token),
-    updated_at = NOW();
+--    (teachers é lida pelo site aberto; token do n8n não pode ficar lá).
+--    Só executa se as colunas existirem neste banco.
+DO $$
+DECLARE
+    has_webhook BOOLEAN;
+    has_token BOOLEAN;
+    has_reminder BOOLEAN;
+BEGIN
+    SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'teachers' AND column_name = 'n8n_webhook_url') INTO has_webhook;
+    SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'teachers' AND column_name = 'n8n_auth_token') INTO has_token;
+    SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'teachers' AND column_name = 'whatsapp_auto_reminder_8h') INTO has_reminder;
+
+    IF has_webhook OR has_token THEN
+        EXECUTE format(
+            'INSERT INTO public.integrations_config (id, teacher_id, webhook_url, whatsapp_api_token, whatsapp_auto_reminder_8h, updated_at)
+             SELECT ''integ-'' || t.id, t.id, %s, %s, %s, NOW()
+             FROM public.teachers t
+             WHERE %s
+             ON CONFLICT (id) DO UPDATE SET
+                 webhook_url = COALESCE(EXCLUDED.webhook_url, public.integrations_config.webhook_url),
+                 whatsapp_api_token = COALESCE(EXCLUDED.whatsapp_api_token, public.integrations_config.whatsapp_api_token),
+                 updated_at = NOW()',
+            CASE WHEN has_webhook THEN 't.n8n_webhook_url' ELSE 'NULL::text' END,
+            CASE WHEN has_token THEN 't.n8n_auth_token' ELSE 'NULL::text' END,
+            CASE WHEN has_reminder THEN 'COALESCE(t.whatsapp_auto_reminder_8h, true)' ELSE 'true' END,
+            CASE
+                WHEN has_webhook AND has_token THEN '(t.n8n_webhook_url IS NOT NULL OR t.n8n_auth_token IS NOT NULL)'
+                WHEN has_webhook THEN 't.n8n_webhook_url IS NOT NULL'
+                ELSE 't.n8n_auth_token IS NOT NULL'
+            END
+        );
+    END IF;
+END $$;
 
 ALTER TABLE public.teachers DROP COLUMN IF EXISTS n8n_webhook_url;
 ALTER TABLE public.teachers DROP COLUMN IF EXISTS n8n_auth_token;
