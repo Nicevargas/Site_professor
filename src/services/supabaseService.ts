@@ -23,9 +23,48 @@ export const supabaseService = {
         rating: Number(t.rating || 5.0),
         reviewCount: Number(t.review_count || 128),
         yearsExperience: Number(t.years_experience || 8),
+        // Identidade visual
+        brandName: t.brand_name || undefined,
+        logoUrl: t.logo_url || undefined,
+        showLogo: t.show_logo ?? true,
+        primaryColor: t.primary_color || undefined,
+        secondaryColor: t.secondary_color || undefined,
+        accentColor: t.accent_color || undefined,
+        themePreset: t.theme_preset || undefined,
+        // Recebimento (Pix)
+        pixKey: t.pix_key || undefined,
+        pixKeyType: t.pix_key_type || undefined,
+        pixReceiverName: t.pix_receiver_name || undefined,
+        pixBankName: t.pix_bank_name || undefined,
+        defaultPaymentGateway: t.default_payment_gateway || undefined,
+        whatsappAutoReminder8h: t.whatsapp_auto_reminder_8h ?? true,
+        vacationMode: t.vacation_mode && typeof t.vacation_mode === 'object' ? t.vacation_mode : undefined,
       }));
     } catch (err) {
       console.warn('Erro ao buscar professores no Supabase:', err);
+      return null;
+    }
+  },
+
+  /**
+   * Segredos de integração (n8n) ficam em integrations_config, visível só ao dono do tenant.
+   */
+  async getIntegrationsConfig(teacherId: string): Promise<Partial<TeacherProfile> | null> {
+    if (!isSupabaseConfigured || !supabase || !teacherId) return null;
+    try {
+      const { data, error } = await supabase
+        .from('integrations_config')
+        .select('webhook_url, whatsapp_api_token, whatsapp_auto_reminder_8h')
+        .eq('teacher_id', teacherId)
+        .limit(1);
+      if (error || !data || data.length === 0) return null;
+      const row = data[0];
+      return {
+        n8nWebhookUrl: row.webhook_url || undefined,
+        n8nAuthToken: row.whatsapp_api_token || undefined,
+        whatsappAutoReminder8h: row.whatsapp_auto_reminder_8h ?? true,
+      };
+    } catch {
       return null;
     }
   },
@@ -47,10 +86,44 @@ export const supabaseService = {
         avatar_url: teacher.avatarUrl || '',
         hero_image_url: teacher.heroImageUrl || '',
         rating: teacher.rating || 5.0,
-        total_students: 25,
+        review_count: teacher.reviewCount ?? 0,
+        years_experience: teacher.yearsExperience ?? 0,
+        // Identidade visual
+        brand_name: teacher.brandName || null,
+        logo_url: teacher.logoUrl || null,
+        show_logo: teacher.showLogo ?? true,
+        primary_color: teacher.primaryColor || '#00687a',
+        secondary_color: teacher.secondaryColor || '#57dffe',
+        accent_color: teacher.accentColor || '#004e5c',
+        theme_preset: teacher.themePreset || 'ocean',
+        // Recebimento (Pix)
+        pix_key: teacher.pixKey || null,
+        pix_key_type: teacher.pixKeyType || 'email',
+        pix_receiver_name: teacher.pixReceiverName || null,
+        pix_bank_name: teacher.pixBankName || null,
+        default_payment_gateway: teacher.defaultPaymentGateway || 'pix',
+        whatsapp_auto_reminder_8h: teacher.whatsappAutoReminder8h ?? true,
+        vacation_mode: teacher.vacationMode || { enabled: false },
         updated_at: new Date().toISOString(),
       });
-      return !error;
+      if (error) {
+        console.warn('Erro ao salvar professor no Supabase:', error.message);
+        return false;
+      }
+
+      // Segredos do n8n nunca vão para a tabela pública teachers
+      if (teacher.n8nWebhookUrl || teacher.n8nAuthToken) {
+        const { error: integError } = await supabase.from('integrations_config').upsert({
+          id: `integ-${teacher.id}`,
+          teacher_id: teacher.id,
+          webhook_url: teacher.n8nWebhookUrl || null,
+          whatsapp_api_token: teacher.n8nAuthToken || null,
+          whatsapp_auto_reminder_8h: teacher.whatsappAutoReminder8h ?? true,
+          updated_at: new Date().toISOString(),
+        });
+        if (integError) console.warn('Erro ao salvar integrações no Supabase:', integError.message);
+      }
+      return true;
     } catch (err) {
       console.warn('Erro ao salvar professor no Supabase:', err);
       return false;
@@ -418,6 +491,7 @@ export const supabaseService = {
       if (error || !data || data.length === 0) return null;
       return data.map((v: any) => ({
         id: v.id,
+        teacherId: v.teacher_id || undefined,
         title: v.title,
         mediaType: v.media_type,
         category: v.category,
@@ -461,9 +535,11 @@ export const supabaseService = {
         audio_url: video.audioUrl || null,
         episode_number: video.episodeNumber || null,
         speaker_or_guest: video.speakerOrGuest || null,
+        publish_date: video.publishDate || null,
         tags: video.tags || [],
         updated_at: new Date().toISOString(),
       });
+      if (error) console.warn('Erro ao salvar vídeo no Supabase:', error.message);
       return !error;
     } catch (err) {
       console.warn('Erro ao salvar vídeo no Supabase:', err);

@@ -185,16 +185,13 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
     { label: 'Laboratório', url: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=800&auto=format&fit=crop&q=80' },
   ];
 
-  const VIDEO_CATEGORY_PRESETS = [
-    'Metodologia & Apresentação',
-    'Aulas & Didática',
-    'Treino & Performance',
-    'Lançamentos & Ofertas',
-    'Entrevistas & Debates',
-    'Depoimentos & Prova Social',
-    'Dicas Rápidas',
-    'Infraestrutura & Espaço',
-  ];
+  // Sugestões de categoria por tipo de conteúdo (a categoria continua livre para digitar)
+  const VIDEO_CATEGORY_PRESETS: Record<'podcast' | 'curso_online' | 'institucional' | 'vendas', string[]> = {
+    podcast: ['Entrevistas & Debates', 'Bate-papo com Alunos', 'Dicas Rápidas', 'Bastidores'],
+    curso_online: ['Aulas & Didática', 'Treino & Performance', 'Resolução de Exercícios', 'Módulo Introdutório'],
+    institucional: ['Metodologia & Apresentação', 'Infraestrutura & Espaço', 'Depoimentos & Prova Social', 'Boas-vindas'],
+    vendas: ['Lançamentos & Ofertas', 'Matrículas Abertas', 'Planos & Pacotes', 'Mentoria Exclusiva'],
+  };
 
   const presetVideoThumbnails = {
     institucional: [
@@ -416,6 +413,15 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
     }
 
     setIsVideoModalOpen(true);
+  };
+
+  // Troca de tipo dentro do formulário: ajusta a categoria sugerida se ela ainda for uma das sugestões
+  const changeVideoType = (type: 'podcast' | 'curso_online' | 'institucional' | 'vendas') => {
+    setVidMediaType(type);
+    const allPresets = Object.values(VIDEO_CATEGORY_PRESETS).flat();
+    if (!vidCategory.trim() || allPresets.includes(vidCategory)) {
+      setVidCategory(VIDEO_CATEGORY_PRESETS[type][0]);
+    }
   };
 
   const openEditVideo = (item: VideoItem) => {
@@ -2163,7 +2169,7 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      setVidMediaType('podcast');
+                      changeVideoType('podcast');
                       if (!editingVideo) {
                         setVidCategory('Podcast & Entrevistas');
                         setVidThumbnail(presetVideoThumbnails.podcast[0].url);
@@ -2183,7 +2189,7 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      setVidMediaType('curso_online');
+                      changeVideoType('curso_online');
                       if (!editingVideo) {
                         setVidCategory('Curso Online & Aulas');
                         setVidThumbnail(presetVideoThumbnails.curso_online[0].url);
@@ -2203,7 +2209,7 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      setVidMediaType('institucional');
+                      changeVideoType('institucional');
                       if (!editingVideo) {
                         setVidCategory('Institucional & Metodologia');
                         setVidThumbnail(presetVideoThumbnails.institucional[0].url);
@@ -2222,7 +2228,7 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      setVidMediaType('vendas');
+                      changeVideoType('vendas');
                       if (!editingVideo) {
                         setVidCategory('Planos & Matrículas');
                         setVidThumbnail(presetVideoThumbnails.vendas[0].url);
@@ -2344,7 +2350,7 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
                 {/* Category Preset Suggestions */}
                 <div className="flex items-center gap-1 flex-wrap pt-0.5">
                   <span className="text-[10px] text-slate-400 font-medium mr-1">Sugestões:</span>
-                  {VIDEO_CATEGORY_PRESETS.map((catPreset) => (
+                  {VIDEO_CATEGORY_PRESETS[vidMediaType].map((catPreset) => (
                     <button
                       key={catPreset}
                       type="button"

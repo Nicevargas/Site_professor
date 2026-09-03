@@ -176,6 +176,11 @@ function AppInner() {
     return allInvoices.filter(inv => !inv.teacherId || inv.teacherId === currentTeacher.id);
   }, [allInvoices, currentTeacher.id]);
 
+  // Conteúdo multimídia do professor atual (isolamento por tenant também no site e no portal)
+  const teacherVideos = useMemo(() => {
+    return videos.filter(v => !v.teacherId || v.teacherId === currentTeacher.id);
+  }, [videos, currentTeacher.id]);
+
   const overdueCount = useMemo(() => {
     return invoices.filter(inv => inv.status === 'vencido').length;
   }, [invoices]);
@@ -307,10 +312,13 @@ function AppInner() {
         if (dbTeachers && dbTeachers.length > 0) {
           setTeachers(dbTeachers);
           const currentExists = dbTeachers.find((t: TeacherProfile) => t.id === currentTeacher.id);
-          if (currentExists) {
-            setCurrentTeacher(currentExists);
-          } else {
-            setCurrentTeacher(dbTeachers[0]);
+          const activeTeacher = currentExists || dbTeachers[0];
+          setCurrentTeacher(activeTeacher);
+
+          // Segredos de integração (n8n) vivem em integrations_config; só o dono consegue ler
+          const integrations = await supabaseService.getIntegrationsConfig(activeTeacher.id);
+          if (integrations) {
+            setCurrentTeacher((prev) => ({ ...prev, ...integrations }));
           }
         }
 
@@ -723,7 +731,7 @@ function AppInner() {
         services={services}
         testimonials={testimonials}
         curriculum={curriculum}
-        videos={videos}
+        videos={teacherVideos}
         photos={photos}
         faqs={faqs}
         isAuthenticated={!!currentUser}
@@ -965,7 +973,7 @@ function AppInner() {
               currentTeacher={currentTeacher}
               appointments={appointments}
               invoices={invoices}
-              videos={videos}
+              videos={teacherVideos}
               onOpenBookingWizard={() => setCurrentView('public-booking')}
               onOpenPublicSite={() => setCurrentView('public-landing')}
             />
@@ -976,7 +984,7 @@ function AppInner() {
               currentTeacher={currentTeacher}
               testimonials={testimonials}
               curriculum={curriculum}
-              videos={videos}
+              videos={teacherVideos}
               photos={photos}
               faqs={faqs}
               onUpdateTestimonials={setTestimonials}

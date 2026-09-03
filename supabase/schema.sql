@@ -150,13 +150,14 @@ CREATE TABLE IF NOT EXISTS public.videos (
     id TEXT PRIMARY KEY,
     teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
-    media_type TEXT NOT NULL DEFAULT 'institucional', -- 'institucional' | 'videoaula' | 'podcast' | 'demonstrativo'
+    media_type TEXT NOT NULL DEFAULT 'institucional', -- 'podcast' | 'curso_online' | 'institucional' | 'vendas'
     category TEXT NOT NULL DEFAULT 'Geral',
     video_url TEXT NOT NULL,
     thumbnail_url TEXT NOT NULL,
     duration TEXT DEFAULT '05:00',
     description TEXT,
     featured BOOLEAN DEFAULT false,
+    active BOOLEAN DEFAULT true, -- false = oculto no site e no portal do aluno
     spotify_url TEXT,
     audio_url TEXT,
     episode_number TEXT,

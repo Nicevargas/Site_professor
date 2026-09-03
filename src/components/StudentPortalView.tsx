@@ -321,7 +321,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {videos.slice(0, 3).map((vid) => (
+            {videos.filter((vid) => vid.active !== false).slice(0, 3).map((vid) => (
               <div 
                 key={vid.id}
                 onClick={() => setActiveMedia(vid)}
