@@ -2329,7 +2329,7 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
                 {/* Category Preset Suggestions */}
                 <div className="flex items-center gap-1 flex-wrap pt-0.5">
                   <span className="text-[10px] text-slate-400 font-medium mr-1">Sugestões:</span>
-                  {VIDEO_CATEGORY_PRESETS[vidMediaType].map((catPreset) => (
+                  {VIDEO_CATEGORY_PRESETS.map((catPreset) => (
                     <button
                       key={catPreset}
                       type="button"

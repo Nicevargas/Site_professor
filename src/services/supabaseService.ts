@@ -67,6 +67,7 @@ export const supabaseService = {
       if (error || !data || data.length === 0) return null;
       return data.map((s: any) => ({
         id: s.id,
+        teacherId: s.teacher_id || undefined,
         name: s.name,
         description: s.description || '',
         price: Number(s.price),
@@ -128,6 +129,7 @@ export const supabaseService = {
       if (error || !data || data.length === 0) return null;
       return data.map((a: any) => ({
         id: a.id,
+        teacherId: a.teacher_id || undefined,
         studentName: a.student_name,
         studentInitials: a.student_initials || 'AL',
         studentPhone: a.student_phone || '',
@@ -205,6 +207,7 @@ export const supabaseService = {
       if (error || !data || data.length === 0) return null;
       return data.map((s: any) => ({
         id: s.id,
+        teacherId: s.teacher_id || undefined,
         name: s.name,
         email: s.email || '',
         phone: s.phone || '',
@@ -257,6 +260,7 @@ export const supabaseService = {
       if (error || !data || data.length === 0) return null;
       return data.map((r: any) => ({
         id: r.id,
+        teacherId: r.teacher_id || undefined,
         title: r.title,
         dueDate: r.due_date,
         completed: Boolean(r.completed),
@@ -572,7 +576,8 @@ export const supabaseService = {
         const { data: teacherData, error: tError } = await tQuery.limit(1);
         if (!tError && teacherData && teacherData.length > 0) {
           const teacher = teacherData[0];
-          const assignedRole = clean.includes('admin') || clean === 'curtatche@gmail.com' ? 'admin' : (teacher.role || 'professor');
+          // Um registro em `teachers` só prova que a pessoa é professora; admin nunca é inferido pelo e-mail
+          const assignedRole = 'professor';
           const sysUser = {
             id: `user-prof-${teacher.id}`,
             name: teacher.name,
@@ -581,7 +586,7 @@ export const supabaseService = {
             avatar_url: teacher.avatar_url,
             teacher_id: teacher.id,
             status: 'ativo',
-            permissions: assignedRole === 'admin' ? ['all_access'] : ['manage_own_agenda', 'manage_own_services', 'manage_own_students', 'manage_own_finances'],
+            permissions: ['manage_own_agenda', 'manage_own_services', 'manage_own_students', 'manage_own_finances'],
           };
 
           // Background auto-sync into system_users
@@ -621,25 +626,6 @@ export const supabaseService = {
         }
       } catch (e) {
         console.warn('Busca em students gerou aviso:', e);
-      }
-
-      // 4. Special provision for curtatche@gmail.com
-      if (clean === 'curtatche@gmail.com' || clean === 'curtatche') {
-        const adminUser = {
-          id: 'user-admin-curtatche',
-          name: 'Administrador (curtatche)',
-          email: 'curtatche@gmail.com',
-          role: 'admin',
-          avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-          status: 'ativo',
-          permissions: ['all_access'],
-        };
-        try {
-          await supabase.from('system_users').upsert(adminUser);
-        } catch {
-          // ignore
-        }
-        return adminUser;
       }
 
       return null;

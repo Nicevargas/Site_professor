@@ -37,7 +37,6 @@ export const INITIAL_TEACHER_PROFILES: TeacherProfile[] = [
     pixReceiverName: 'Roberto Almeida - Educação Física',
     pixBankName: 'Nubank / Itaú',
     defaultPaymentGateway: 'pix',
-    brandName: 'Aquagenda',
     logoUrl: '/icon.svg',
     showLogo: true
   },
@@ -62,7 +61,6 @@ export const INITIAL_TEACHER_PROFILES: TeacherProfile[] = [
     pixReceiverName: 'Carlos Silva Aulas Particulares',
     pixBankName: 'Inter / Santander',
     defaultPaymentGateway: 'pix',
-    brandName: 'Aquagenda',
     logoUrl: '/icon.svg',
     showLogo: true
   }

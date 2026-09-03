@@ -54,6 +54,8 @@ interface DashboardViewProps {
   onNavigateToPayments?: () => void;
   onOpenVacationModal?: () => void;
   onNavigateToTutorialWizard?: () => void;
+  /** false para a secretaria: esconde faturamento, automações e gestão do site (dono do tenant) */
+  canManageBusiness?: boolean;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -73,6 +75,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigateToPayments,
   onOpenVacationModal,
   onNavigateToTutorialWizard,
+  canManageBusiness = true,
 }) => {
   const [newReminderText, setNewReminderText] = useState('');
   const [showAddReminder, setShowAddReminder] = useState(false);
@@ -260,6 +263,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* Metrics Bento Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {/* Metric Card 1: Receita Estimada */}
+          {canManageBusiness && (
           <div 
             onClick={onNavigateToPayments}
             className="bg-white rounded-2xl p-5 shadow-ambient border border-[#eceef0] flex flex-col justify-between h-44 hover:border-emerald-300 transition-all cursor-pointer group"
@@ -279,6 +283,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <p className="text-[11px] text-emerald-600 font-semibold mt-1">Clique para gerenciar links & PIX</p>
             </div>
           </div>
+          )}
 
           {/* Metric Card 2: Aulas Hoje */}
           <div className="bg-white rounded-2xl p-5 shadow-ambient border border-[#eceef0] flex flex-col justify-between h-44 hover:border-slate-300 transition-all">
@@ -317,6 +322,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Metric Card 4: Status de Automações & n8n */}
+          {canManageBusiness && (
           <div className="bg-white rounded-2xl p-5 shadow-ambient border border-[#eceef0] flex flex-col justify-between h-44 hover:border-orange-300 transition-all">
             <div className="flex justify-between items-start">
               <div className="w-11 h-11 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600 border border-orange-100">
@@ -353,6 +359,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             </div>
           </div>
+          )}
         </div>
 
         {/* 8-Hour Prior WhatsApp Automated Notification Banner */}

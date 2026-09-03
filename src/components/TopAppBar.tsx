@@ -178,7 +178,8 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
                 Usuários & RBAC
               </button>
             )}
-            <button 
+            {(userRole === 'admin' || userRole === 'professor') && (
+            <button
               onClick={() => onNavigate('pagamentos')}
               className={`text-sm font-semibold transition-colors pb-1 ${
                 currentView === 'pagamentos'
@@ -188,7 +189,7 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
             >
               Financeiro
             </button>
-          </div>
+            )}          </div>
         ) : (
           <div className="hidden md:flex items-center gap-6">
             <button 
@@ -241,7 +242,7 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
             <button
               onClick={() => setIsRoleSwitcherOpen(!isRoleSwitcherOpen)}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all border border-slate-200"
-              title="Trocar Perfil de Acesso Rapidamente para Demonstração"
+              title="Assumir outro perfil (apenas administrador)"
             >
               <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border ${currentRoleBadge.bg}`}>
                 <RoleIcon className="w-3 h-3" />
@@ -432,16 +433,18 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
                 </button>
               )}
 
-              <button
-                onClick={() => {
-                  onNavigate('configuracoes');
-                  setIsProfileOpen(false);
-                }}
-                className="w-full px-4 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-              >
-                <User className="w-3.5 h-3.5 text-slate-400" />
-                <span>Meu Perfil & Configurações</span>
-              </button>
+              {userRole !== 'assistente' && (
+                <button
+                  onClick={() => {
+                    onNavigate('configuracoes');
+                    setIsProfileOpen(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                >
+                  <User className="w-3.5 h-3.5 text-slate-400" />
+                  <span>{userRole === 'aluno' ? 'Meus Dados' : 'Meu Perfil & Configurações'}</span>
+                </button>
+              )}
 
               <div className="border-t border-slate-100 my-1"></div>
 

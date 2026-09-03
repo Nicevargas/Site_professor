@@ -40,6 +40,7 @@ interface SideNavProps {
   currentUser?: AuthUser | null;
   isOpen: boolean;
   onClose: () => void;
+  onOpen?: () => void;
   sidebarMode: SidebarMode;
   onChangeSidebarMode: (mode: SidebarMode) => void;
 }
@@ -52,6 +53,7 @@ export const SideNav: React.FC<SideNavProps> = ({
   currentUser,
   isOpen,
   onClose,
+  onOpen,
   sidebarMode,
   onChangeSidebarMode
 }) => {
@@ -93,7 +95,6 @@ export const SideNav: React.FC<SideNavProps> = ({
           { id: 'agenda' as ViewMode, label: 'Agenda de Aulas', icon: CalendarIcon },
           { id: 'alunos' as ViewMode, label: 'Cadastro de Alunos', icon: Users },
           { id: 'servicos' as ViewMode, label: 'Consulta Serviços', icon: Layers },
-          { id: 'configuracoes' as ViewMode, label: 'Configurações', icon: Settings },
         ];
 
       case 'aluno':
@@ -453,10 +454,7 @@ export const SideNav: React.FC<SideNavProps> = ({
             if (isOpen) {
               onClose();
             } else {
-              // Open drawer
-              onChangeSidebarMode('drawer');
-              // Let parent know to open
-              if (isOpen) onClose();
+              onOpen?.();
             }
           }}
           className={`flex flex-col items-center justify-center py-1 px-3 rounded-lg relative transition-all ${

@@ -63,6 +63,8 @@ import { TutorialWizardView } from './components/TutorialWizardView';
 import { supabaseService } from './services/supabaseService';
 import { isSupabaseConfigured, supabase } from './lib/supabase';
 import { dispatchAppointmentWebhook, dispatchFormWebhook } from './utils/webhookDispatcher';
+import { canAccessView, getDefaultView, canSwitchProfiles, canViewFinances, sanitizeSelfDeclaredRole } from './utils/permissions';
+import { StudentProfileView } from './components/StudentProfileView';
 
 
 function AppInner() {
@@ -169,7 +171,7 @@ function AppInner() {
   }, [allInvoices, currentTeacher.id]);
 
   const overdueCount = useMemo(() => {
-    return invoices.filter(inv => inv.status === 'overdue').length;
+    return invoices.filter(inv => inv.status === 'vencido').length;
   }, [invoices]);
 
   // Sidebar Display Mode (Móvel / Sob Demanda vs Fixada vs Compacta)
@@ -234,6 +236,14 @@ function AppInner() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isSidebarOpen]);
+
+  // Guarda de rotas por papel: nunca manter aberta uma tela que o papel atual não pode acessar
+  useEffect(() => {
+    if (!currentUser) return;
+    if (!canAccessView(currentUser.role, currentView)) {
+      setCurrentView(getDefaultView(currentUser.role));
+    }
+  }, [currentUser, currentView]);
 
   // Load from Supabase on startup
   useEffect(() => {
@@ -302,7 +312,7 @@ function AppInner() {
         if (session?.user) {
           const email = session.user.email || '';
           const dbUser = await supabaseService.findUserByEmail(email);
-          const role = (dbUser?.role as UserRole) || (email === 'curtatche@gmail.com' ? 'admin' : (session.user.user_metadata?.role as UserRole) || 'professor');
+          const role = (dbUser?.role as UserRole) || sanitizeSelfDeclaredRole(session.user.user_metadata?.role);
           const authUser: AuthUser = {
             id: dbUser?.id || session.user.id,
             email: email,
@@ -322,7 +332,7 @@ function AppInner() {
         if (session?.user) {
           const email = session.user.email || '';
           const dbUser = await supabaseService.findUserByEmail(email);
-          const role = (dbUser?.role as UserRole) || (email === 'curtatche@gmail.com' ? 'admin' : (session.user.user_metadata?.role as UserRole) || 'professor');
+          const role = (dbUser?.role as UserRole) || sanitizeSelfDeclaredRole(session.user.user_metadata?.role);
           const authUser: AuthUser = {
             id: dbUser?.id || session.user.id,
             email: email,
@@ -348,31 +358,34 @@ function AppInner() {
     setCurrentUser(user);
     localStorage.setItem('agenda_prof_current_user', JSON.stringify(user));
 
-    const updatedProfile: TeacherProfile = {
-      ...currentTeacher,
-      ...(teacherData || {}),
-      id: user.id || currentTeacher.id,
-      name: teacherData?.name || user.name || currentTeacher.name,
-      email: teacherData?.email || user.email || currentTeacher.email,
-      specialty: teacherData?.specialty || currentTeacher.specialty,
-      whatsapp: teacherData?.whatsapp || currentTeacher.whatsapp,
-    };
-    setCurrentTeacher(updatedProfile);
-    localStorage.setItem(`agenda_prof_teacher_${updatedProfile.id}`, JSON.stringify(updatedProfile));
+    if (user.role === 'professor') {
+      // Só o próprio professor alimenta o perfil público com os dados do seu login
+      const updatedProfile: TeacherProfile = {
+        ...currentTeacher,
+        ...(teacherData || {}),
+        id: user.id || currentTeacher.id,
+        name: teacherData?.name || user.name || currentTeacher.name,
+        email: teacherData?.email || user.email || currentTeacher.email,
+        specialty: teacherData?.specialty || currentTeacher.specialty,
+        whatsapp: teacherData?.whatsapp || currentTeacher.whatsapp,
+      };
+      setCurrentTeacher(updatedProfile);
+      localStorage.setItem(`agenda_prof_teacher_${updatedProfile.id}`, JSON.stringify(updatedProfile));
 
-    setTeachers((prev) => {
-      const exists = prev.some((t) => t.id === updatedProfile.id || t.email === updatedProfile.email);
-      if (exists) {
-        return prev.map((t) => (t.id === updatedProfile.id || t.email === updatedProfile.email ? updatedProfile : t));
-      }
-      return [updatedProfile, ...prev];
-    });
-
-    if (user.role === 'aluno') {
-      setCurrentView('portal-aluno');
-    } else {
-      setCurrentView('dashboard');
+      setTeachers((prev) => {
+        const exists = prev.some((t) => t.id === updatedProfile.id || t.email === updatedProfile.email);
+        if (exists) {
+          return prev.map((t) => (t.id === updatedProfile.id || t.email === updatedProfile.email ? updatedProfile : t));
+        }
+        return [updatedProfile, ...prev];
+      });
+    } else if (user.teacherId) {
+      // Assistente ou aluno: apenas seleciona o professor ao qual está vinculado, sem alterar o perfil dele
+      const linkedTeacher = teachers.find((t) => t.id === user.teacherId);
+      if (linkedTeacher) setCurrentTeacher(linkedTeacher);
     }
+
+    setCurrentView(getDefaultView(user.role));
   };
 
   const handleLogout = async () => {
@@ -413,6 +426,8 @@ function AppInner() {
   };
 
   const handleSwitchUser = (user: SystemUser) => {
+    // Somente admin pode assumir outro perfil (suporte / demonstração)
+    if (!currentUser || !canSwitchProfiles(currentUser.role)) return;
     const authUser: AuthUser = {
       id: user.id,
       name: user.name,
@@ -432,10 +447,31 @@ function AppInner() {
       if (matchingTeacher) setCurrentTeacher(matchingTeacher);
     }
 
-    if (user.role === 'aluno') {
-      setCurrentView('portal-aluno');
-    } else {
-      setCurrentView('dashboard');
+    setCurrentView(getDefaultView(user.role));
+  };
+
+  // Atualização dos próprios dados (aluno) sem tocar no perfil do professor
+  const handleUpdateOwnProfile = (updates: { name?: string; phone?: string }) => {
+    if (!currentUser) return;
+    const updatedUser: AuthUser = { ...currentUser, ...updates };
+    setCurrentUser(updatedUser);
+    localStorage.setItem('agenda_prof_current_user', JSON.stringify(updatedUser));
+
+    if (systemUsers.some((u) => u.id === updatedUser.id)) {
+      handleUpdateUser(updatedUser.id, updates);
+    }
+
+    if (!updatedUser.isDemo) {
+      supabaseService.saveSystemUser({
+        id: updatedUser.id,
+        name: updatedUser.name || '',
+        email: updatedUser.email,
+        role: updatedUser.role,
+        phone: updatedUser.phone,
+        avatarUrl: updatedUser.avatarUrl,
+        teacherId: updatedUser.teacherId,
+        studentId: updatedUser.studentId,
+      });
     }
   };
 
@@ -724,6 +760,11 @@ function AppInner() {
     );
   }
 
+  // Enquanto o guard de rotas redireciona, não renderizar uma tela proibida para este papel
+  if (!canAccessView(currentUser.role, currentView)) {
+    return null;
+  }
+
   // Dynamic left padding based on active sidebar mode:
   // - 'pinned': 256px (md:pl-64)
   // - 'compact': 80px (md:pl-20)
@@ -749,6 +790,7 @@ function AppInner() {
         currentUser={currentUser}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
+        onOpen={() => setIsSidebarOpen(true)}
         sidebarMode={sidebarMode}
         onChangeSidebarMode={handleChangeSidebarMode}
       />
@@ -769,8 +811,8 @@ function AppInner() {
           onSelectTeacher={setCurrentTeacher}
           currentUser={currentUser}
           onLogout={handleLogout}
-          systemUsers={systemUsers}
-          onSwitchUser={handleSwitchUser}
+          systemUsers={canSwitchProfiles(currentUser.role) ? systemUsers : []}
+          onSwitchUser={canSwitchProfiles(currentUser.role) ? handleSwitchUser : undefined}
           isSidebarOpen={isSidebarOpen}
           onToggleSidebar={handleToggleSidebar}
           sidebarMode={sidebarMode}
@@ -801,10 +843,11 @@ function AppInner() {
                 setIsGoogleCalendarModalOpen(true);
               }}
               onOpenWhatsApp8hModal={() => setIsWhatsApp8hModalOpen(true)}
-              onNavigateToIntegrations={() => setCurrentView('integracoes')}
-              onNavigateToSiteAdmin={() => setCurrentView('site-admin')}
-              onNavigateToPayments={() => setCurrentView('pagamentos')}
+              onNavigateToIntegrations={canViewFinances(currentUser.role) ? () => setCurrentView('integracoes') : undefined}
+              onNavigateToSiteAdmin={canViewFinances(currentUser.role) ? () => setCurrentView('site-admin') : undefined}
+              onNavigateToPayments={canViewFinances(currentUser.role) ? () => setCurrentView('pagamentos') : undefined}
               onNavigateToTutorialWizard={() => setCurrentView('tutorial-wizard')}
+              canManageBusiness={canViewFinances(currentUser.role)}
             />
           )}
 
@@ -935,7 +978,15 @@ function AppInner() {
             />
           )}
 
-          {currentView === 'configuracoes' && (
+          {currentView === 'configuracoes' && currentUser.role === 'aluno' && (
+            <StudentProfileView
+              currentUser={currentUser}
+              currentTeacher={currentTeacher}
+              onUpdateProfile={handleUpdateOwnProfile}
+            />
+          )}
+
+          {currentView === 'configuracoes' && currentUser.role !== 'aluno' && (
             <SettingsView
               currentTeacher={currentTeacher}
               onUpdateTeacher={(updated) => {

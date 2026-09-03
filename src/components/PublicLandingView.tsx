@@ -349,7 +349,7 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
             </div>
             
             <h1 className="text-3xl md:text-5xl font-extrabold text-[#091426] tracking-tight leading-[1.15]">
-              {brandTitle}
+              {teacher.name}
             </h1>
             
             <p className="text-base md:text-lg text-[#45474c] leading-relaxed max-w-xl">
