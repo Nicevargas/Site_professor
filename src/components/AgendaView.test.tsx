@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { AgendaView } from './AgendaView';
 import { Appointment, ServiceItem, TeacherProfile } from '../types';
+import { addDays, toLocalDateKey, buildWeek, formatWeekRange, formatMonthYearPtBR } from '../utils/dates';
 
 const teacher: TeacherProfile = {
   id: 'prof-roberto',
@@ -60,7 +61,91 @@ function renderAgenda(appointments: Appointment[], selected: Appointment | null 
   return { onCancelAppointment, onReopenAppointment, onDeleteAppointment };
 }
 
+const periodTitle = () => screen.getByRole('heading', { name: /período exibido/i });
 const history = () => screen.getByRole('region', { name: /histórico de cancelamentos/i });
+
+/** Aula em um dia relativo a hoje, para os testes da grade. */
+function aptOn(daysFromToday: number, studentName: string, startTime = '10:00'): Appointment {
+  const d = addDays(new Date(), daysFromToday);
+  return {
+    id: `apt-${studentName.replace(/\s/g, '')}-${daysFromToday}`,
+    studentName,
+    serviceId: 'serv-1',
+    serviceName: 'Personal Trainer 1h',
+    date: toLocalDateKey(d),
+    dayOfWeek: d.getDay(),
+    startTime,
+    endTime: '11:00',
+    durationMinutes: 60,
+    modality: 'Presencial',
+    status: 'Confirmado',
+    price: 150,
+  };
+}
+
+describe('agenda: grade com datas reais', () => {
+  it('abre na semana de hoje, não em uma data fixa do passado', () => {
+    renderAgenda([]);
+    expect(screen.queryByText(/13 - 19 novembro/i)).not.toBeInTheDocument();
+    expect(periodTitle()).toHaveTextContent(formatWeekRange(buildWeek(new Date())));
+  });
+
+  it('mostra as aulas da semana atual e esconde as de outras semanas', () => {
+    renderAgenda([aptOn(0, 'Aluno Desta Semana'), aptOn(30, 'Aluno Do Mes Que Vem')]);
+    expect(screen.getByText('Aluno Desta Semana')).toBeInTheDocument();
+    expect(screen.queryByText('Aluno Do Mes Que Vem')).not.toBeInTheDocument();
+  });
+
+  it('avançar e voltar trocam a semana; Hoje volta para a atual', () => {
+    renderAgenda([aptOn(0, 'Aula De Hoje')]);
+    const thisWeek = formatWeekRange(buildWeek(new Date()));
+
+    fireEvent.click(screen.getByRole('button', { name: /próximo período/i }));
+    expect(periodTitle()).not.toHaveTextContent(thisWeek);
+    expect(screen.queryByText('Aula De Hoje')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /período anterior/i }));
+    expect(periodTitle()).toHaveTextContent(thisWeek);
+    expect(screen.getByText('Aula De Hoje')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /próximo período/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^hoje$/i }));
+    expect(periodTitle()).toHaveTextContent(thisWeek);
+  });
+
+  it('o modo Dia mostra só o dia escolhido', () => {
+    // duas aulas na mesma semana, em dias diferentes de hoje
+    const hoje = aptOn(0, 'Aula De Hoje');
+    const outroDia = aptOn(new Date().getDay() === 1 ? 1 : -1, 'Aula Outro Dia');
+    renderAgenda([hoje, outroDia]);
+
+    fireEvent.click(screen.getByRole('button', { name: /^dia$/i }));
+    expect(screen.getByText('Aula De Hoje')).toBeInTheDocument();
+    expect(screen.queryByText('Aula Outro Dia')).not.toBeInTheDocument();
+  });
+
+  it('o modo Mês lista as aulas do mês em uma grade própria', () => {
+    renderAgenda([aptOn(0, 'Aula De Hoje')]);
+    fireEvent.click(screen.getByRole('button', { name: /^mês$/i }));
+
+    const month = screen.getByLabelText(/calendário do mês/i);
+    expect(within(month).getByRole('button', { name: /aula de hoje/i })).toBeInTheDocument();
+    expect(periodTitle()).toHaveTextContent(formatMonthYearPtBR(new Date()));
+  });
+
+  it('clicar num dia do mini calendário leva a grade para aquela semana', () => {
+    renderAgenda([aptOn(30, 'Aluno Do Mes Que Vem')]);
+    expect(screen.queryByText('Aluno Do Mes Que Vem')).not.toBeInTheDocument();
+
+    // navega o mini calendário até o mês seguinte e clica no dia da aula
+    const target = toLocalDateKey(addDays(new Date(), 30));
+    fireEvent.click(screen.getByRole('button', { name: /próximo mês/i }));
+    const dayLabel = new RegExp(`ir para ${target.split('-').reverse().join('/')}`, 'i');
+    fireEvent.click(screen.getByRole('button', { name: dayLabel }));
+
+    expect(screen.getByText('Aluno Do Mes Que Vem')).toBeInTheDocument();
+  });
+});
 
 describe('agenda: histórico de cancelamentos', () => {
   it('aula cancelada sai da grade e aparece no histórico com data e motivo', () => {

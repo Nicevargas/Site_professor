@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Appointment, ServiceItem, AppointmentStatus, TeacherProfile } from '../types';
 import { 
   ChevronLeft, 
@@ -18,6 +18,10 @@ import {
   CheckCheck
 } from 'lucide-react';
 import { generateGoogleCalendarUrl, getWhatsApp8hLink, calculate8hDispatchTime } from '../utils/calendarAndWhatsapp';
+import {
+  toLocalDateKey, addDays, parseDateKey, startOfWeek, buildWeek, buildMonthGrid,
+  formatWeekRange, formatMonthYearPtBR, CalendarDay,
+} from '../utils/dates';
 
 interface AgendaViewProps {
   appointments: Appointment[];
@@ -55,7 +59,8 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
   const [cancelReason, setCancelReason] = useState('');
   const [selectedServiceId, setSelectedServiceId] = useState<string>('all');
   const [calendarViewMode, setCalendarViewMode] = useState<'dia' | 'semana' | 'mes'>('semana');
-  const [selectedDay, setSelectedDay] = useState<number>(15); // 15 Nov (Wed)
+  // Data de referência da grade; começa na semana de hoje
+  const [anchorDate, setAnchorDate] = useState<Date>(() => new Date());
   const [editingNotes, setEditingNotes] = useState<string>('');
   const [isSavingNotes, setIsSavingNotes] = useState<boolean>(false);
 
@@ -101,15 +106,35 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
     setCancelReason('');
   };
 
-  const weekDays = [
-    { dayNumber: 13, dayName: 'Seg', dayOfWeek: 1 },
-    { dayNumber: 14, dayName: 'Ter', dayOfWeek: 2 },
-    { dayNumber: 15, dayName: 'Qua', dayOfWeek: 3, isToday: true },
-    { dayNumber: 16, dayName: 'Qui', dayOfWeek: 4 },
-    { dayNumber: 17, dayName: 'Sex', dayOfWeek: 5 },
-    { dayNumber: 18, dayName: 'Sáb', dayOfWeek: 6, isWeekend: true },
-    { dayNumber: 19, dayName: 'Dom', dayOfWeek: 0, isWeekend: true },
-  ];
+  const anchorKey = toLocalDateKey(anchorDate);
+
+  // Colunas da grade: a semana inteira, ou só o dia escolhido no modo "Dia"
+  const weekDays: CalendarDay[] = useMemo(() => buildWeek(anchorDate), [anchorKey]);
+  const monthGrid: CalendarDay[] = useMemo(() => buildMonthGrid(anchorDate), [anchorKey]);
+  const visibleDays: CalendarDay[] = calendarViewMode === 'dia'
+    ? weekDays.filter((d) => d.date === anchorKey)
+    : weekDays;
+  const visibleDayKeys = new Set(visibleDays.map((d) => d.date));
+
+  // Só as aulas do período mostrado entram na grade
+  const appointmentsInView = filteredAppointments.filter((apt) => visibleDayKeys.has(apt.date));
+
+  const periodLabel = calendarViewMode === 'dia'
+    ? parseDateKey(anchorKey).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })
+    : calendarViewMode === 'mes'
+    ? formatMonthYearPtBR(anchorDate)
+    : formatWeekRange(weekDays);
+
+  const stepPeriod = (direction: 1 | -1) => {
+    setAnchorDate((prev) => {
+      if (calendarViewMode === 'dia') return addDays(prev, direction);
+      if (calendarViewMode === 'mes') return new Date(prev.getFullYear(), prev.getMonth() + direction, 1);
+      return addDays(startOfWeek(prev), direction * 7);
+    });
+  };
+
+  const countByDay = (dateKey: string) =>
+    filteredAppointments.filter((apt) => apt.date === dateKey).length;
 
   const timeHours = [
     '08:00', '09:00', '10:00', '11:00', '12:00', 
@@ -202,12 +227,20 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
         {/* Mini Calendar Card */}
         <div className="bg-[#f7f9fb] p-5 rounded-xl shadow-card border border-[#e0e3e5] hidden lg:block">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-sm font-bold text-[#091426]">Novembro 2024</h3>
+            <h3 className="text-sm font-bold text-[#091426] capitalize">{formatMonthYearPtBR(anchorDate)}</h3>
             <div className="flex gap-1">
-              <button className="p-1 rounded hover:bg-[#e0e3e5] text-[#45474c]">
+              <button
+                onClick={() => setAnchorDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+                aria-label="Mês anterior"
+                className="p-1 rounded hover:bg-[#e0e3e5] text-[#45474c]"
+              >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <button className="p-1 rounded hover:bg-[#e0e3e5] text-[#45474c]">
+              <button
+                onClick={() => setAnchorDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
+                aria-label="Próximo mês"
+                className="p-1 rounded hover:bg-[#e0e3e5] text-[#45474c]"
+              >
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -224,27 +257,37 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
           </div>
 
           <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-[#191c1e]">
-            <div className="py-1.5 text-[#75777d] opacity-40">29</div>
-            <div className="py-1.5 text-[#75777d] opacity-40">30</div>
-            <div className="py-1.5 text-[#75777d] opacity-40">31</div>
-            <div className="py-1.5 rounded hover:bg-slate-200 cursor-pointer">1</div>
-            <div className="py-1.5 rounded hover:bg-slate-200 cursor-pointer">2</div>
-            <div className="py-1.5 rounded hover:bg-slate-200 cursor-pointer">3</div>
-            <div className="py-1.5 rounded hover:bg-slate-200 cursor-pointer">4</div>
-            <div className="py-1.5 rounded hover:bg-slate-200 cursor-pointer">5</div>
-            <div className="py-1.5 rounded hover:bg-slate-200 cursor-pointer">6</div>
-            <div className="py-1.5 rounded hover:bg-slate-200 cursor-pointer">7</div>
-            <div className="py-1.5 rounded bg-[#091426] text-white font-bold cursor-pointer">8</div>
-            <div className="py-1.5 rounded hover:bg-slate-200 cursor-pointer">9</div>
-            <div className="py-1.5 rounded hover:bg-slate-200 cursor-pointer">10</div>
-            <div className="py-1.5 rounded hover:bg-slate-200 cursor-pointer">11</div>
-            <div className="py-1.5 rounded hover:bg-slate-200 cursor-pointer">12</div>
-            <div className="py-1.5 rounded hover:bg-slate-200 cursor-pointer">13</div>
-            <div className="py-1.5 rounded hover:bg-slate-200 cursor-pointer">14</div>
-            <div className={`py-1.5 rounded font-bold cursor-pointer ${selectedDay === 15 ? 'bg-[#00687a] text-white' : 'hover:bg-slate-200'}`} onClick={() => setSelectedDay(15)}>15</div>
-            <div className="py-1.5 rounded hover:bg-slate-200 cursor-pointer">16</div>
-            <div className="py-1.5 rounded hover:bg-slate-200 cursor-pointer">17</div>
-            <div className="py-1.5 rounded hover:bg-slate-200 cursor-pointer">18</div>
+            {monthGrid.map((day) => {
+              const isSelectedWeek = weekDays.some((wd) => wd.date === day.date);
+              const hasAppointments = countByDay(day.date) > 0;
+              return (
+                <button
+                  key={day.date}
+                  type="button"
+                  onClick={() => setAnchorDate(parseDateKey(day.date))}
+                  aria-label={`Ir para ${day.date.split('-').reverse().join('/')}`}
+                  aria-current={day.isToday ? 'date' : undefined}
+                  className={`py-1.5 rounded relative transition-colors ${
+                    !day.inMonth
+                      ? 'text-[#75777d] opacity-40 hover:bg-slate-100'
+                      : day.isToday
+                      ? 'bg-[#091426] text-white font-bold'
+                      : isSelectedWeek
+                      ? 'bg-[#acedff] text-[#001f26] font-semibold'
+                      : 'hover:bg-slate-200'
+                  }`}
+                >
+                  {day.dayNumber}
+                  {hasAppointments && (
+                    <span
+                      className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${
+                        day.isToday ? 'bg-[#57dffe]' : 'bg-[#00687a]'
+                      }`}
+                    />
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -263,18 +306,30 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
         {/* Calendar Toolbar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 md:px-8 md:py-4 border-b border-[#c5c6cd] gap-4 bg-white z-10 shadow-xs">
           <div className="flex items-center gap-4">
-            <h2 className="text-xl md:text-2xl font-bold text-[#091426] truncate">
-              13 - 19 Novembro
+            <h2
+              aria-label={`Período exibido: ${periodLabel}`}
+              aria-live="polite"
+              className="text-xl md:text-2xl font-bold text-[#091426] truncate capitalize"
+            >
+              {periodLabel}
             </h2>
             <div className="flex items-center gap-1">
-              <button className="w-9 h-9 flex items-center justify-center rounded-full border border-[#c5c6cd] text-[#45474c] hover:bg-[#eceef0] transition-colors">
+              <button
+                onClick={() => stepPeriod(-1)}
+                aria-label="Período anterior"
+                className="w-9 h-9 flex items-center justify-center rounded-full border border-[#c5c6cd] text-[#45474c] hover:bg-[#eceef0] transition-colors"
+              >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <button className="w-9 h-9 flex items-center justify-center rounded-full border border-[#c5c6cd] text-[#45474c] hover:bg-[#eceef0] transition-colors">
+              <button
+                onClick={() => stepPeriod(1)}
+                aria-label="Próximo período"
+                className="w-9 h-9 flex items-center justify-center rounded-full border border-[#c5c6cd] text-[#45474c] hover:bg-[#eceef0] transition-colors"
+              >
                 <ChevronRight className="w-4 h-4" />
               </button>
-              <button 
-                onClick={() => setSelectedDay(15)}
+              <button
+                onClick={() => setAnchorDate(new Date())}
                 className="px-3.5 py-1.5 rounded-full border border-[#c5c6cd] text-xs font-semibold text-[#191c1e] hover:bg-[#eceef0] transition-colors ml-2 hidden sm:block"
               >
                 Hoje
@@ -335,19 +390,87 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
           </div>
         </div>
 
-        {/* Calendar Grid (Week View) */}
+        {/* Visão de mês: uma célula por dia, com as aulas listadas */}
+        {calendarViewMode === 'mes' && (
+          <div className="flex-1 overflow-auto calendar-scroll bg-white p-4 md:p-6" aria-label="Calendário do mês">
+            <div className="grid grid-cols-7 gap-px bg-[#c5c6cd] border border-[#c5c6cd] rounded-xl overflow-hidden min-w-[720px]">
+              {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((label) => (
+                <div key={label} className="bg-[#f7f9fb] py-2 text-center text-[11px] font-bold uppercase text-[#75777d]">
+                  {label}
+                </div>
+              ))}
+
+              {monthGrid.map((day) => {
+                const dayAppointments = filteredAppointments
+                  .filter((apt) => apt.date === day.date)
+                  .sort((a, b) => a.startTime.localeCompare(b.startTime));
+                return (
+                  <div
+                    key={day.date}
+                    className={`bg-white min-h-[104px] p-1.5 flex flex-col gap-1 ${
+                      !day.inMonth ? 'opacity-45' : ''
+                    } ${day.isWeekend ? 'bg-[#f7f9fb]' : ''}`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => { setAnchorDate(parseDateKey(day.date)); setCalendarViewMode('dia'); }}
+                      aria-label={`Abrir ${day.date.split('-').reverse().join('/')}`}
+                      className={`self-start text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
+                        day.isToday ? 'bg-[#091426] text-white' : 'text-[#191c1e] hover:bg-slate-200'
+                      }`}
+                    >
+                      {day.dayNumber}
+                    </button>
+
+                    {dayAppointments.slice(0, 3).map((apt) => (
+                      <button
+                        key={apt.id}
+                        type="button"
+                        onClick={() => onSelectAppointment(apt)}
+                        className={`text-left text-[10px] leading-tight px-1.5 py-1 rounded truncate transition-colors ${
+                          apt.status === 'Confirmado'
+                            ? 'bg-[#acedff] text-[#001f26] hover:bg-[#4cd7f6]'
+                            : 'bg-[#ffddb8] text-[#2a1700] hover:bg-[#ffb95f]'
+                        }`}
+                        title={`${apt.startTime} ${apt.studentName} · ${apt.serviceName}`}
+                      >
+                        {apt.startTime} {apt.studentName}
+                      </button>
+                    ))}
+
+                    {dayAppointments.length > 3 && (
+                      <button
+                        type="button"
+                        onClick={() => { setAnchorDate(parseDateKey(day.date)); setCalendarViewMode('dia'); }}
+                        className="text-[10px] font-semibold text-[#00687a] hover:underline text-left px-1.5"
+                      >
+                        +{dayAppointments.length - 3} aulas
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Calendar Grid (Week / Day View) */}
+        {calendarViewMode !== 'mes' && (
         <div className="flex-1 overflow-auto calendar-scroll bg-white">
-          <div className="min-w-[850px] h-full flex flex-col">
-            
+          <div className={`${calendarViewMode === 'dia' ? 'min-w-full' : 'min-w-[850px]'} h-full flex flex-col`}>
+
             {/* Header Row (Days) */}
-            <div className="grid grid-cols-[80px_repeat(7,1fr)] border-b border-[#c5c6cd] sticky top-0 bg-white z-20 shadow-xs">
+            <div
+              className="grid border-b border-[#c5c6cd] sticky top-0 bg-white z-20 shadow-xs"
+              style={{ gridTemplateColumns: `80px repeat(${visibleDays.length}, 1fr)` }}
+            >
               <div className="p-2 border-r border-[#c5c6cd] flex items-end justify-center">
                 <span className="text-[11px] font-semibold text-[#75777d]">GMT-3</span>
               </div>
 
-              {weekDays.map((wd) => (
-                <div 
-                  key={wd.dayNumber}
+              {visibleDays.map((wd) => (
+                <div
+                  key={wd.date}
                   className={`p-3 text-center border-r border-[#c5c6cd] last:border-r-0 flex flex-col items-center ${
                     wd.isWeekend ? 'bg-[#f2f4f6]/50' : ''
                   }`}
@@ -371,15 +494,17 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
             {/* Time Grid with appointments */}
             <div className="flex-1 relative pb-12">
               {/* Background vertical columns */}
-              <div className="absolute inset-0 grid grid-cols-[80px_repeat(7,1fr)] pointer-events-none">
+              <div
+                className="absolute inset-0 grid pointer-events-none"
+                style={{ gridTemplateColumns: `80px repeat(${visibleDays.length}, 1fr)` }}
+              >
                 <div className="border-r border-[#c5c6cd]"></div>
-                <div className="border-r border-[#c5c6cd]"></div>
-                <div className="border-r border-[#c5c6cd]"></div>
-                <div className="border-r border-[#c5c6cd]"></div>
-                <div className="border-r border-[#c5c6cd]"></div>
-                <div className="border-r border-[#c5c6cd]"></div>
-                <div className="border-r border-[#c5c6cd] bg-[#f2f4f6]/30"></div>
-                <div className="bg-[#f2f4f6]/30"></div>
+                {visibleDays.map((wd) => (
+                  <div
+                    key={wd.date}
+                    className={`border-r border-[#c5c6cd] last:border-r-0 ${wd.isWeekend ? 'bg-[#f2f4f6]/30' : ''}`}
+                  ></div>
+                ))}
               </div>
 
               {/* Time Rows */}
@@ -408,10 +533,12 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                       Hour rows: 08:00=0px, 09:00=80px, 10:00=160px, 11:00=240px, 12:00=320px, 13:00=400px, 14:00=480px, 15:00=560px, 16:00=640px, 17:00=720px
                   */}
 
-                  {filteredAppointments.map((apt) => {
-                    // Calculate left offset based on day of week (1=Seg -> left:0, 2=Ter -> left: 14.28%, etc.)
-                    let dayIndex = apt.dayOfWeek === 0 ? 6 : apt.dayOfWeek - 1; // 0=Dom -> index 6, 1=Seg -> 0
-                    const leftPct = dayIndex * 14.285;
+                  {appointmentsInView.map((apt) => {
+                    // A coluna vem da data real da aula dentro do período mostrado
+                    const dayIndex = visibleDays.findIndex((d) => d.date === apt.date);
+                    if (dayIndex < 0) return null;
+                    const columnWidth = 100 / visibleDays.length;
+                    const leftPct = dayIndex * columnWidth;
 
                     // Calculate top offset based on startTime
                     const [h, m] = apt.startTime.split(':').map(Number);
@@ -429,7 +556,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                         style={{
                           left: `${leftPct}%`,
                           top: `${topPx}px`,
-                          width: '14.285%',
+                          width: `${columnWidth}%`,
                           height: `${heightPx}px`,
                         }}
                         className="absolute p-1 cursor-pointer group z-20 transition-all"
@@ -467,6 +594,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
             </div>
           </div>
         </div>
+        )}
 
         {/* Histórico de cancelamentos: aulas canceladas ficam registradas, fora da grade */}
         {(statusFilter === 'Cancelado' || (statusFilter === 'Todos' && cancelledAppointments.length > 0)) && (
