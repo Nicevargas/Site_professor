@@ -174,6 +174,10 @@ export interface Appointment {
   notes?: string;
   clientSince?: string;
   price: number;
+  /** Quando a aula foi cancelada (YYYY-MM-DD). Preenchido só em status 'Cancelado'. */
+  cancelledAt?: string;
+  /** Motivo informado no cancelamento, exibido no histórico. */
+  cancellationReason?: string;
 }
 
 export interface ServiceItem {

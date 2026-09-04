@@ -652,11 +652,40 @@ function AppInner() {
     }
   };
 
-  const handleCancelAppointment = (id: string) => {
+  /** Cancelar preserva o histórico: marca a aula como cancelada com data e motivo. */
+  const handleCancelAppointment = (id: string, reason?: string) => {
     const target = allAppointments.find((a) => a.id === id);
-    if (target) {
-      dispatchAppointmentWebhook({ ...target, status: 'Cancelado' }, currentTeacher, 'cancelled');
-    }
+    if (!target) return;
+    const cancelled: Appointment = {
+      ...target,
+      status: 'Cancelado',
+      cancelledAt: toLocalDateKey(new Date()),
+      cancellationReason: reason?.trim() || undefined,
+    };
+    setAllAppointments((prev) => prev.map((apt) => (apt.id === id ? cancelled : apt)));
+    supabaseService.saveAppointment(cancelled, currentTeacher.id);
+    dispatchAppointmentWebhook(cancelled, currentTeacher, 'cancelled');
+    setSelectedAppointment(null);
+  };
+
+  /** Reabrir devolve a aula cancelada para a agenda, se o horário ainda estiver livre. */
+  const handleReopenAppointment = (id: string) => {
+    const target = allAppointments.find((a) => a.id === id);
+    if (!target) return;
+    const restored: Appointment = {
+      ...target,
+      status: 'Confirmado',
+      cancelledAt: undefined,
+      cancellationReason: undefined,
+    };
+    setAllAppointments((prev) => prev.map((apt) => (apt.id === id ? restored : apt)));
+    supabaseService.saveAppointment(restored, currentTeacher.id);
+    dispatchAppointmentWebhook(restored, currentTeacher, 'updated');
+    setSelectedAppointment(restored);
+  };
+
+  /** Apagar de vez, usado só no histórico de cancelamentos. */
+  const handleDeleteAppointment = (id: string) => {
     setAllAppointments((prev) => prev.filter((apt) => apt.id !== id));
     supabaseService.deleteAppointment(id);
     setSelectedAppointment(null);
@@ -966,6 +995,8 @@ function AppInner() {
               onSelectAppointment={setSelectedAppointment}
               onUpdateAppointmentNotes={handleUpdateAppointmentNotes}
               onCancelAppointment={handleCancelAppointment}
+              onReopenAppointment={handleReopenAppointment}
+              onDeleteAppointment={handleDeleteAppointment}
               onRescheduleAppointment={(apt) => {
                 setReschedulingAppointment(apt);
                 setPreSelectedStudent(null);

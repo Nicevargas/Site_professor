@@ -219,6 +219,9 @@ export const supabaseService = {
         status: a.status || 'Confirmado',
         notes: a.notes || '',
         price: Number(a.price || 150),
+        clientSince: a.client_since || undefined,
+        cancelledAt: a.cancelled_at || undefined,
+        cancellationReason: a.cancellation_reason || undefined,
       }));
     } catch (err) {
       console.warn('Erro ao buscar agendamentos no Supabase:', err);
@@ -251,6 +254,9 @@ export const supabaseService = {
         status: apt.status || 'Confirmado',
         notes: apt.notes || '',
         price: apt.price || 150,
+        client_since: apt.clientSince || null,
+        cancelled_at: apt.cancelledAt || null,
+        cancellation_reason: apt.cancellationReason || null,
       });
       return syncResult(error, 'agendamento');
     } catch (err) {

@@ -26,7 +26,9 @@ interface AgendaViewProps {
   selectedAppointment: Appointment | null;
   onSelectAppointment: (apt: Appointment | null) => void;
   onUpdateAppointmentNotes: (id: string, notes: string) => void;
-  onCancelAppointment: (id: string) => void;
+  onCancelAppointment: (id: string, reason?: string) => void;
+  onReopenAppointment?: (id: string) => void;
+  onDeleteAppointment?: (id: string) => void;
   onRescheduleAppointment: (apt: Appointment) => void;
   onOpenNewAppointmentModal: () => void;
   onOpenGoogleCalendarModal: (apt?: Appointment) => void;
@@ -41,12 +43,16 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
   onSelectAppointment,
   onUpdateAppointmentNotes,
   onCancelAppointment,
+  onReopenAppointment,
+  onDeleteAppointment,
   onRescheduleAppointment,
   onOpenNewAppointmentModal,
   onOpenGoogleCalendarModal,
   onOpenWhatsApp8hModal,
 }) => {
-  const [statusFilter, setStatusFilter] = useState<'Todos' | 'Confirmado' | 'Pendente'>('Todos');
+  const [statusFilter, setStatusFilter] = useState<'Todos' | 'Confirmado' | 'Pendente' | 'Cancelado'>('Todos');
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
   const [selectedServiceId, setSelectedServiceId] = useState<string>('all');
   const [calendarViewMode, setCalendarViewMode] = useState<'dia' | 'semana' | 'mes'>('semana');
   const [selectedDay, setSelectedDay] = useState<number>(15); // 15 Nov (Wed)
@@ -75,12 +81,25 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
     window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
   };
 
-  // Filter appointments
+  // Aulas canceladas saem da grade e aparecem no histórico próprio, abaixo do calendário
   const filteredAppointments = appointments.filter((apt) => {
-    if (statusFilter !== 'Todos' && apt.status !== statusFilter) return false;
+    if (apt.status === 'Cancelado') return false;
+    if (statusFilter !== 'Todos' && statusFilter !== 'Cancelado' && apt.status !== statusFilter) return false;
     if (selectedServiceId !== 'all' && apt.serviceId !== selectedServiceId) return false;
     return true;
   });
+
+  const cancelledAppointments = appointments
+    .filter((apt) => apt.status === 'Cancelado')
+    .filter((apt) => selectedServiceId === 'all' || apt.serviceId === selectedServiceId)
+    .sort((a, b) => (b.cancelledAt || b.date).localeCompare(a.cancelledAt || a.date));
+
+  const confirmCancellation = () => {
+    if (!cancellingId) return;
+    onCancelAppointment(cancellingId, cancelReason);
+    setCancellingId(null);
+    setCancelReason('');
+  };
 
   const weekDays = [
     { dayNumber: 13, dayName: 'Seg', dayOfWeek: 1 },
@@ -144,6 +163,17 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                 >
                   <span className="w-2 h-2 rounded-full bg-[#ffb95f]"></span>
                   Pendente
+                </button>
+                <button
+                  onClick={() => setStatusFilter('Cancelado')}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                    statusFilter === 'Cancelado'
+                      ? 'bg-[#ba1a1a] text-white'
+                      : 'bg-[#eceef0] border border-[#c5c6cd] text-[#191c1e] hover:bg-[#e0e3e5]'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-[#ffdad6]"></span>
+                  Canceladas ({cancelledAppointments.length})
                 </button>
               </div>
             </div>
@@ -438,6 +468,95 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
           </div>
         </div>
 
+        {/* Histórico de cancelamentos: aulas canceladas ficam registradas, fora da grade */}
+        {(statusFilter === 'Cancelado' || (statusFilter === 'Todos' && cancelledAppointments.length > 0)) && (
+          <section className="mt-6" aria-label="Histórico de cancelamentos">
+            <div className="bg-white rounded-2xl border border-[#eceef0] shadow-ambient p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <History className="w-4 h-4 text-[#ba1a1a]" />
+                <h3 className="text-sm font-bold text-[#091426]">
+                  Histórico de cancelamentos ({cancelledAppointments.length})
+                </h3>
+              </div>
+
+              {cancelledAppointments.length === 0 ? (
+                <p className="text-xs text-[#45474c] py-4 text-center">
+                  Nenhuma aula cancelada até agora.
+                </p>
+              ) : (
+                <ul className="divide-y divide-[#eceef0]">
+                  {cancelledAppointments.map((apt) => (
+                    <li key={apt.id}>
+                      <button
+                        onClick={() => onSelectAppointment(apt)}
+                        className="w-full text-left py-3 flex items-start justify-between gap-3 hover:bg-[#f7f9fb] rounded-lg px-2 transition-colors"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-[#191c1e] truncate">
+                            {apt.studentName}
+                            <span className="font-normal text-[#45474c]"> · {apt.serviceName}</span>
+                          </p>
+                          <p className="text-[11px] text-[#45474c] mt-0.5">
+                            Aula em {apt.date.split('-').reverse().join('/')} às {apt.startTime}
+                            {apt.cancelledAt && ` · cancelada em ${apt.cancelledAt.split('-').reverse().join('/')}`}
+                          </p>
+                          {apt.cancellationReason && (
+                            <p className="text-[11px] text-[#ba1a1a] mt-0.5 truncate">
+                              Motivo: {apt.cancellationReason}
+                            </p>
+                          )}
+                        </div>
+                        <span className="shrink-0 px-2 py-0.5 rounded-full bg-[#ffdad6] text-[#ba1a1a] text-[10px] font-bold">
+                          Cancelada
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* Confirmação de cancelamento com motivo opcional */}
+        {cancellingId && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-[60] flex items-center justify-center p-4">
+            <div role="dialog" aria-label="Cancelar aula" className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+              <h3 className="text-base font-bold text-[#091426]">Cancelar esta aula?</h3>
+              <p className="text-xs text-[#45474c] mt-1">
+                A aula sai da agenda e fica registrada no histórico de cancelamentos. O horário volta a ficar livre.
+              </p>
+
+              <label htmlFor="cancel-reason" className="block text-xs font-semibold text-slate-700 mt-4 mb-1">
+                Motivo (opcional)
+              </label>
+              <input
+                id="cancel-reason"
+                type="text"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Ex: Aluno pediu remarcação"
+                className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-[#00687a]"
+              />
+
+              <div className="flex justify-end gap-2.5 mt-5">
+                <button
+                  onClick={() => { setCancellingId(null); setCancelReason(''); }}
+                  className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+                >
+                  Voltar
+                </button>
+                <button
+                  onClick={confirmCancellation}
+                  className="px-5 py-2.5 bg-[#ba1a1a] hover:bg-red-800 text-white text-xs font-bold rounded-xl"
+                >
+                  Confirmar cancelamento
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Sliding Appointment Details Panel (Drawer) */}
         {selectedAppointment && (
           <div className="absolute top-0 right-0 h-full w-full max-w-sm bg-white shadow-2xl z-50 flex flex-col border-l border-[#c5c6cd] animate-in slide-in-from-right duration-200">
@@ -461,14 +580,20 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
               <div className="flex items-center justify-between">
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 ${
-                    selectedAppointment.status === 'Confirmado'
+                    selectedAppointment.status === 'Cancelado'
+                      ? 'bg-[#ffdad6] text-[#ba1a1a]'
+                      : selectedAppointment.status === 'Confirmado'
                       ? 'bg-[#acedff] text-[#001f26]'
                       : 'bg-[#ffddb8] text-[#2a1700]'
                   }`}
                 >
                   <span
                     className={`w-2 h-2 rounded-full ${
-                      selectedAppointment.status === 'Confirmado' ? 'bg-[#00687a]' : 'bg-[#c88000]'
+                      selectedAppointment.status === 'Cancelado'
+                        ? 'bg-[#ba1a1a]'
+                        : selectedAppointment.status === 'Confirmado'
+                        ? 'bg-[#00687a]'
+                        : 'bg-[#c88000]'
                     }`}
                   />
                   <span>{selectedAppointment.status}</span>
@@ -585,6 +710,43 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                 </button>
               </div>
 
+              {selectedAppointment.status === 'Cancelado' ? (
+                <div className="space-y-3 pt-1">
+                  <div className="p-3.5 rounded-xl bg-[#ffdad6]/50 border border-[#ffdad6] text-xs text-[#410002]">
+                    <p className="font-bold">
+                      Cancelada
+                      {selectedAppointment.cancelledAt
+                        ? ` em ${selectedAppointment.cancelledAt.split('-').reverse().join('/')}`
+                        : ''}
+                    </p>
+                    {selectedAppointment.cancellationReason && (
+                      <p className="mt-1">Motivo: {selectedAppointment.cancellationReason}</p>
+                    )}
+                  </div>
+                  <div className="flex gap-2.5">
+                    {onReopenAppointment && (
+                      <button
+                        onClick={() => onReopenAppointment(selectedAppointment.id)}
+                        className="flex-1 h-10 bg-[#00687a] hover:bg-[#004e5c] text-white font-semibold text-xs rounded-xl transition-colors"
+                      >
+                        Reabrir aula
+                      </button>
+                    )}
+                    {onDeleteAppointment && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm('Excluir esta aula do histórico? Esta ação não pode ser desfeita.')) {
+                            onDeleteAppointment(selectedAppointment.id);
+                          }
+                        }}
+                        className="flex-1 h-10 border border-[#c5c6cd] bg-white text-[#ba1a1a] font-semibold text-xs rounded-xl hover:bg-red-50 transition-colors"
+                      >
+                        Excluir do histórico
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
               <div className="flex gap-2.5 pt-1">
                 <button
                   onClick={() => onRescheduleAppointment(selectedAppointment)}
@@ -593,12 +755,13 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                   Reagendar
                 </button>
                 <button
-                  onClick={() => onCancelAppointment(selectedAppointment.id)}
+                  onClick={() => { setCancellingId(selectedAppointment.id); setCancelReason(''); }}
                   className="flex-1 h-10 bg-[#ffdad6] text-[#ba1a1a] font-semibold text-xs rounded-xl hover:bg-red-200 transition-colors"
                 >
                   Cancelar
                 </button>
               </div>
+              )}
             </div>
           </div>
         )}
