@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { TeacherProfile, ServiceItem, Appointment } from '../types';
 import confetti from 'canvas-confetti';
+import { nextBusinessDays, formatMonthYearPtBR } from '../utils/dates';
+import { findConflict, addMinutes } from './NewAppointmentModal';
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -24,6 +26,8 @@ interface PublicBookingWizardProps {
   teacher: TeacherProfile;
   services: ServiceItem[];
   preSelectedServiceId?: string;
+  /** Agenda do professor: horários já ocupados não são oferecidos ao visitante */
+  existingAppointments?: Appointment[];
   onBookingComplete: (newApt: Appointment) => void;
   onBackToLanding: () => void;
   onBackToDashboard: () => void;
@@ -33,6 +37,7 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
   teacher,
   services,
   preSelectedServiceId,
+  existingAppointments = [],
   onBookingComplete,
   onBackToLanding,
   onBackToDashboard,
@@ -43,8 +48,8 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
   );
   
   // Step 2 selections
-  const [selectedDate, setSelectedDate] = useState<string>('2024-11-18');
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('14:00');
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
   const [selectedModality, setSelectedModality] = useState<string>('Online (Zoom)');
 
   // Step 3 student inputs
@@ -53,19 +58,15 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
   const [studentEmail, setStudentEmail] = useState('');
   const [studentNotes, setStudentNotes] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
+  const [slotTakenError, setSlotTakenError] = useState<string | null>(null);
   const [createdAppointment, setCreatedAppointment] = useState<Appointment | null>(null);
 
   const selectedService = services.find((s) => s.id === selectedServiceId) || services[0];
 
-  const availableDays = [
-    { date: '2024-11-18', label: 'Seg, 18 Nov', dayOfWeek: 1 },
-    { date: '2024-11-19', label: 'Ter, 19 Nov', dayOfWeek: 2 },
-    { date: '2024-11-20', label: 'Qua, 20 Nov', dayOfWeek: 3 },
-    { date: '2024-11-21', label: 'Qui, 21 Nov', dayOfWeek: 4 },
-    { date: '2024-11-22', label: 'Sex, 22 Nov', dayOfWeek: 5 },
-  ];
+  // Próximos cinco dias úteis a partir de amanhã
+  const availableDays = useMemo(() => nextBusinessDays(5), []);
 
-  const availableTimeSlots = [
+  const allTimeSlots = [
     { time: '09:00', period: 'Manhã' },
     { time: '10:30', period: 'Manhã' },
     { time: '14:00', period: 'Tarde' },
@@ -73,36 +74,55 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
     { time: '17:00', period: 'Tarde' },
   ];
 
+  // Primeiro dia da lista quando ainda não há escolha
+  const activeDate = selectedDate || availableDays[0]?.date || '';
+
+  // Um horário some da lista se colidir com uma aula ou bloqueio já existente
+  const availableTimeSlots = useMemo(() => {
+    const duration = selectedService?.durationMinutes || 60;
+    return allTimeSlots.filter(
+      (ts) => !findConflict({ date: activeDate, startTime: ts.time, endTime: addMinutes(ts.time, duration) }, existingAppointments)
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDate, existingAppointments, selectedService?.durationMinutes]);
+
+  const activeTimeSlot =
+    selectedTimeSlot && availableTimeSlots.some((ts) => ts.time === selectedTimeSlot)
+      ? selectedTimeSlot
+      : availableTimeSlots[0]?.time || '';
+
   const handleConfirmBooking = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!studentName.trim() || !studentPhone.trim()) return;
+    if (!studentName.trim() || !studentPhone.trim() || !activeTimeSlot || !activeDate) return;
 
-    // Calculate end time
-    const [hours, mins] = selectedTimeSlot.split(':').map(Number);
-    const totalMins = hours * 60 + mins + (selectedService?.durationMinutes || 60);
-    const endH = String(Math.floor(totalMins / 60)).padStart(2, '0');
-    const endM = String(totalMins % 60).padStart(2, '0');
-    const endTime = `${endH}:${endM}`;
+    const duration = selectedService?.durationMinutes || 60;
+    const endTime = addMinutes(activeTimeSlot, duration);
+    const chosenDay = availableDays.find((d) => d.date === activeDate) || availableDays[0];
 
-    const chosenDay = availableDays.find((d) => d.date === selectedDate) || availableDays[0];
+    // Alguém pode ter reservado o mesmo horário enquanto o visitante preenchia o formulário
+    if (findConflict({ date: activeDate, startTime: activeTimeSlot, endTime }, existingAppointments)) {
+      setSlotTakenError('Esse horário acabou de ser reservado. Escolha outro horário disponível.');
+      setStep(2);
+      return;
+    }
 
     const newApt: Appointment = {
       id: `apt-${Date.now()}`,
       studentName: studentName.trim(),
       studentInitials: studentName.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase(),
       studentPhone: studentPhone.trim(),
-      studentEmail: studentEmail.trim() || `${studentName.toLowerCase().replace(/\s+/g, '.')}@email.com`,
+      studentEmail: studentEmail.trim() || undefined,
       serviceId: selectedService.id,
       serviceName: selectedService.name,
-      date: selectedDate,
+      date: activeDate,
       dayOfWeek: chosenDay.dayOfWeek,
-      startTime: selectedTimeSlot,
+      startTime: activeTimeSlot,
       endTime: endTime,
       durationMinutes: selectedService.durationMinutes,
       modality: selectedModality as any,
       status: 'Confirmado',
       notes: studentNotes.trim() || 'Agendamento realizado pelo site.',
-      clientSince: 'Novo Aluno (2024)',
+      clientSince: `Novo aluno (${formatMonthYearPtBR(new Date())})`,
       price: selectedService.price,
     };
 
@@ -368,14 +388,14 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
                       <button
                         key={d.date}
                         type="button"
-                        onClick={() => setSelectedDate(d.date)}
+                        onClick={() => { setSelectedDate(d.date); setSlotTakenError(null); }}
                         className={`p-3.5 rounded-xl text-left border transition-all ${
-                          selectedDate === d.date
+                          activeDate === d.date
                             ? 'bg-[#00687a] text-white border-[#00687a] shadow-sm'
                             : 'bg-white text-[#191c1e] border-[#c5c6cd] hover:border-slate-400'
                         }`}
                       >
-                        <CalendarIcon className={`w-4 h-4 mb-1 ${selectedDate === d.date ? 'text-cyan-200' : 'text-slate-400'}`} />
+                        <CalendarIcon className={`w-4 h-4 mb-1 ${activeDate === d.date ? 'text-cyan-200' : 'text-slate-400'}`} />
                         <p className="text-xs font-bold">{d.label}</p>
                       </button>
                     ))}
@@ -387,23 +407,34 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
                   <label className="block text-xs font-bold text-[#191c1e] mb-2 uppercase tracking-wider">
                     Horários Disponíveis
                   </label>
+                  {slotTakenError && (
+                    <div role="alert" className="mb-2.5 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold">
+                      {slotTakenError}
+                    </div>
+                  )}
+                  {availableTimeSlots.length === 0 ? (
+                    <p className="p-4 rounded-xl bg-slate-50 border border-dashed border-slate-300 text-xs text-slate-600">
+                      Não há horários livres neste dia. Escolha outra data ou fale com o professor no WhatsApp.
+                    </p>
+                  ) : (
                   <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
                     {availableTimeSlots.map((ts) => (
                       <button
                         key={ts.time}
                         type="button"
-                        onClick={() => setSelectedTimeSlot(ts.time)}
+                        onClick={() => { setSelectedTimeSlot(ts.time); setSlotTakenError(null); }}
                         className={`py-3 px-2 rounded-xl text-center border transition-all ${
-                          selectedTimeSlot === ts.time
+                          activeTimeSlot === ts.time
                             ? 'bg-[#091426] text-white border-[#091426] font-bold shadow-sm'
                             : 'bg-white text-[#191c1e] border-[#c5c6cd] hover:border-[#091426]'
                         }`}
                       >
                         <span className="text-sm block">{ts.time}</span>
-                        <span className={`text-[10px] block ${selectedTimeSlot === ts.time ? 'text-slate-300' : 'text-slate-400'}`}>{ts.period}</span>
+                        <span className={`text-[10px] block ${activeTimeSlot === ts.time ? 'text-slate-300' : 'text-slate-400'}`}>{ts.period}</span>
                       </button>
                     ))}
                   </div>
+                  )}
                 </div>
 
                 {/* Modality selector */}
@@ -479,7 +510,7 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
                   <div className="flex justify-between">
                     <span className="text-slate-500">Data e Horário:</span>
                     <span className="font-bold text-[#00687a]">
-                      {selectedDate} às {selectedTimeSlot}
+                      {activeDate.split('-').reverse().join('/')} às {activeTimeSlot}
                     </span>
                   </div>
                   <div className="flex justify-between">

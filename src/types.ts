@@ -154,6 +154,8 @@ export interface MessageTemplate {
 export interface Appointment {
   id: string;
   teacherId?: string;
+  /** Vínculo com o aluno cadastrado; usado pelo portal para mostrar só o que é dele */
+  studentId?: string;
   studentName: string;
   studentInitials?: string;
   studentAvatar?: string;

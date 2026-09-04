@@ -51,17 +51,18 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
   const [copiedPix, setCopiedPix] = useState(false);
   const [activeMedia, setActiveMedia] = useState<VideoItem | null>(null);
 
-  const studentName = currentUser?.name || 'Mariana Costa';
-  const studentEmail = currentUser?.email || 'mariana.costa@email.com';
+  const studentName = currentUser?.name || '';
+  const studentEmail = (currentUser?.email || '').trim().toLowerCase();
+  const studentId = currentUser?.studentId;
 
-  // Filter student's own appointments
-  const myAppointments = appointments.filter((app) => {
-    return (
-      app.studentName.toLowerCase().includes(studentName.toLowerCase()) ||
-      (app.studentEmail && app.studentEmail.toLowerCase() === studentEmail.toLowerCase()) ||
-      app.studentName.toLowerCase().includes('mariana')
-    );
-  });
+  // Privacidade: o aluno só vê o que é dele (id, e-mail exato ou nome completo exato)
+  const belongsToStudent = (record: { studentId?: string; studentEmail?: string; studentName: string }) => {
+    if (studentId && record.studentId) return record.studentId === studentId;
+    if (studentEmail && record.studentEmail) return record.studentEmail.trim().toLowerCase() === studentEmail;
+    return Boolean(studentName) && record.studentName.trim().toLowerCase() === studentName.trim().toLowerCase();
+  };
+
+  const myAppointments = appointments.filter((app) => belongsToStudent(app));
 
   const upcomingAppointments = myAppointments.filter(
     (a) => a.status === 'Confirmado' || a.status === 'Pendente'
@@ -72,13 +73,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
   );
 
   // Filter student's own invoices
-  const myInvoices = invoices.filter((inv) => {
-    return (
-      inv.studentName.toLowerCase().includes(studentName.toLowerCase()) ||
-      (inv.studentEmail && inv.studentEmail.toLowerCase() === studentEmail.toLowerCase()) ||
-      inv.studentName.toLowerCase().includes('mariana')
-    );
-  });
+  const myInvoices = invoices.filter((inv) => belongsToStudent(inv));
 
   const pendingInvoices = myInvoices.filter((i) => i.status === 'pendente' || i.status === 'vencido');
   const paidInvoices = myInvoices.filter((i) => i.status === 'pago');
@@ -133,7 +128,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-8 pt-6 border-t border-white/10">
             <div>
               <p className="text-[11px] uppercase tracking-wider text-cyan-200 font-semibold">Aulas Realizadas</p>
-              <p className="text-2xl font-extrabold mt-0.5">{pastAppointments.length + 18}</p>
+              <p className="text-2xl font-extrabold mt-0.5">{pastAppointments.length}</p>
             </div>
             <div>
               <p className="text-[11px] uppercase tracking-wider text-cyan-200 font-semibold">Próximas Aulas</p>

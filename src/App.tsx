@@ -67,7 +67,7 @@ import { dispatchAppointmentWebhook, dispatchFormWebhook } from './utils/webhook
 import { canAccessView, getDefaultView, canSwitchProfiles, canViewFinances, sanitizeSelfDeclaredRole } from './utils/permissions';
 import { StudentProfileView } from './components/StudentProfileView';
 import { hashFromView, viewFromHash } from './utils/routes';
-import { formatMonthYearPtBR } from './utils/dates';
+import { formatMonthYearPtBR, toLocalDateKey } from './utils/dates';
 import { SyncErrorToast } from './components/SyncErrorToast';
 
 
@@ -314,7 +314,8 @@ function AppInner() {
           dbCurriculum,
           dbVideos,
           dbPhotos,
-          dbFaqs
+          dbFaqs,
+          dbSystemUsers
         ] = await Promise.all([
           supabaseService.getTeachers(),
           supabaseService.getServices(),
@@ -327,6 +328,7 @@ function AppInner() {
           supabaseService.getVideos(),
           supabaseService.getPhotos(),
           supabaseService.getFaqs(),
+          supabaseService.getSystemUsers(),
         ]);
 
         if (dbTeachers && dbTeachers.length > 0) {
@@ -352,6 +354,10 @@ function AppInner() {
         if (dbVideos && dbVideos.length > 0) setVideos(dbVideos);
         if (dbPhotos && dbPhotos.length > 0) setPhotos(dbPhotos);
         if (dbFaqs && dbFaqs.length > 0) setFaqs(dbFaqs);
+        if (dbSystemUsers && dbSystemUsers.length > 0) {
+          setSystemUsers(dbSystemUsers);
+          localStorage.setItem('agenda_prof_system_users', JSON.stringify(dbSystemUsers));
+        }
       } catch (err) {
         console.warn('Could not load from Supabase, using mock local data:', err);
       }
@@ -451,25 +457,44 @@ function AppInner() {
   };
 
   // RBAC User Management Handlers
+  const persistSystemUser = (user: SystemUser) => {
+    supabaseService.saveSystemUser({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      avatarUrl: user.avatarUrl,
+      phone: user.phone,
+      teacherId: user.teacherId,
+      studentId: user.studentId,
+      status: user.status,
+      permissions: user.permissions,
+      bio: user.bio,
+    });
+  };
+
   const handleAddUser = (newUserData: Omit<SystemUser, 'id' | 'createdAt'>) => {
     const newUser: SystemUser = {
       ...newUserData,
       id: `user-${Date.now()}`,
-      createdAt: new Date().toISOString().split('T')[0],
+      createdAt: toLocalDateKey(new Date()),
     };
     setSystemUsers((prev) => {
       const updated = [newUser, ...prev];
       localStorage.setItem('agenda_prof_system_users', JSON.stringify(updated));
       return updated;
     });
+    persistSystemUser(newUser);
   };
 
   const handleUpdateUser = (id: string, updates: Partial<SystemUser>) => {
+    const target = systemUsers.find((u) => u.id === id);
     setSystemUsers((prev) => {
       const updated = prev.map((u) => (u.id === id ? { ...u, ...updates } : u));
       localStorage.setItem('agenda_prof_system_users', JSON.stringify(updated));
       return updated;
     });
+    if (target) persistSystemUser({ ...target, ...updates });
   };
 
   const handleDeleteUser = (id: string) => {
@@ -478,6 +503,7 @@ function AppInner() {
       localStorage.setItem('agenda_prof_system_users', JSON.stringify(updated));
       return updated;
     });
+    supabaseService.deleteSystemUser(id);
   };
 
   const handleSwitchUser = (user: SystemUser) => {
@@ -798,6 +824,7 @@ function AppInner() {
         teacher={currentTeacher}
         services={services}
         preSelectedServiceId={bookingServiceId}
+        existingAppointments={appointments}
         onBookingComplete={handleBookingCompleted}
         onBackToLanding={() => setCurrentView('public-landing')}
         onBackToDashboard={() => {

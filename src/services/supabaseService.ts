@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { syncResult, reportSyncError } from '../utils/syncNotifier';
-import { TeacherProfile, ServiceItem, Appointment, Student, Reminder, PaymentInvoice, TestimonialItem, CurriculumItem, PhotoItem, FaqItem } from '../types';
+import { TeacherProfile, ServiceItem, Appointment, Student, Reminder, PaymentInvoice, TestimonialItem, CurriculumItem, PhotoItem, FaqItem, SystemUser } from '../types';
 
 export const supabaseService = {
   /**
@@ -234,11 +234,12 @@ export const supabaseService = {
     try {
       const { error } = await supabase.from('appointments').upsert({
         id: apt.id,
-        teacher_id: teacherId || 'prof-roberto',
+        teacher_id: teacherId || apt.teacherId || null,
+        student_id: apt.studentId || null,
         student_name: apt.studentName,
-        student_initials: apt.studentInitials || 'AL',
-        student_phone: apt.studentPhone || '',
-        student_email: apt.studentEmail || '',
+        student_initials: apt.studentInitials || null,
+        student_phone: apt.studentPhone || null,
+        student_email: apt.studentEmail || null,
         service_id: apt.serviceId || null,
         service_name: apt.serviceName,
         date: apt.date,
@@ -769,15 +770,40 @@ export const supabaseService = {
   /**
    * Fetch System Users (RBAC)
    */
-  async getSystemUsers(): Promise<any[] | null> {
+  async getSystemUsers(): Promise<SystemUser[] | null> {
     if (!isSupabaseConfigured || !supabase) return null;
     try {
       const { data, error } = await supabase.from('system_users').select('*').order('name');
-      if (error || !data) return null;
-      return data;
+      if (error || !data || data.length === 0) return null;
+      return data.map((u: any): SystemUser => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role || 'professor',
+        avatarUrl: u.avatar_url || undefined,
+        phone: u.phone || undefined,
+        teacherId: u.teacher_id || undefined,
+        studentId: u.student_id || undefined,
+        status: u.status || 'ativo',
+        createdAt: u.created_at ? String(u.created_at).split('T')[0] : '',
+        lastLogin: u.last_login || undefined,
+        permissions: u.permissions || [],
+        bio: u.bio || undefined,
+      }));
     } catch (err) {
       console.warn('Erro ao buscar usuários do sistema:', err);
       return null;
+    }
+  },
+
+  async deleteSystemUser(id: string): Promise<boolean> {
+    if (!isSupabaseConfigured || !supabase) return false;
+    try {
+      const { error } = await supabase.from('system_users').delete().eq('id', id);
+      return syncResult(error, 'exclusão do usuário');
+    } catch (err) {
+      reportSyncError('exclusão do usuário', err);
+      return false;
     }
   },
 
@@ -959,6 +985,7 @@ export const supabaseService = {
     studentId?: string;
     status?: string;
     permissions?: string[];
+    bio?: string;
   }): Promise<boolean> {
     if (!isSupabaseConfigured || !supabase) return false;
     try {
@@ -974,6 +1001,7 @@ export const supabaseService = {
         teacher_id: user.teacherId || null,
         student_id: user.studentId || null,
         status: user.status || 'ativo',
+        bio: user.bio || null,
         permissions: user.permissions || [
           user.role === 'admin' ? 'all_access' : 'manage_own_agenda'
         ],
