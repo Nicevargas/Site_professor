@@ -28,7 +28,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Menu,
-  Smartphone
+  Smartphone,
+  Link2
 } from 'lucide-react';
 
 export type SidebarMode = 'drawer' | 'pinned' | 'compact';
@@ -77,6 +78,7 @@ export const SideNav: React.FC<SideNavProps> = ({
           { id: 'pagamentos' as ViewMode, label: 'Financeiro & Pix', icon: DollarSign, badge: overdueCount > 0 ? `${overdueCount}` : undefined },
           { id: 'usuarios' as ViewMode, label: 'Usuários & Permissões', icon: ShieldCheck },
           { id: 'site-admin' as ViewMode, label: 'Meu Site & Conteúdo', icon: Globe },
+          { id: 'meu-endereco' as ViewMode, label: 'Meu Endereço', icon: Link2 },
           { id: 'planos' as ViewMode, label: 'Planos & Assinatura', icon: CreditCard },
           { id: 'integracoes' as ViewMode, label: 'Automações & n8n', icon: Zap },
           { id: 'configuracoes' as ViewMode, label: 'Configurações', icon: Settings },
@@ -91,6 +93,7 @@ export const SideNav: React.FC<SideNavProps> = ({
           { id: 'alunos' as ViewMode, label: 'Meus Alunos', icon: Users },
           { id: 'pagamentos' as ViewMode, label: 'Meu Financeiro', icon: DollarSign, badge: overdueCount > 0 ? `${overdueCount}` : undefined },
           { id: 'site-admin' as ViewMode, label: 'Meu Site & Vitrine', icon: Globe },
+          { id: 'meu-endereco' as ViewMode, label: 'Meu Endereço', icon: Link2 },
           { id: 'planos' as ViewMode, label: 'Planos', icon: CreditCard },
           { id: 'configuracoes' as ViewMode, label: 'Meu Perfil', icon: Settings },
           { id: 'public-landing' as ViewMode, label: 'Ver meu site', icon: Globe },

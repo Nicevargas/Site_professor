@@ -40,9 +40,33 @@ export const supabaseService = {
         defaultPaymentGateway: t.default_payment_gateway || undefined,
         whatsappAutoReminder8h: t.whatsapp_auto_reminder_8h ?? true,
         vacationMode: t.vacation_mode && typeof t.vacation_mode === 'object' ? t.vacation_mode : undefined,
+        // Assinatura e endereço público
+        plan: t.plan || 'start',
+        slug: t.slug || undefined,
+        customDomain: t.custom_domain || undefined,
+        customDomainStatus: t.custom_domain_status || 'nenhum',
       }));
     } catch (err) {
       console.warn('Erro ao buscar professores no Supabase:', err);
+      return null;
+    }
+  },
+
+  /**
+   * Busca a vitrine pelo endereço, antes de qualquer login.
+   * Usada na resolução por caminho, subdomínio e domínio próprio.
+   */
+  async getTeacherByAddress(ref: { slug?: string; domain?: string }): Promise<TeacherProfile | null> {
+    if (!isSupabaseConfigured || !supabase) return null;
+    const column = ref.domain ? 'custom_domain' : 'slug';
+    const value = (ref.domain || ref.slug || '').toLowerCase();
+    if (!value) return null;
+    try {
+      const { data, error } = await supabase.from('teachers').select('*').eq(column, value).limit(1);
+      if (error || !data || data.length === 0) return null;
+      const all = await this.getTeachers();
+      return all?.find((t) => t.id === data[0].id) || null;
+    } catch {
       return null;
     }
   },
@@ -105,6 +129,11 @@ export const supabaseService = {
         default_payment_gateway: teacher.defaultPaymentGateway || 'pix',
         whatsapp_auto_reminder_8h: teacher.whatsappAutoReminder8h ?? true,
         vacation_mode: teacher.vacationMode || { enabled: false },
+        // O plano só é aceito de admin; o gatilho no banco recusa o resto
+        plan: teacher.plan || 'start',
+        slug: teacher.slug || null,
+        custom_domain: teacher.customDomain || null,
+        custom_domain_status: teacher.customDomainStatus || 'nenhum',
         updated_at: new Date().toISOString(),
       });
       if (!syncResult(error, 'perfil do professor')) return false;

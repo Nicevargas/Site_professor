@@ -8,6 +8,7 @@ export type ViewMode =
   | 'portal-aluno'
   | 'site-admin'
   | 'planos'
+  | 'meu-endereco'
   | 'integracoes'
   | 'public-landing'
   | 'public-booking'
@@ -231,6 +232,13 @@ export interface VacationModeConfig {
 export interface TeacherProfile {
   id: string;
   name: string;
+  /** Assinatura do professor com o Aquagenda: define o endereço que ele pode usar */
+  plan?: 'start' | 'pro' | 'premium';
+  /** Identificador do endereço público: "roberto-almeida" */
+  slug?: string;
+  /** Domínio próprio, só no plano Premium */
+  customDomain?: string;
+  customDomainStatus?: 'nenhum' | 'pendente' | 'verificado' | 'erro';
   role: string;
   specialty: string;
   bio: string;

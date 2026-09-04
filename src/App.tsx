@@ -69,6 +69,9 @@ import { StudentProfileView } from './components/StudentProfileView';
 import { hashFromView, viewFromHash } from './utils/routes';
 import { formatMonthYearPtBR, toLocalDateKey } from './utils/dates';
 import { SyncErrorToast } from './components/SyncErrorToast';
+import { MyAddressView } from './components/MyAddressView';
+import { resolveTenant, slugify, buildPublicUrl, PLATFORM_HOST } from './utils/tenant';
+import { getPlan, planAllows } from './utils/plans';
 
 
 const DEFAULT_STUDENT_AVATAR = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80';
@@ -120,6 +123,9 @@ function AppInner() {
     return INITIAL_SYSTEM_USERS;
   });
 
+  // Endereço pedido pelo visitante: caminho, subdomínio ou domínio próprio
+  const [tenantRef] = useState(() => resolveTenant(window.location));
+
   // Core domain state
   const [teachers, setTeachers] = useState<TeacherProfile[]>(INITIAL_TEACHER_PROFILES);
   const [currentTeacher, setCurrentTeacher] = useState<TeacherProfile>(() => {
@@ -132,15 +138,30 @@ function AppInner() {
         // User custom teacher profile
         const savedTeacher = localStorage.getItem(`agenda_prof_teacher_${u.id}`);
         if (savedTeacher) return JSON.parse(savedTeacher);
-        return {
-          ...INITIAL_TEACHER_PROFILES[0],
-          id: u.id,
-          name: u.name,
-          email: u.email,
-        };
+        // Só um professor vira perfil de vitrine. Admin, secretaria e aluno olham
+        // o tenant selecionado, senão o nome do admin viraria o nome do site.
+        if (u.role === 'professor') {
+          return {
+            ...INITIAL_TEACHER_PROFILES[0],
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            slug: undefined,
+            customDomain: undefined,
+          };
+        }
+        return INITIAL_TEACHER_PROFILES[0];
       }
     } catch {
       // fallback
+    }
+    // Visitante anônimo chegando por um endereço de professor
+    const ref = resolveTenant(window.location);
+    if (ref.mode !== 'none') {
+      const byAddress = INITIAL_TEACHER_PROFILES.find((t) =>
+        ref.domain ? t.customDomain === ref.domain : (t.slug || slugify(t.name)) === ref.slug
+      );
+      if (byAddress) return byAddress;
     }
     return INITIAL_TEACHER_PROFILES[0];
   });
@@ -267,6 +288,43 @@ function AppInner() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isSidebarOpen]);
+
+  // A vitrine pedida pelo endereço vence a lista local assim que o banco responde
+  useEffect(() => {
+    if (tenantRef.mode === 'none' || !isSupabaseConfigured) return;
+    let cancelled = false;
+    supabaseService.getTeacherByAddress({ slug: tenantRef.slug, domain: tenantRef.domain }).then((found) => {
+      if (found && !cancelled) setCurrentTeacher(found);
+    });
+    return () => { cancelled = true; };
+  }, [tenantRef.mode, tenantRef.slug, tenantRef.domain]);
+
+  // Título e prévia de link seguem o professor da vitrine, não um texto fixo no HTML
+  useEffect(() => {
+    const brand = currentTeacher.brandName || 'Aquagenda';
+    document.title = `${currentTeacher.name} | ${currentTeacher.specialty || brand}`;
+    const setMeta = (selector: string, attr: string, value: string) => {
+      const el = document.head.querySelector(selector);
+      if (el) el.setAttribute(attr, value);
+    };
+    const description = currentTeacher.bio || `Agende aulas com ${currentTeacher.name}.`;
+    setMeta('meta[name="description"]', 'content', description);
+    setMeta('meta[property="og:title"]', 'content', currentTeacher.name);
+    setMeta('meta[property="og:description"]', 'content', description);
+    if (currentTeacher.heroImageUrl) setMeta('meta[property="og:image"]', 'content', currentTeacher.heroImageUrl);
+    setMeta('meta[property="og:url"]', 'content', buildPublicUrl(
+      currentTeacher.customDomain && planAllows(currentTeacher.plan, 'domain')
+        ? 'domain'
+        : planAllows(currentTeacher.plan, 'subdomain')
+        ? 'subdomain'
+        : 'path',
+      {
+        slug: currentTeacher.slug || slugify(currentTeacher.name),
+        domain: currentTeacher.customDomain,
+        platformHost: PLATFORM_HOST,
+      }
+    ));
+  }, [currentTeacher]);
 
   // URL: mantém #/rota sincronizada com a tela (botão voltar e links compartilháveis)
   useEffect(() => {
@@ -1108,6 +1166,20 @@ function AppInner() {
           )}
 
           {currentView === 'planos' && <PricingPlansView />}
+
+          {currentView === 'meu-endereco' && (
+            <MyAddressView
+              currentTeacher={currentTeacher}
+              userRole={currentUser.role}
+              takenSlugs={teachers.filter((t) => t.id !== currentTeacher.id).map((t) => t.slug || slugify(t.name))}
+              onOpenPlans={() => setCurrentView('planos')}
+              onUpdateTeacher={(updated) => {
+                setCurrentTeacher(updated);
+                setTeachers((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+                supabaseService.saveTeacher(updated);
+              }}
+            />
+          )}
 
           {currentView === 'integracoes' && (
             <IntegrationsView

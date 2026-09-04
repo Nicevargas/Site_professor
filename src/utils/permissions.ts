@@ -12,11 +12,11 @@ const PUBLIC_VIEWS: ViewMode[] = ['public-landing', 'public-booking', 'auth', 't
 const VIEWS_BY_ROLE: Record<UserRole, ViewMode[]> = {
   admin: [
     'dashboard', 'agenda', 'servicos', 'alunos', 'pagamentos', 'usuarios',
-    'site-admin', 'planos', 'integracoes', 'configuracoes',
+    'site-admin', 'meu-endereco', 'planos', 'integracoes', 'configuracoes',
   ],
   professor: [
     'dashboard', 'agenda', 'servicos', 'alunos', 'pagamentos',
-    'site-admin', 'planos', 'integracoes', 'configuracoes',
+    'site-admin', 'meu-endereco', 'planos', 'integracoes', 'configuracoes',
   ],
   // Secretaria: agenda, alunos e consulta de serviços. Sem financeiro, site, integrações ou perfil do professor.
   assistente: ['dashboard', 'agenda', 'alunos', 'servicos'],
