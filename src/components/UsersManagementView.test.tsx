@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { UsersManagementView } from './UsersManagementView';
 import { AuthUser, Company, SystemUser, TeacherProfile } from '../types';
 
@@ -149,5 +149,74 @@ describe('empresas', () => {
       document: '11.222.333/0001-44',
       status: 'ativa',
     });
+  });
+});
+
+describe('convite de professor', () => {
+  it('quem é cadastrado nasce pendente, não ativo', () => {
+    // A conta só existe de verdade quando a pessoa cria o acesso: até lá
+    // o gatilho on_auth_user_created não tem o que ligar.
+    const { onAddUser } = renderView([]);
+    fireEvent.click(screen.getByRole('button', { name: /novo usuário/i }));
+    fireEvent.change(screen.getByLabelText(/nome completo/i), { target: { value: 'João Mendes' } });
+    fireEvent.change(screen.getByLabelText(/e-mail de acesso/i), { target: { value: 'joao@teste.com' } });
+    fireEvent.click(screen.getByRole('button', { name: /cadastrar usuário/i }));
+
+    expect(onAddUser.mock.calls[0][0].status).toBe('pendente');
+  });
+
+  it('convite pendente aparece como tal, e não como conta inativa', () => {
+    renderView([user({ name: 'João Mendes', status: 'pendente' })]);
+    const row = rowOf('João Mendes');
+    expect(within(row).getByText(/convite pendente/i)).toBeInTheDocument();
+  });
+
+  it('só o convite pendente oferece copiar as instruções', () => {
+    renderView([
+      user({ id: 'u-pend', name: 'João Mendes', status: 'pendente' }),
+      user({ id: 'u-ativo', name: 'Maria Ativa', status: 'ativo' }),
+    ]);
+    expect(within(rowOf('João Mendes')).getByRole('button', { name: /copiar convite/i })).toBeInTheDocument();
+    expect(within(rowOf('Maria Ativa')).queryByRole('button', { name: /copiar convite/i })).not.toBeInTheDocument();
+  });
+
+  it('o convite copiado traz o endereço e o e-mail exato', async () => {
+    const escrito: string[] = [];
+    Object.assign(navigator, {
+      clipboard: { writeText: (t: string) => { escrito.push(t); return Promise.resolve(); } },
+    });
+
+    renderView([user({ name: 'João Mendes', email: 'joao@teste.com', status: 'pendente' })]);
+    fireEvent.click(within(rowOf('João Mendes')).getByRole('button', { name: /copiar convite/i }));
+
+    await waitFor(() => expect(escrito).toHaveLength(1));
+    expect(escrito[0]).toContain('joao@teste.com');
+    expect(escrito[0]).toContain('#/entrar');
+    // Usar outro e-mail quebra o vínculo: o texto precisa avisar
+    expect(escrito[0]).toMatch(/exatamente este e-mail/i);
+  });
+
+  it('o gestor não pode conceder admin nem gestor', () => {
+    renderView([], { currentRole: 'gestor' });
+    fireEvent.click(screen.getByRole('button', { name: /novo usuário/i }));
+    const papeis = within(screen.getByLabelText(/nível de acesso/i))
+      .getAllByRole('option')
+      .map((o) => (o as HTMLOptionElement).value);
+
+    expect(papeis).toContain('professor');
+    expect(papeis).toContain('aluno');
+    expect(papeis).not.toContain('admin');
+    expect(papeis).not.toContain('gestor');
+  });
+
+  it('o admin continua podendo conceder os dois', () => {
+    renderView([], { currentRole: 'admin' });
+    fireEvent.click(screen.getByRole('button', { name: /novo usuário/i }));
+    const papeis = within(screen.getByLabelText(/nível de acesso/i))
+      .getAllByRole('option')
+      .map((o) => (o as HTMLOptionElement).value);
+
+    expect(papeis).toContain('admin');
+    expect(papeis).toContain('gestor');
   });
 });

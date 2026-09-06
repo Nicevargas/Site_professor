@@ -89,6 +89,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
   // Empresas
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
+  const [convidadoCopiado, setConvidadoCopiado] = useState<string | null>(null);
 
   const countAdmin = users.filter((u) => u.role === 'admin').length;
   const countProfessor = users.filter((u) => u.role === 'professor').length;
@@ -103,6 +104,34 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
     const matchesRole = roleFilter === 'todos' || u.role === roleFilter;
     return matchesSearch && matchesRole;
   });
+
+  /**
+   * Convite pendente: a pessoa foi cadastrada mas ainda não criou o acesso.
+   * Quem faz a ligação é o gatilho on_auth_user_created, quando ela se
+   * cadastra com o MESMO e-mail -- daí o convite vira conta ativa.
+   */
+  const isConvitePendente = (user: SystemUser) => user.status === 'pendente';
+
+  const copiarConvite = async (user: SystemUser) => {
+    const endereco = `${window.location.origin}${window.location.pathname}#/entrar`;
+    const texto = [
+      `Olá, ${user.name.split(' ')[0]}!`,
+      '',
+      'Seu acesso ao Aquagenda já está preparado. Para entrar, crie seu cadastro em:',
+      endereco,
+      '',
+      `Use exatamente este e-mail: ${user.email}`,
+      'Se usar outro, o acesso não será reconhecido.',
+    ].join('\n');
+
+    try {
+      await navigator.clipboard.writeText(texto);
+      setConvidadoCopiado(user.id);
+      setTimeout(() => setConvidadoCopiado(null), 2500);
+    } catch {
+      window.prompt('Copie o convite abaixo:', texto);
+    }
+  };
 
   const teacherName = (id?: string) => teachers.find((t) => t.id === id)?.name;
   const companyName = (id?: string) => companies.find((c) => c.id === id)?.name;
@@ -166,7 +195,8 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
       phone: phone.trim() || '(11) 98888-0000',
       teacherId: role === 'admin' ? undefined : teacherId === NEW_TEACHER_OPTION ? `prof-${Date.now()}` : teacherId,
       companyId: role === 'admin' ? undefined : companyId || undefined,
-      status: 'ativo',
+      // Convite: só vira 'ativo' quando a pessoa cria o acesso com este e-mail
+      status: 'pendente',
       lastLogin: 'Nunca',
       bio: bio.trim() || `Usuário do tipo ${role} cadastrado no sistema.`,
       avatarUrl: role === 'aluno' 
@@ -503,12 +533,20 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                           {/* Status */}
                           <td className="py-4 px-4">
                             <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                              user.status === 'ativo' 
-                                ? 'bg-emerald-50 text-emerald-700' 
+                              user.status === 'ativo'
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : user.status === 'pendente'
+                                ? 'bg-amber-50 text-amber-800 border border-amber-200'
                                 : 'bg-slate-100 text-slate-500'
                             }`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${user.status === 'ativo' ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
-                              <span className="capitalize">{user.status}</span>
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                user.status === 'ativo' ? 'bg-emerald-500'
+                                : user.status === 'pendente' ? 'bg-amber-500'
+                                : 'bg-slate-400'
+                              }`}></span>
+                              <span className="capitalize">
+                                {isConvitePendente(user) ? 'Convite pendente' : user.status}
+                              </span>
                             </span>
                           </td>
 
@@ -534,6 +572,33 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                           {/* Actions & Switch Role */}
                           <td className="py-4 px-5 text-right">
                             <div className="flex items-center justify-end gap-2">
+                              {/* Convite ainda não aceito: o caminho útil aqui é
+                                  reenviar as instruções, não simular acesso a
+                                  uma conta que ainda não existe. */}
+                              {isConvitePendente(user) && (
+                                <button
+                                  onClick={() => copiarConvite(user)}
+                                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs transition-all ${
+                                    convidadoCopiado === user.id
+                                      ? 'bg-emerald-600 text-white'
+                                      : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
+                                  }`}
+                                  title={`Copiar as instruções de acesso para ${user.name}`}
+                                >
+                                  {convidadoCopiado === user.id ? (
+                                    <>
+                                      <Check className="w-3.5 h-3.5" />
+                                      <span>Copiado</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Mail className="w-3.5 h-3.5" />
+                                      <span>Copiar convite</span>
+                                    </>
+                                  )}
+                                </button>
+                              )}
+
                               {/* Fast Switch / Demo test button */}
                               <button
                                 onClick={() => onSwitchUser(user)}

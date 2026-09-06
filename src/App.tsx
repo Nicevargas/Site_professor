@@ -603,6 +603,9 @@ function AppInner() {
   const handleAddUser = (newUserData: Omit<SystemUser, 'id' | 'createdAt'>) => {
     const newUser: SystemUser = {
       ...newUserData,
+      // O gestor só cadastra dentro da própria academia. A tela já limita as
+      // opções, e o RLS recusaria outra empresa -- isto evita a ida perdida.
+      companyId: isManager ? currentCompanyId : newUserData.companyId,
       id: `user-${Date.now()}`,
       createdAt: toLocalDateKey(new Date()),
     };
