@@ -144,8 +144,9 @@ CREATE TRIGGER protect_company_privileges
 -- ====================================================================
 DO $$
 DECLARE
-    r RECORD;
-    ajustadas INTEGER := 0;
+    r          RECORD;
+    rank_atual INTEGER;
+    ajustadas  INTEGER := 0;
 BEGIN
     FOR r IN
         SELECT c.id,
@@ -155,7 +156,12 @@ BEGIN
           JOIN public.teachers t ON t.company_id = c.id
          GROUP BY c.id, c.plan
     LOOP
-        IF r.maior > CASE r.plano_empresa WHEN 'premium' THEN 3 WHEN 'pro' THEN 2 ELSE 1 END THEN
+        -- O rank sai para uma variavel de proposito: um CASE dentro da
+        -- condicao do IF quebra, porque o PL/pgSQL fecha a condicao no
+        -- primeiro THEN que encontra -- inclusive o THEN do proprio CASE.
+        rank_atual := CASE r.plano_empresa WHEN 'premium' THEN 3 WHEN 'pro' THEN 2 ELSE 1 END;
+
+        IF r.maior > rank_atual THEN
             UPDATE public.companies
                SET plan = CASE r.maior WHEN 3 THEN 'premium' WHEN 2 THEN 'pro' ELSE 'start' END,
                    updated_at = NOW()
