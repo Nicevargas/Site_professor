@@ -1154,6 +1154,43 @@ export const supabaseService = {
   /**
    * Save or Update a System User
    */
+  /**
+   * Atualiza o cadastro da própria pessoa logada.
+   * A linha em system_users nasce do gatilho on_auth_user_created, então aqui
+   * é UPDATE, nunca INSERT: quem não é admin não tem permissão de inserir e a
+   * tentativa só gerava o aviso de "gravação recusada".
+   * Papel, vínculo, status e permissões ficam de fora de propósito — quem muda
+   * isso é um admin, pela tela de Usuários.
+   */
+  async saveOwnProfile(updates: {
+    name?: string;
+    phone?: string;
+    avatarUrl?: string;
+    bio?: string;
+  }): Promise<boolean> {
+    if (!isSupabaseConfigured || !supabase) return false;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      // Sem sessão não há o que gravar: o cadastro local segue valendo
+      if (!user) return false;
+
+      const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (updates.name !== undefined) payload.name = updates.name;
+      if (updates.phone !== undefined) payload.phone = updates.phone || null;
+      if (updates.avatarUrl !== undefined) payload.avatar_url = updates.avatarUrl || null;
+      if (updates.bio !== undefined) payload.bio = updates.bio || null;
+
+      const { error } = await supabase
+        .from('system_users')
+        .update(payload)
+        .eq('auth_user_id', user.id);
+      return syncResult(error, 'meus dados');
+    } catch (err) {
+      reportSyncError('meus dados', err);
+      return false;
+    }
+  },
+
   async saveSystemUser(user: {
     id?: string;
     name: string;
@@ -1345,17 +1382,26 @@ export const supabaseService = {
   /**
    * Sign Up with Email & Password & Full Name
    */
-  async signUp(email: string, password: string, fullName?: string): Promise<{ data: any; error: string | null }> {
+  async signUp(
+    email: string,
+    password: string,
+    fullName?: string,
+    profile?: { role?: string; phone?: string }
+  ): Promise<{ data: any; error: string | null }> {
     if (!isSupabaseConfigured || !supabase) {
       return { data: null, error: 'Supabase não configurado. Use o modo de teste.' };
     }
     try {
+      // O gatilho on_auth_user_created cria a linha em system_users lendo estes
+      // campos. Papel só pode ser professor ou aluno; o banco reforça isso.
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName || '',
+            role: profile?.role === 'aluno' ? 'aluno' : 'professor',
+            phone: profile?.phone || null,
           },
         },
       });

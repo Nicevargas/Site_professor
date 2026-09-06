@@ -644,15 +644,12 @@ function AppInner() {
     }
 
     if (!updatedUser.isDemo) {
-      supabaseService.saveSystemUser({
-        id: updatedUser.id,
+      // Atualiza a própria linha pelo auth_user_id: o id guardado no navegador
+      // pode não ser o da linha no banco, e aí o upsert virava INSERT recusado
+      supabaseService.saveOwnProfile({
         name: updatedUser.name || '',
-        email: updatedUser.email,
-        role: updatedUser.role,
         phone: updatedUser.phone,
         avatarUrl: updatedUser.avatarUrl,
-        teacherId: updatedUser.teacherId,
-        studentId: updatedUser.studentId,
       });
     }
   };

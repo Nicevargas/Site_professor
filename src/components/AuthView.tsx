@@ -260,21 +260,21 @@ export const AuthView: React.FC<AuthViewProps> = ({
     saveStoredUsers(currentUsers);
 
     if (isSupabaseConfigured) {
-      // 1. Save directly into Supabase database table `system_users`
-      await supabaseService.saveSystemUser({
-        id: newUserId,
-        name: cleanName,
-        email: cleanEmail,
-        role: safeRole,
-        phone: whatsapp.trim() || undefined,
-        status: 'ativo',
-      });
+      // Cadastrar é só criar a conta no Supabase Auth. A linha em system_users
+      // é criada pelo gatilho on_auth_user_created, com o papel e o telefone
+      // que vão aqui no metadata. Tentar inserir por fora daria erro de
+      // permissão: antes do signUp não existe sessão nenhuma.
+      const { error: signUpError } = await supabaseService.signUp(
+        cleanEmail,
+        password,
+        cleanName,
+        { role: safeRole, phone: whatsapp.trim() || undefined }
+      );
 
-      // 2. Also register in Supabase Auth (non-blocking if rate limited)
-      try {
-        await supabaseService.signUp(cleanEmail, password, cleanName);
-      } catch {
-        // Continue even if Supabase Auth email rate limits
+      if (signUpError) {
+        setIsLoading(false);
+        setErrorMessage(signUpError);
+        return;
       }
     }
 
