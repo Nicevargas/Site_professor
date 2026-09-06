@@ -51,6 +51,8 @@ interface PublicLandingViewProps {
   faqs?: FaqItem[];
   isAuthenticated?: boolean;
   onOpenLogin?: () => void;
+  /** Quando o visitante chegou pela vitrine de uma academia, o caminho de volta */
+  backToCompany?: { name: string; onBack: () => void };
   onStartBooking: (serviceId?: string) => void;
   onBackToDashboard: () => void;
   onOpenSiteAdmin: () => void;
@@ -67,6 +69,7 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
   faqs = [],
   isAuthenticated = false,
   onOpenLogin,
+  backToCompany,
   onStartBooking,
   onBackToDashboard,
   onOpenSiteAdmin,
@@ -304,6 +307,14 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
                 <Sliders className="w-3.5 h-3.5 text-[#00687a]" />
                 <span className="hidden sm:inline">Painel de Gestão</span>
                 <span className="sm:hidden">Painel</span>
+              </button>
+            ) : backToCompany ? (
+              <button
+                onClick={backToCompany.onBack}
+                className="hover:text-[#00687a] text-slate-500 font-medium flex items-center gap-1 transition-colors"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Voltar para {backToCompany.name}</span>
               </button>
             ) : onOpenLogin ? (
               <button

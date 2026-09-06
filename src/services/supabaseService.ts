@@ -870,10 +870,61 @@ export const supabaseService = {
         status: c.status === 'inativa' ? 'inativa' : 'ativa',
         managerSeesFinance: Boolean(c.manager_sees_finance),
         plan: c.plan || 'start',
+        slug: c.slug || undefined,
+        customDomain: c.custom_domain || undefined,
+        customDomainStatus: c.custom_domain_status || 'nenhum',
+        headline: c.headline || undefined,
+        bio: c.bio || undefined,
+        heroImageUrl: c.hero_image_url || undefined,
+        primaryColor: c.primary_color || undefined,
+        secondaryColor: c.secondary_color || undefined,
+        accentColor: c.accent_color || undefined,
         createdAt: c.created_at ? String(c.created_at).split('T')[0] : '',
       }));
     } catch (err) {
       console.warn('Erro ao buscar empresas no Supabase:', err);
+      return null;
+    }
+  },
+
+  /** Academia pedida pelo endereço: /e/<slug>, subdomínio ou domínio próprio. */
+  async getCompanyByAddress(ref: { slug?: string; domain?: string }): Promise<Company | null> {
+    if (!isSupabaseConfigured || !supabase) return null;
+    try {
+      let query = supabase.from('companies').select('*').limit(1);
+      if (ref.domain) query = query.eq('custom_domain', ref.domain.toLowerCase());
+      else if (ref.slug) query = query.eq('slug', ref.slug.toLowerCase());
+      else return null;
+
+      const { data, error } = await query;
+      if (error || !data || data.length === 0) return null;
+      const c = data[0] as any;
+      return {
+        id: c.id,
+        name: c.name,
+        tradeName: c.trade_name || undefined,
+        document: c.document || undefined,
+        email: c.email || undefined,
+        phone: c.phone || undefined,
+        city: c.city || undefined,
+        logoUrl: c.logo_url || undefined,
+        notes: c.notes || undefined,
+        status: c.status === 'inativa' ? 'inativa' : 'ativa',
+        managerSeesFinance: Boolean(c.manager_sees_finance),
+        plan: c.plan || 'start',
+        slug: c.slug || undefined,
+        customDomain: c.custom_domain || undefined,
+        customDomainStatus: c.custom_domain_status || 'nenhum',
+        headline: c.headline || undefined,
+        bio: c.bio || undefined,
+        heroImageUrl: c.hero_image_url || undefined,
+        primaryColor: c.primary_color || undefined,
+        secondaryColor: c.secondary_color || undefined,
+        accentColor: c.accent_color || undefined,
+        createdAt: c.created_at ? String(c.created_at).split('T')[0] : '',
+      };
+    } catch (err) {
+      console.warn('Erro ao buscar academia pelo endereço:', err);
       return null;
     }
   },
@@ -892,6 +943,15 @@ export const supabaseService = {
         logo_url: company.logoUrl || null,
         notes: company.notes || null,
         status: company.status || 'ativa',
+        slug: company.slug || null,
+        custom_domain: company.customDomain || null,
+        custom_domain_status: company.customDomainStatus || 'nenhum',
+        headline: company.headline || null,
+        bio: company.bio || null,
+        hero_image_url: company.heroImageUrl || null,
+        primary_color: company.primaryColor || null,
+        secondary_color: company.secondaryColor || null,
+        accent_color: company.accentColor || null,
         // manager_sees_finance e plan ficam de fora: só um admin muda, e o
         // gatilho protect_company_privileges recusa vindo do gestor.
       });

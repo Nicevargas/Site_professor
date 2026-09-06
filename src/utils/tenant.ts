@@ -19,23 +19,45 @@ const RESERVED_SUBDOMAINS = new Set([
 /** Hospedagens de desenvolvimento e prévia não representam domínio de professor. */
 const NON_TENANT_HOSTS = /(^localhost$|^127\.|^0\.0\.0\.0$|^\[|\.local$|\.vercel\.app$|\.netlify\.app$|\.github\.io$)/;
 
+/**
+ * De quem é a vitrine pedida.
+ * O caminho diz explicitamente (/p/ professor, /e/ academia). Subdomínio e
+ * domínio próprio dividem o mesmo espaço, então quem decide é a consulta --
+ * daí 'indefinido'. O banco garante que um endereço não pertence aos dois.
+ */
+export type TenantKind = 'professor' | 'empresa' | 'indefinido';
+
 export interface TenantRef {
   mode: AddressingMode | 'none';
-  /** Identificador do professor, para caminho e subdomínio */
+  kind: TenantKind;
+  /** Identificador do professor ou da academia, para caminho e subdomínio */
   slug?: string;
   /** Domínio informado pelo visitante, para domínio próprio */
   domain?: string;
 }
 
-const NONE: TenantRef = { mode: 'none' };
+const NONE: TenantRef = { mode: 'none', kind: 'indefinido' };
 
-/** Extrai o identificador de "/p/<slug>" vindo do caminho ou do hash. */
-export function slugFromRoute(pathname: string, hash: string): string | null {
-  const fromPath = /^\/p\/([a-z0-9][a-z0-9-]*)/i.exec(pathname || '');
-  if (fromPath) return fromPath[1].toLowerCase();
+/** Prefixo do caminho: "p" para professor, "e" para academia. */
+const ROUTE_PREFIX: Record<string, TenantKind> = { p: 'professor', e: 'empresa' };
+
+export interface RouteSlug {
+  slug: string;
+  kind: TenantKind;
+}
+
+/** Extrai o identificador de "/p/<slug>" ou "/e/<slug>", do caminho ou do hash. */
+export function slugFromRoute(pathname: string, hash: string): RouteSlug | null {
+  const padrao = /^\/(p|e)\/([a-z0-9][a-z0-9-]*)/i;
+  const fromPath = padrao.exec(pathname || '');
+  if (fromPath) {
+    return { slug: fromPath[2].toLowerCase(), kind: ROUTE_PREFIX[fromPath[1].toLowerCase()] };
+  }
   const cleanHash = (hash || '').replace(/^#/, '');
-  const fromHash = /^\/p\/([a-z0-9][a-z0-9-]*)/i.exec(cleanHash);
-  return fromHash ? fromHash[1].toLowerCase() : null;
+  const fromHash = padrao.exec(cleanHash);
+  return fromHash
+    ? { slug: fromHash[2].toLowerCase(), kind: ROUTE_PREFIX[fromHash[1].toLowerCase()] }
+    : null;
 }
 
 /**
@@ -48,7 +70,7 @@ export function resolveTenant(
 ): TenantRef {
   const host = (location.hostname || '').toLowerCase().replace(/\.$/, '');
   const platform = (platformHost || '').toLowerCase().replace(/^www\./, '');
-  const slug = slugFromRoute(location.pathname, location.hash);
+  const rota = slugFromRoute(location.pathname, location.hash);
 
   const isDevHost = NON_TENANT_HOSTS.test(host);
 
@@ -57,26 +79,35 @@ export function resolveTenant(
       const sub = host.slice(0, -(platform.length + 1));
       // Só um nível conta: o certificado curinga não cobre a.b.dominio
       if (sub && !sub.includes('.') && !RESERVED_SUBDOMAINS.has(sub)) {
-        return { mode: 'subdomain', slug: sub };
+        // Pode ser academia ou professor: só a consulta resolve
+        return { mode: 'subdomain', kind: 'indefinido', slug: sub };
       }
     } else {
-      return { mode: 'domain', domain: host };
+      return { mode: 'domain', kind: 'indefinido', domain: host };
     }
   }
 
-  return slug ? { mode: 'path', slug } : NONE;
+  return rota ? { mode: 'path', kind: rota.kind, slug: rota.slug } : NONE;
 }
 
 /** Endereço público da vitrine, conforme o que o plano do professor libera. */
 export function buildPublicUrl(
   mode: AddressingMode,
-  opts: { slug?: string; domain?: string; platformHost?: string; protocol?: string }
+  opts: {
+    slug?: string;
+    domain?: string;
+    platformHost?: string;
+    protocol?: string;
+    /** 'empresa' usa /e/ no caminho; o padrão continua sendo o professor */
+    kind?: TenantKind;
+  }
 ): string {
   const platform = (opts.platformHost ?? PLATFORM_HOST) || 'aquagenda.com.br';
   const scheme = opts.protocol ?? 'https://';
   if (mode === 'domain' && opts.domain) return `${scheme}${opts.domain}`;
   if (mode === 'subdomain' && opts.slug) return `${scheme}${opts.slug}.${platform}`;
-  return `${scheme}${platform}/p/${opts.slug || ''}`;
+  const prefixo = opts.kind === 'empresa' ? 'e' : 'p';
+  return `${scheme}${platform}/${prefixo}/${opts.slug || ''}`;
 }
 
 const TITLE_PREFIXES = /^(prof|profa|professor|professora|dr|dra|sr|sra)\.?\s+/i;

@@ -50,6 +50,18 @@ export interface Company {
    * o gestor de liberar para si mesmo (companies.manager_sees_finance).
    */
   managerSeesFinance?: boolean;
+
+  // ----- Vitrine da academia -----
+  /** Endereço público: aquagenda.com.br/e/<slug> */
+  slug?: string;
+  customDomain?: string;
+  customDomainStatus?: 'nenhum' | 'pendente' | 'verificado' | 'erro';
+  headline?: string;
+  bio?: string;
+  heroImageUrl?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  accentColor?: string;
 }
 
 /** Nível do aluno, usado para montar turmas e filtrar a lista de alunos. */

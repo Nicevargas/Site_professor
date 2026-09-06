@@ -38,6 +38,7 @@ import {
 
 import { AttendanceModal } from './components/AttendanceModal';
 import { CompanyPanelView } from './components/CompanyPanelView';
+import { CompanyLandingView } from './components/CompanyLandingView';
 import { availability, ClassSlot } from './utils/classes';
 import { addMinutes } from './utils/schedule';
 import { SideNav, SidebarMode } from './components/SideNav';
@@ -141,6 +142,15 @@ function AppInner() {
 
   // Endereço pedido pelo visitante: caminho, subdomínio ou domínio próprio
   const [tenantRef] = useState(() => resolveTenant(window.location));
+
+  /**
+   * Academia pedida pelo endereço. Em /e/<slug> o caminho já diz que é uma
+   * academia; em subdomínio e domínio próprio, quem descobre é a busca --
+   * o endereço pode ser de professor ou de academia, nunca dos dois.
+   */
+  const [addressedCompany, setAddressedCompany] = useState<Company | null>(null);
+  /** O visitante já escolheu um professor dentro da página da academia */
+  const [pickedTeacherFromCompany, setPickedTeacherFromCompany] = useState(false);
 
   // Core domain state
   const [teachers, setTeachers] = useState<TeacherProfile[]>(INITIAL_TEACHER_PROFILES);
@@ -347,9 +357,30 @@ function AppInner() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isSidebarOpen]);
 
+  // Academia pedida pelo endereço: primeiro o que está em memória
+  useEffect(() => {
+    if (tenantRef.mode === 'none' || tenantRef.kind === 'professor') return;
+    const achada = companies.find((c) =>
+      tenantRef.domain ? c.customDomain === tenantRef.domain : c.slug === tenantRef.slug
+    );
+    if (achada) setAddressedCompany(achada);
+  }, [companies, tenantRef.mode, tenantRef.kind, tenantRef.slug, tenantRef.domain]);
+
+  // ...e depois o banco, que é a fonte da verdade
+  useEffect(() => {
+    if (tenantRef.mode === 'none' || tenantRef.kind === 'professor' || !isSupabaseConfigured) return;
+    let cancelled = false;
+    supabaseService
+      .getCompanyByAddress({ slug: tenantRef.slug, domain: tenantRef.domain })
+      .then((found) => {
+        if (found && !cancelled) setAddressedCompany(found);
+      });
+    return () => { cancelled = true; };
+  }, [tenantRef.mode, tenantRef.kind, tenantRef.slug, tenantRef.domain]);
+
   // A vitrine pedida pelo endereço vence a lista local assim que o banco responde
   useEffect(() => {
-    if (tenantRef.mode === 'none' || !isSupabaseConfigured) return;
+    if (tenantRef.mode === 'none' || tenantRef.kind === 'empresa' || !isSupabaseConfigured) return;
     let cancelled = false;
     supabaseService.getTeacherByAddress({ slug: tenantRef.slug, domain: tenantRef.domain }).then((found) => {
       if (found && !cancelled) setCurrentTeacher(found);
@@ -357,14 +388,42 @@ function AppInner() {
     return () => { cancelled = true; };
   }, [tenantRef.mode, tenantRef.slug, tenantRef.domain]);
 
-  // Título e prévia de link seguem o professor da vitrine, não um texto fixo no HTML
+  // Título e prévia de link seguem a vitrine aberta, não um texto fixo no HTML
   useEffect(() => {
-    const brand = currentTeacher.brandName || 'Aquagenda';
-    document.title = `${currentTeacher.name} | ${currentTeacher.specialty || brand}`;
     const setMeta = (selector: string, attr: string, value: string) => {
       const el = document.head.querySelector(selector);
       if (el) el.setAttribute(attr, value);
     };
+
+    // Na página da academia, quem dá nome ao link é a academia -- senão o
+    // compartilhamento mostraria o nome de um professor qualquer dela.
+    if (addressedCompany && !pickedTeacherFromCompany) {
+      const nomeAcademia = addressedCompany.tradeName || addressedCompany.name;
+      const descricaoAcademia =
+        addressedCompany.bio ||
+        addressedCompany.headline ||
+        `Agende aulas com os professores da ${nomeAcademia}.`;
+      document.title = `${nomeAcademia}${addressedCompany.headline ? ` | ${addressedCompany.headline}` : ''}`;
+      setMeta('meta[name="description"]', 'content', descricaoAcademia);
+      setMeta('meta[property="og:title"]', 'content', nomeAcademia);
+      setMeta('meta[property="og:description"]', 'content', descricaoAcademia);
+      if (addressedCompany.heroImageUrl) {
+        setMeta('meta[property="og:image"]', 'content', addressedCompany.heroImageUrl);
+      }
+      setMeta('meta[property="og:url"]', 'content', buildPublicUrl(
+        addressedCompany.customDomain ? 'domain' : 'path',
+        {
+          slug: addressedCompany.slug,
+          domain: addressedCompany.customDomain,
+          kind: 'empresa',
+          platformHost: PLATFORM_HOST,
+        }
+      ));
+      return;
+    }
+
+    const brand = currentTeacher.brandName || 'Aquagenda';
+    document.title = `${currentTeacher.name} | ${currentTeacher.specialty || brand}`;
     const description = currentTeacher.bio || `Agende aulas com ${currentTeacher.name}.`;
     setMeta('meta[name="description"]', 'content', description);
     setMeta('meta[property="og:title"]', 'content', currentTeacher.name);
@@ -382,7 +441,7 @@ function AppInner() {
         platformHost: PLATFORM_HOST,
       }
     ));
-  }, [currentTeacher]);
+  }, [currentTeacher, addressedCompany, pickedTeacherFromCompany]);
 
   // URL: mantém #/rota sincronizada com a tela (botão voltar e links compartilháveis)
   useEffect(() => {
@@ -1126,6 +1185,27 @@ function AppInner() {
     );
   }
 
+  /**
+   * Vitrine da academia: quando o endereço aponta para uma empresa e o
+   * visitante ainda não escolheu um professor, a porta de entrada é a
+   * página dela. Escolher um professor cai na vitrine dele, como sempre.
+   */
+  if (currentView === 'public-landing' && addressedCompany && !pickedTeacherFromCompany) {
+    const daAcademia = teachers.filter((t) => t.companyId === addressedCompany.id);
+    return (
+      <CompanyLandingView
+        company={addressedCompany}
+        teachers={daAcademia}
+        services={allServices}
+        onSelectTeacher={(teacher) => {
+          setCurrentTeacher(teacher);
+          setPickedTeacherFromCompany(true);
+        }}
+        onEnterApp={() => setCurrentView('auth')}
+      />
+    );
+  }
+
   if (currentView === 'public-landing') {
     return (
       <PublicLandingView
@@ -1148,6 +1228,14 @@ function AppInner() {
         }}
         onOpenSiteAdmin={() => setCurrentView('site-admin')}
         onOpenPlans={() => setCurrentView('planos')}
+        backToCompany={
+          addressedCompany && pickedTeacherFromCompany
+            ? {
+                name: addressedCompany.tradeName || addressedCompany.name,
+                onBack: () => setPickedTeacherFromCompany(false),
+              }
+            : undefined
+        }
       />
     );
   }

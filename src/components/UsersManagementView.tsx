@@ -31,7 +31,8 @@ import {
   Settings,
   DollarSign,
   Building2,
-  Plus
+  Plus,
+  Globe
 } from 'lucide-react';
 
 interface UsersManagementViewProps {
@@ -1155,6 +1156,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                   const name = value('company-name');
                   if (!name) return;
                   onSaveCompany({
+                    ...(editingCompany || {}),
                     id: editingCompany?.id || `comp-${Date.now()}`,
                     name,
                     document: value('company-document') || undefined,
@@ -1162,6 +1164,10 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                     phone: value('company-phone') || undefined,
                     city: value('company-city') || undefined,
                     status: value('company-status') === 'inativa' ? 'inativa' : 'ativa',
+                    // Vitrine da academia
+                    slug: value('company-slug') || undefined,
+                    headline: value('company-headline') || undefined,
+                    bio: value('company-bio') || undefined,
                     createdAt: editingCompany?.createdAt || new Date().toISOString().slice(0, 10),
                   });
                   setIsCompanyModalOpen(false);
@@ -1222,6 +1228,65 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                       name="company-phone"
                       defaultValue={editingCompany?.phone || ''}
                       placeholder="(11) 3000-0000"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#00687a] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 space-y-3">
+                  <p className="font-bold text-slate-700 flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5 text-[#00687a]" />
+                    Vitrine da academia
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    A página pública da academia lista os professores dela. Cada professor continua
+                    com a vitrine dele; esta é a porta de entrada de quem procura a escola.
+                  </p>
+
+                  <div>
+                    <label htmlFor="company-slug" className="block font-bold text-slate-700 mb-1">
+                      Endereço público
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-slate-400 shrink-0">/e/</span>
+                      <input
+                        id="company-slug"
+                        name="company-slug"
+                        defaultValue={editingCompany?.slug || ''}
+                        placeholder="aqua-vida"
+                        pattern="[a-z0-9][a-z0-9-]{1,47}"
+                        title="Letras minúsculas, números e hífen"
+                        className="flex-1 px-3 py-2 border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#00687a] focus:outline-none"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Não pode ser igual ao endereço de um professor: os dois dividem o mesmo espaço.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label htmlFor="company-headline" className="block font-bold text-slate-700 mb-1">
+                      Título da página
+                    </label>
+                    <input
+                      id="company-headline"
+                      name="company-headline"
+                      defaultValue={editingCompany?.headline || ''}
+                      placeholder="Natação e preparação física em São Paulo"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#00687a] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="company-bio" className="block font-bold text-slate-700 mb-1">
+                      Sobre a academia
+                    </label>
+                    <textarea
+                      id="company-bio"
+                      name="company-bio"
+                      rows={2}
+                      defaultValue={editingCompany?.bio || ''}
+                      placeholder="Turmas pequenas, avaliação individual e horários flexíveis."
                       className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#00687a] focus:outline-none"
                     />
                   </div>

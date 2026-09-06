@@ -28,6 +28,12 @@ export const INITIAL_COMPANIES: Company[] = [
     city: 'São Paulo - SP',
     status: 'ativa',
     plan: 'pro',
+    slug: 'aqua-vida',
+    headline: 'Natação e preparação física em São Paulo, com professores que acompanham de perto',
+    bio: 'Turmas pequenas, avaliação individual e horários que cabem na sua rotina. Escolha o professor e agende pela internet.',
+    primaryColor: '#00687a',
+    secondaryColor: '#57dffe',
+    accentColor: '#004e5c',
     createdAt: '2026-01-05',
   },
 ];
