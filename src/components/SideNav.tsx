@@ -29,7 +29,8 @@ import {
   PanelLeftOpen,
   Menu,
   Smartphone,
-  Link2
+  Link2,
+  Building2,
 } from 'lucide-react';
 
 export type SidebarMode = 'drawer' | 'pinned' | 'compact';
@@ -47,6 +48,8 @@ interface SideNavProps {
   onChangeSidebarMode: (mode: SidebarMode) => void;
   siteAdminTab?: SiteAdminTab;
   onSelectSiteAdminTab?: (tab: SiteAdminTab) => void;
+  /** Gestor só vê o financeiro quando a empresa dele libera */
+  canSeeFinance?: boolean;
 }
 
 export const SideNav: React.FC<SideNavProps> = ({ 
@@ -62,6 +65,7 @@ export const SideNav: React.FC<SideNavProps> = ({
   onChangeSidebarMode,
   siteAdminTab,
   onSelectSiteAdminTab,
+  canSeeFinance = false,
 }) => {
   const userRole: UserRole = currentUser?.role || 'professor';
   const { setIsTutorialHubOpen, setIsInteractiveTourOpen, setIsA11yModalOpen } = useAccessibility();
@@ -115,6 +119,27 @@ export const SideNav: React.FC<SideNavProps> = ({
           { id: 'public-landing' as ViewMode, label: 'Vitrine do Professor', icon: Globe },
           { id: 'configuracoes' as ViewMode, label: 'Meus Dados', icon: Settings },
         ];
+
+      case 'gestor':
+        // "da academia" x "do professor": o gestor alterna entre professores
+        // pelo seletor do topo, e os rótulos deixam claro o que está vendo.
+        return [
+          { id: 'dashboard' as ViewMode, label: 'Painel da Academia', icon: Building2 },
+          { id: 'agenda' as ViewMode, label: 'Agenda do Professor', icon: CalendarIcon },
+          { id: 'alunos' as ViewMode, label: 'Alunos do Professor', icon: Users },
+          { id: 'servicos' as ViewMode, label: 'Serviços do Professor', icon: Layers },
+          ...(canSeeFinance
+            ? [{ id: 'pagamentos' as ViewMode, label: 'Financeiro da Academia', icon: DollarSign, badge: overdueCount > 0 ? `${overdueCount}` : undefined }]
+            : []),
+          { id: 'usuarios' as ViewMode, label: 'Equipe & Alunos', icon: ShieldCheck },
+          { id: 'configuracoes' as ViewMode, label: 'Meus Dados', icon: Settings },
+        ];
+
+      default:
+        // Papel desconhecido vê o mínimo, em vez de derrubar a barra lateral
+        return [
+          { id: 'configuracoes' as ViewMode, label: 'Meus Dados', icon: Settings },
+        ];
     }
   };
 
@@ -130,6 +155,12 @@ export const SideNav: React.FC<SideNavProps> = ({
         return { title: 'Secretaria & Atendimento', badge: 'Assistente', color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' };
       case 'aluno':
         return { title: 'Portal do Aluno', badge: 'Aluno', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' };
+      case 'gestor':
+        return { title: 'Gestor da Academia', badge: 'Gestor', color: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' };
+      default:
+        // Papel desconhecido não pode derrubar a barra lateral inteira:
+        // sem este default, um papel novo devolvia undefined e quebrava o app.
+        return { title: 'Usuário', badge: 'Acesso', color: 'bg-slate-500/20 text-slate-300 border-slate-500/30' };
     }
   };
 

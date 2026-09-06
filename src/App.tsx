@@ -37,6 +37,7 @@ import {
 } from './data/mockData';
 
 import { AttendanceModal } from './components/AttendanceModal';
+import { CompanyPanelView } from './components/CompanyPanelView';
 import { availability, ClassSlot } from './utils/classes';
 import { addMinutes } from './utils/schedule';
 import { SideNav, SidebarMode } from './components/SideNav';
@@ -72,7 +73,7 @@ import { TutorialWizardView } from './components/TutorialWizardView';
 import { supabaseService } from './services/supabaseService';
 import { isSupabaseConfigured, supabase } from './lib/supabase';
 import { dispatchAppointmentWebhook, dispatchFormWebhook } from './utils/webhookDispatcher';
-import { canAccessView, getDefaultView, canSwitchProfiles, canViewFinances, sanitizeSelfDeclaredRole } from './utils/permissions';
+import { canAccessView, getDefaultView, canSwitchProfiles, canViewFinances, canManageCompany, sanitizeSelfDeclaredRole } from './utils/permissions';
 import { StudentProfileView } from './components/StudentProfileView';
 import { hashFromView, viewFromHash } from './utils/routes';
 import { formatMonthYearPtBR, toLocalDateKey } from './utils/dates';
@@ -215,6 +216,44 @@ function AppInner() {
   const waitlist = useMemo(() => {
     return allWaitlist.filter(w => !w.teacherId || w.teacherId === currentTeacher.id);
   }, [allWaitlist, currentTeacher.id]);
+
+  // ---- Escopo de empresa (gestor da academia) ----
+  const currentCompanyId = useMemo(() => {
+    if (currentUser?.companyId) return currentUser.companyId;
+    if (currentUser?.teacherId) {
+      return teachers.find((t) => t.id === currentUser.teacherId)?.companyId;
+    }
+    return undefined;
+  }, [currentUser?.companyId, currentUser?.teacherId, teachers]);
+
+  const currentCompany = useMemo(
+    () => companies.find((c) => c.id === currentCompanyId) || null,
+    [companies, currentCompanyId]
+  );
+
+  /** O gestor só enxerga (e só troca entre) os professores da empresa dele. */
+  const isManager = currentUser?.role === 'gestor';
+  const managerSeesFinance = Boolean(currentCompany?.managerSeesFinance);
+
+  const teachersInScope = useMemo(() => {
+    if (!isManager) return teachers;
+    return teachers.filter((t) => t.companyId && t.companyId === currentCompanyId);
+  }, [isManager, teachers, currentCompanyId]);
+
+  /**
+   * Usuários que o gestor administra: os da empresa dele, direto pelo
+   * companyId ou indireto pelo professor a que respondem. Isto espelha a
+   * política system_users_manager_read; o banco é quem manda de verdade.
+   */
+  const usersInScope = useMemo(() => {
+    if (!isManager) return systemUsers;
+    const idsDaEmpresa = new Set(teachersInScope.map((t) => t.id));
+    return systemUsers.filter(
+      (u) =>
+        (u.companyId && u.companyId === currentCompanyId) ||
+        (u.teacherId && idsDaEmpresa.has(u.teacherId))
+    );
+  }, [isManager, systemUsers, teachersInScope, currentCompanyId]);
 
   const invoices = useMemo(() => {
     return allInvoices.filter(inv => !inv.teacherId || inv.teacherId === currentTeacher.id);
@@ -369,10 +408,10 @@ function AppInner() {
   // Guarda de rotas por papel: nunca manter aberta uma tela que o papel atual não pode acessar
   useEffect(() => {
     if (!currentUser) return;
-    if (!canAccessView(currentUser.role, currentView)) {
+    if (!canAccessView(currentUser.role, currentView, { managerSeesFinance })) {
       setCurrentView(getDefaultView(currentUser.role));
     }
-  }, [currentUser, currentView]);
+  }, [currentUser, currentView, managerSeesFinance]);
 
   // Load from Supabase on startup
   useEffect(() => {
@@ -523,6 +562,11 @@ function AppInner() {
         }
         return [updatedProfile, ...prev];
       });
+    } else if (user.role === 'gestor') {
+      // Gestor não tem tenant próprio: entra no primeiro professor da empresa
+      // dele, para que agenda e alunos já abram em algo que exista.
+      const daEmpresa = teachers.filter((t) => t.companyId && t.companyId === user.companyId);
+      if (daEmpresa.length > 0) setCurrentTeacher(daEmpresa[0]);
     } else if (user.teacherId) {
       // Assistente ou aluno: apenas seleciona o professor ao qual está vinculado, sem alterar o perfil dele
       const linkedTeacher = teachers.find((t) => t.id === user.teacherId);
@@ -1153,7 +1197,7 @@ function AppInner() {
   }
 
   // Enquanto o guard de rotas redireciona, não renderizar uma tela proibida para este papel
-  if (!canAccessView(currentUser.role, currentView)) {
+  if (!canAccessView(currentUser.role, currentView, { managerSeesFinance })) {
     return null;
   }
 
@@ -1187,6 +1231,7 @@ function AppInner() {
         onChangeSidebarMode={handleChangeSidebarMode}
         siteAdminTab={siteAdminTab}
         onSelectSiteAdminTab={setSiteAdminTab}
+        canSeeFinance={canViewFinances(currentUser.role, { managerSeesFinance })}
       />
 
       {/* Main Content Area */}
@@ -1200,7 +1245,7 @@ function AppInner() {
           }}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          teachers={teachers}
+          teachers={teachersInScope}
           currentTeacher={currentTeacher}
           onSelectTeacher={setCurrentTeacher}
           currentUser={currentUser}
@@ -1215,7 +1260,24 @@ function AppInner() {
 
         {/* Dynamic Main View */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-          {currentView === 'dashboard' && (
+          {currentView === 'dashboard' && isManager && (
+            <CompanyPanelView
+              company={currentCompany}
+              teachers={teachersInScope}
+              appointments={allAppointments}
+              students={allStudents}
+              invoices={allInvoices}
+              services={allServices}
+              showFinance={managerSeesFinance}
+              managerName={currentUser.name}
+              onOpenTeacher={(teacher) => {
+                setCurrentTeacher(teacher);
+                setCurrentView('agenda');
+              }}
+            />
+          )}
+
+          {currentView === 'dashboard' && !isManager && (
             <DashboardView
               currentTeacher={currentTeacher}
               appointments={filteredAppointmentsForView}
@@ -1323,10 +1385,11 @@ function AppInner() {
 
           {currentView === 'usuarios' && (
             <UsersManagementView
-              users={systemUsers}
-              teachers={teachers}
-              companies={companies}
-              onSaveCompany={currentUser.role === 'admin' ? handleSaveCompany : undefined}
+              users={isManager ? usersInScope : systemUsers}
+              teachers={teachersInScope}
+              companies={isManager ? (currentCompany ? [currentCompany] : []) : companies}
+              currentRole={currentUser.role}
+              onSaveCompany={canManageCompany(currentUser.role) ? handleSaveCompany : undefined}
               onDeleteCompany={currentUser.role === 'admin' ? handleDeleteCompany : undefined}
               currentUser={currentUser}
               onAddUser={handleAddUser}

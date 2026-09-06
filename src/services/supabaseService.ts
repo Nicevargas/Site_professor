@@ -868,6 +868,7 @@ export const supabaseService = {
         logoUrl: c.logo_url || undefined,
         notes: c.notes || undefined,
         status: c.status === 'inativa' ? 'inativa' : 'ativa',
+        managerSeesFinance: Boolean(c.manager_sees_finance),
         createdAt: c.created_at ? String(c.created_at).split('T')[0] : '',
       }));
     } catch (err) {
@@ -890,6 +891,8 @@ export const supabaseService = {
         logo_url: company.logoUrl || null,
         notes: company.notes || null,
         status: company.status || 'ativa',
+        // manager_sees_finance fica de fora: só um admin muda, e o gatilho
+        // protect_company_privileges recusa a alteração vinda do gestor.
       });
       return syncResult(error, 'empresa');
     } catch (err) {

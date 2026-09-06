@@ -39,6 +39,12 @@ export interface Company {
   notes?: string;
   status: 'ativa' | 'inativa';
   createdAt: string;
+  /**
+   * Quando true, o gestor desta empresa também enxerga financeiro dos
+   * professores dela. Quem liga é um admin da plataforma: o banco impede
+   * o gestor de liberar para si mesmo (companies.manager_sees_finance).
+   */
+  managerSeesFinance?: boolean;
 }
 
 /** Nível do aluno, usado para montar turmas e filtrar a lista de alunos. */

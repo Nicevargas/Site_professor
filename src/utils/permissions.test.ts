@@ -5,6 +5,7 @@ import {
   canSwitchProfiles,
   canViewFinances,
   sanitizeSelfDeclaredRole,
+  canManageCompany,
 } from './permissions';
 import { UserRole, ViewMode } from '../types';
 
@@ -86,22 +87,43 @@ describe('governança de acesso por papel', () => {
 });
 
 describe('gestor da empresa', () => {
-  it('não alcança as telas de um professor específico enquanto não há seletor', () => {
-    // Painel, agenda e alunos giram em torno de UM professor. Mostrá-los ao
-    // gestor exibiria um professor arbitrário da academia -- Fase 3.
-    expect(canAccessView('gestor', 'dashboard')).toBe(false);
-    expect(canAccessView('gestor', 'agenda')).toBe(false);
-    expect(canAccessView('gestor', 'alunos')).toBe(false);
-  });
-
-  it('alcança as telas que já funcionam certo para ele', () => {
+  it('opera a academia: painel, agenda, alunos, serviços e usuários', () => {
+    expect(canAccessView('gestor', 'dashboard')).toBe(true);
+    expect(canAccessView('gestor', 'agenda')).toBe(true);
+    expect(canAccessView('gestor', 'alunos')).toBe(true);
+    expect(canAccessView('gestor', 'servicos')).toBe(true);
     expect(canAccessView('gestor', 'usuarios')).toBe(true);
-    expect(canAccessView('gestor', 'configuracoes')).toBe(true);
-    expect(getDefaultView('gestor')).toBe('usuarios');
+    expect(getDefaultView('gestor')).toBe('dashboard');
   });
 
-  it('não vê financeiro pelo app: quem libera isso é a empresa, no banco', () => {
+  it('não mexe na vitrine nem no endereço do professor', () => {
+    // Marca, domínio e automações são do professor sobre o site dele
+    expect(canAccessView('gestor', 'site-admin')).toBe(false);
+    expect(canAccessView('gestor', 'meu-endereco')).toBe(false);
+    expect(canAccessView('gestor', 'integracoes')).toBe(false);
+  });
+
+  it('o financeiro depende da empresa liberar, não do papel', () => {
     expect(canViewFinances('gestor')).toBe(false);
+    expect(canViewFinances('gestor', { managerSeesFinance: true })).toBe(true);
+
+    expect(canAccessView('gestor', 'pagamentos')).toBe(false);
+    expect(canAccessView('gestor', 'pagamentos', { managerSeesFinance: true })).toBe(true);
+  });
+
+  it('a liberação da empresa não afeta os outros papéis', () => {
+    // Professor sempre vê o próprio financeiro; assistente e aluno, nunca
+    expect(canViewFinances('professor')).toBe(true);
+    expect(canViewFinances('assistente', { managerSeesFinance: true })).toBe(false);
+    expect(canViewFinances('aluno', { managerSeesFinance: true })).toBe(false);
+    expect(canAccessView('assistente', 'pagamentos', { managerSeesFinance: true })).toBe(false);
+  });
+
+  it('gestor administra empresa; professor e assistente, não', () => {
+    expect(canManageCompany('gestor')).toBe(true);
+    expect(canManageCompany('admin')).toBe(true);
+    expect(canManageCompany('professor')).toBe(false);
+    expect(canManageCompany('assistente')).toBe(false);
   });
 
   it('não assume outro perfil: simular acesso é só do admin', () => {

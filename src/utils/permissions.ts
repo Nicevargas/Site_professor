@@ -19,12 +19,12 @@ const VIEWS_BY_ROLE: Record<UserRole, ViewMode[]> = {
     'site-admin', 'meu-endereco', 'planos', 'integracoes', 'configuracoes',
   ],
   /**
-   * Gestor da empresa: por enquanto só as telas que já funcionam certo para
-   * ele. Painel, agenda e alunos ainda são construídos em torno de UM
-   * professor, então mostrá-los agora exibiria um professor arbitrário da
-   * academia. Entram na Fase 3, junto com o seletor de professor.
+   * Gestor da empresa: painel somado da academia, e as telas de um professor
+   * por vez através do seletor no topo. Sem 'site-admin', 'meu-endereco' nem
+   * 'integracoes': essas são do professor sobre a vitrine dele.
+   * 'pagamentos' entra só quando a empresa libera (ver canViewFinances).
    */
-  gestor: ['usuarios', 'configuracoes'],
+  gestor: ['dashboard', 'agenda', 'alunos', 'servicos', 'pagamentos', 'usuarios', 'configuracoes'],
   // Secretaria: agenda, alunos e consulta de serviços. Sem financeiro, site, integrações ou perfil do professor.
   assistente: ['dashboard', 'agenda', 'alunos', 'servicos'],
   // Aluno: portal próprio e edição dos próprios dados (nunca o perfil do professor).
@@ -33,14 +33,20 @@ const VIEWS_BY_ROLE: Record<UserRole, ViewMode[]> = {
 
 const DEFAULT_VIEW_BY_ROLE: Record<UserRole, ViewMode> = {
   admin: 'dashboard',
-  gestor: 'usuarios',
+  gestor: 'dashboard',
   professor: 'dashboard',
   assistente: 'dashboard',
   aluno: 'portal-aluno',
 };
 
-export function canAccessView(role: UserRole, view: ViewMode): boolean {
+export function canAccessView(
+  role: UserRole,
+  view: ViewMode,
+  options: { managerSeesFinance?: boolean } = {}
+): boolean {
   if (PUBLIC_VIEWS.includes(view)) return true;
+  // O financeiro do gestor depende da empresa dele, não do papel
+  if (role === 'gestor' && view === 'pagamentos' && !options.managerSeesFinance) return false;
   return VIEWS_BY_ROLE[role]?.includes(view) ?? false;
 }
 
@@ -55,12 +61,21 @@ export function canSwitchProfiles(role: UserRole): boolean {
 
 /**
  * Financeiro e Pix pertencem ao dono do tenant ou ao admin.
- * O gestor só enxerga o financeiro quando a empresa dele libera
- * (companies.manager_sees_finance) -- e essa decisão é do banco, não daqui.
- * Até a Fase 3 trazer esse dado para o app, o gestor fica de fora.
+ * O gestor só enxerga quando a empresa dele libera. Isso é decidido no banco
+ * (companies.manager_sees_finance); aqui só espelhamos, para não mostrar uma
+ * tela que o RLS vai devolver vazia.
  */
-export function canViewFinances(role: UserRole): boolean {
-  return role === 'admin' || role === 'professor';
+export function canViewFinances(
+  role: UserRole,
+  options: { managerSeesFinance?: boolean } = {}
+): boolean {
+  if (role === 'admin' || role === 'professor') return true;
+  return role === 'gestor' && Boolean(options.managerSeesFinance);
+}
+
+/** O gestor administra os professores da empresa dele. */
+export function canManageCompany(role: UserRole): boolean {
+  return role === 'admin' || role === 'gestor';
 }
 
 /**

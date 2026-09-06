@@ -22,7 +22,8 @@ import {
   RotateCcw,
   HelpCircle,
   PlayCircle,
-  Sliders
+  Sliders,
+  Building2
 } from 'lucide-react';
 
 
@@ -82,6 +83,12 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
         return { label: 'Secretaria', icon: Headphones, bg: 'bg-purple-100 text-purple-800 border-purple-300' };
       case 'aluno':
         return { label: 'Aluno', icon: Users, bg: 'bg-emerald-100 text-emerald-800 border-emerald-300' };
+      case 'gestor':
+        return { label: 'Gestor', icon: Building2, bg: 'bg-indigo-100 text-indigo-800 border-indigo-300' };
+      default:
+        // Sem este default, um papel novo devolve undefined e a barra do topo
+        // quebra a página inteira ao ler .icon.
+        return { label: 'Acesso', icon: User, bg: 'bg-slate-100 text-slate-700 border-slate-300' };
     }
   };
 

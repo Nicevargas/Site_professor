@@ -908,6 +908,20 @@ export const INITIAL_PAYMENT_INVOICES: PaymentInvoice[] = [
 
 export const INITIAL_SYSTEM_USERS: SystemUser[] = [
   {
+    id: 'user-gestor-1',
+    name: 'Renata Prado (Gestora da Academia)',
+    email: 'gestora@aquavida.com.br',
+    role: 'gestor',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+    phone: '(11) 97000-1122',
+    companyId: 'comp-aquavida',
+    status: 'ativo',
+    createdAt: '2026-05-02',
+    lastLogin: 'Hoje às 08:10',
+    permissions: ['manage_company_users', 'view_company_agenda'],
+    bio: 'Responsável pela operação do Centro Esportivo Aqua Vida.'
+  },
+  {
     id: 'user-admin-1',
     name: 'Admin Geral (Gestão & Diretoria)',
     email: 'admin@agendaprofessor.com.br',

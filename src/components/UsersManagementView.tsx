@@ -43,6 +43,8 @@ interface UsersManagementViewProps {
   currentUser: AuthUser | null;
   teachers: TeacherProfile[];
   companies?: Company[];
+  /** Papel de quem está usando a tela; o gestor não cria admin nem outro gestor */
+  currentRole?: UserRole;
   onSaveCompany?: (company: Company) => void;
   onDeleteCompany?: (id: string) => void;
 }
@@ -59,9 +61,13 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
   currentUser,
   teachers,
   companies = [],
+  currentRole = 'admin',
   onSaveCompany,
   onDeleteCompany,
 }) => {
+  // Elevar papel é coisa da plataforma. O banco recusa de qualquer jeito
+  // (system_users_manager_insert), mas a tela não deve nem oferecer.
+  const canAssignPrivilegedRoles = currentRole === 'admin';
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'todos' | UserRole>('todos');
   const [activeTab, setActiveTab] = useState<'usuarios' | 'empresas' | 'permissoes'>('usuarios');
@@ -220,7 +226,9 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
               </h1>
             </div>
             <p className="text-sm text-[#75777d] mt-1">
-              Controle de múltiplos usuários, perfis de permissão (RBAC) e controle de acesso individual.
+              {currentRole === 'gestor'
+                ? 'Você administra os professores, a secretaria e os alunos da sua academia. Contas de outras academias não aparecem aqui.'
+                : 'Controle de múltiplos usuários, perfis de permissão (RBAC) e controle de acesso individual.'}
             </p>
           </div>
 
@@ -807,8 +815,12 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                     <option value="professor">🎓 Professor / Instrutor / Mentor</option>
                     <option value="assistente">📋 Secretaria / Assistente / Atendimento</option>
                     <option value="aluno">🎒 Aluno / Cliente (Portal do Aluno)</option>
-                    <option value="gestor">🏢 Gestor da Empresa (toda a academia)</option>
-                    <option value="admin">👑 Administrador Geral (Acesso Total)</option>
+                    {canAssignPrivilegedRoles && (
+                      <>
+                        <option value="gestor">🏢 Gestor da Empresa (toda a academia)</option>
+                        <option value="admin">👑 Administrador Geral (Acesso Total)</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
@@ -957,8 +969,12 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                       <option value="professor">🎓 Professor / Mentor</option>
                       <option value="assistente">📋 Secretaria / Assistente</option>
                       <option value="aluno">🎒 Aluno / Cliente</option>
-                      <option value="gestor">🏢 Gestor da Empresa</option>
-                      <option value="admin">👑 Administrador Geral</option>
+                      {canAssignPrivilegedRoles && (
+                        <>
+                          <option value="gestor">🏢 Gestor da Empresa</option>
+                          <option value="admin">👑 Administrador Geral</option>
+                        </>
+                      )}
                     </select>
                   </div>
                   <div>
