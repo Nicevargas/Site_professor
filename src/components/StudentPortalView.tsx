@@ -27,10 +27,18 @@ import {
   User,
   Plus
 } from 'lucide-react';
+import { getFirstName } from '../utils/names';
 
 interface StudentPortalViewProps {
   currentUser: AuthUser | null;
+  /** Professor pelo qual o aluno entrou; usado para agendar e para a marca da página */
   currentTeacher: TeacherProfile;
+  /** Todos os professores conhecidos, para dar nome a cada aula do aluno */
+  teachers?: TeacherProfile[];
+  /**
+   * Agenda completa: o recorte é feito aqui dentro, pelo dono do registro.
+   * Um aluno pode treinar com mais de um professor e precisa ver todos.
+   */
   appointments: Appointment[];
   invoices: PaymentInvoice[];
   videos: VideoItem[];
@@ -41,6 +49,7 @@ interface StudentPortalViewProps {
 export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
   currentUser,
   currentTeacher,
+  teachers = [],
   appointments,
   invoices,
   videos,
@@ -64,6 +73,21 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 
   const myAppointments = appointments.filter((app) => belongsToStudent(app));
 
+  // Os professores do aluno saem das próprias aulas dele. Sem aula ainda,
+  // vale o professor pelo qual ele entrou.
+  const teacherById = new Map(teachers.map((t) => [t.id, t]));
+  const myTeacherIds = Array.from(
+    new Set(myAppointments.map((a) => a.teacherId).filter((id): id is string => Boolean(id)))
+  );
+  const myTeachers = myTeacherIds.length
+    ? myTeacherIds.map((id) => teacherById.get(id)).filter((t): t is TeacherProfile => Boolean(t))
+    : [currentTeacher];
+  const hasSeveralTeachers = myTeachers.length > 1;
+
+  /** Nome do professor de um registro; cai no professor atual quando não há vínculo. */
+  const teacherNameOf = (teacherId?: string) =>
+    (teacherId && teacherById.get(teacherId)?.name) || currentTeacher.name;
+
   const upcomingAppointments = myAppointments.filter(
     (a) => a.status === 'Confirmado' || a.status === 'Pendente'
   );
@@ -77,6 +101,11 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 
   const pendingInvoices = myInvoices.filter((i) => i.status === 'pendente' || i.status === 'vencido');
   const paidInvoices = myInvoices.filter((i) => i.status === 'pago');
+
+  // Conteúdo só dos professores dele, não da plataforma inteira
+  const myVideos = videos.filter(
+    (v) => !v.teacherId || myTeachers.some((t) => t.id === v.teacherId)
+  );
 
   const handleCopyPix = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -99,10 +128,20 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                 <span>Portal do Aluno • Área Exclusiva</span>
               </div>
               <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight">
-                Olá, {studentName.split(' ')[0]}! 👋
+                Olá, {getFirstName(studentName)}! 👋
               </h1>
               <p className="text-sm text-cyan-100/90 max-w-xl">
-                Acompanhe suas aulas com o <strong>{currentTeacher.name}</strong>, acesse as salas virtuais, visualize seus pagamentos e agende novos horários.
+                {hasSeveralTeachers ? (
+                  <>
+                    Suas aulas com <strong>{myTeachers.map((t) => t.name).join(', ')}</strong> estão todas
+                    aqui: salas virtuais, pagamentos e novos horários.
+                  </>
+                ) : (
+                  <>
+                    Acompanhe suas aulas com o <strong>{myTeachers[0]?.name || currentTeacher.name}</strong>,
+                    acesse as salas virtuais, visualize seus pagamentos e agende novos horários.
+                  </>
+                )}
               </p>
             </div>
 
@@ -125,7 +164,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
           </div>
 
           {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-8 pt-6 border-t border-white/10">
+          <div className={`grid grid-cols-2 ${hasSeveralTeachers ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-3 mt-8 pt-6 border-t border-white/10`}>
             <div>
               <p className="text-[11px] uppercase tracking-wider text-cyan-200 font-semibold">Aulas Realizadas</p>
               <p className="text-2xl font-extrabold mt-0.5">{pastAppointments.length}</p>
@@ -134,7 +173,13 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
               <p className="text-[11px] uppercase tracking-wider text-cyan-200 font-semibold">Próximas Aulas</p>
               <p className="text-2xl font-extrabold mt-0.5">{upcomingAppointments.length}</p>
             </div>
-            <div className="col-span-2 sm:col-span-1">
+            {hasSeveralTeachers && (
+              <div>
+                <p className="text-[11px] uppercase tracking-wider text-cyan-200 font-semibold">Professores</p>
+                <p className="text-2xl font-extrabold mt-0.5">{myTeachers.length}</p>
+              </div>
+            )}
+            <div className={hasSeveralTeachers ? '' : 'col-span-2 sm:col-span-1'}>
               <p className="text-[11px] uppercase tracking-wider text-cyan-200 font-semibold">Faturas Pendentes</p>
               <p className="text-2xl font-extrabold mt-0.5">
                 {pendingInvoices.length > 0 ? (
@@ -146,6 +191,66 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
             </div>
           </div>
         </div>
+
+        {hasSeveralTeachers && (
+          <section className="space-y-4" aria-label="Meus professores">
+            <div className="flex items-center gap-2">
+              <User className="w-5 h-5 text-[#00687a]" />
+              <h2 className="text-lg md:text-xl font-bold text-[#091426]">Meus Professores</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {myTeachers.map((t) => {
+                const aulas = myAppointments.filter((a) => a.teacherId === t.id);
+                const proximas = aulas.filter(
+                  (a) => a.status === 'Confirmado' || a.status === 'Pendente'
+                ).length;
+                const phone = (t.whatsapp || '').replace(/\D/g, '');
+                return (
+                  <div
+                    key={t.id}
+                    className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col gap-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      {t.avatarUrl ? (
+                        <img
+                          src={t.avatarUrl}
+                          alt=""
+                          referrerPolicy="no-referrer"
+                          className="w-11 h-11 rounded-full object-cover border border-slate-200 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-11 h-11 rounded-full bg-[#00687a]/10 text-[#00687a] flex items-center justify-center shrink-0">
+                          <GraduationCap className="w-5 h-5" />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-sm text-[#091426] truncate">{t.name}</h3>
+                        <p className="text-xs text-slate-500 truncate">{t.specialty || t.role}</p>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-slate-500">
+                      <strong className="text-slate-800">{aulas.length}</strong> aula(s) no total
+                      {proximas > 0 ? ` · ${proximas} agendada(s)` : ''}
+                    </p>
+
+                    {phone && (
+                      <a
+                        href={`https://wa.me/${phone}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-auto flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#091426] hover:bg-[#1e293b] text-white text-xs font-bold transition-colors"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Falar com {getFirstName(t.name)}</span>
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* Section 1: Próximas Aulas */}
         <div className="space-y-4">
@@ -194,7 +299,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                       </div>
                       <div>
                         <h3 className="font-bold text-sm text-[#091426]">{app.serviceName}</h3>
-                        <p className="text-xs text-slate-500">{currentTeacher.name}</p>
+                        <p className="text-xs text-slate-500">{teacherNameOf(app.teacherId)}</p>
                       </div>
                     </div>
                     <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -277,6 +382,9 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                           </span>
                         </div>
                         <p className="text-xs text-slate-500 mt-1">
+                          {hasSeveralTeachers && (
+                            <>{teacherNameOf(inv.teacherId)} • </>
+                          )}
                           Vencimento: {inv.dueDate} • Valor: <strong className="text-slate-800">R$ {inv.amount.toFixed(2)}</strong>
                         </p>
                       </div>
@@ -316,7 +424,7 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {videos.filter((vid) => vid.active !== false).slice(0, 3).map((vid) => (
+            {myVideos.filter((vid) => vid.active !== false).slice(0, 3).map((vid) => (
               <div 
                 key={vid.id}
                 onClick={() => setActiveMedia(vid)}

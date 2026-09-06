@@ -1340,9 +1340,10 @@ function AppInner() {
             <StudentPortalView
               currentUser={currentUser}
               currentTeacher={currentTeacher}
-              appointments={appointments}
-              invoices={invoices}
-              videos={teacherVideos}
+              teachers={teachers}
+              appointments={allAppointments}
+              invoices={allInvoices}
+              videos={videos}
               onOpenBookingWizard={() => setCurrentView('public-booking')}
               onOpenPublicSite={() => setCurrentView('public-landing')}
             />

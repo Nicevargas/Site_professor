@@ -302,6 +302,7 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
   {
     id: 'apt-4',
     teacherId: 'prof-roberto',
+    studentId: 'std-1',
     studentName: 'Mariana Costa',
     studentInitials: 'MC',
     studentAvatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBBK4ZdjGlXcYUkNbEPgBCJ2ybOX87uTuhEIW-bh1S_6aUuhw3LbpojczkFt7hLMuVkBrvtmonkTNLYDBnpXnY8VeoyWHUzo9lTl7o4AYZV53TqGGXbGuc3CVUOLKbpGRa80w_0YcCGtnYeuP97M5S1TuGnG5L72vqotjZDwMVDIWF9N7shtJ2fI_9L2OOOUCTYfgP1vQF4Vjms-_6o4t7L90jfsLMghpGEespEMyKNBXoQr7B-RD-cww',
@@ -316,6 +317,27 @@ export const INITIAL_APPOINTMENTS: Appointment[] = [
     status: 'Confirmado',
     notes: 'Treinamento focado em hipertrofia e fortalecimento postural.',
     clientSince: 'Cliente desde 2023',
+    price: 150
+  },
+  {
+    id: 'apt-4b',
+    teacherId: 'prof-carlos',
+    studentId: 'std-1',
+    studentName: 'Mariana Costa',
+    studentInitials: 'MC',
+    studentAvatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBBK4ZdjGlXcYUkNbEPgBCJ2ybOX87uTuhEIW-bh1S_6aUuhw3LbpojczkFt7hLMuVkBrvtmonkTNLYDBnpXnY8VeoyWHUzo9lTl7o4AYZV53TqGGXbGuc3CVUOLKbpGRa80w_0YcCGtnYeuP97M5S1TuGnG5L72vqotjZDwMVDIWF9N7shtJ2fI_9L2OOOUCTYfgP1vQF4Vjms-_6o4t7L90jfsLMghpGEespEMyKNBXoQr7B-RD-cww',
+    studentPhone: '(11) 98765-4321',
+    studentEmail: 'mariana.costa@email.com',
+    serviceId: 'serv-4',
+    serviceName: 'Aula Particular - Matemática',
+    ...relativeDate(1),
+    startTime: '18:00',
+    endTime: '19:00',
+    durationMinutes: 60,
+    modality: 'Online (Zoom)',
+    status: 'Confirmado',
+    notes: 'Revisão de geometria espacial para o vestibular.',
+    clientSince: 'Cliente desde 2024',
     price: 150
   },
   {
