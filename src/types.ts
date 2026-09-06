@@ -38,6 +38,11 @@ export interface Company {
   logoUrl?: string;
   notes?: string;
   status: 'ativa' | 'inativa';
+  /**
+   * Assinatura da academia com o Aquagenda. Vale para todos os professores
+   * dela e vence o plano individual de cada um -- quem paga é a empresa.
+   */
+  plan?: 'start' | 'pro' | 'premium';
   createdAt: string;
   /**
    * Quando true, o gestor desta empresa também enxerga financeiro dos
@@ -324,7 +329,11 @@ export interface TeacherProfile {
   name: string;
   /** Empresa / escola dona deste professor. Vazio = professor autônomo. */
   companyId?: string;
-  /** Assinatura do professor com o Aquagenda: define o endereço que ele pode usar */
+  /**
+   * Assinatura do professor autônomo. Ignorada quando ele pertence a uma
+   * empresa: ali vale o plano dela. Use effectivePlan() em vez de ler isto
+   * direto, para não decidir pelo campo errado.
+   */
   plan?: 'start' | 'pro' | 'premium';
   /** Identificador do endereço público: "roberto-almeida" */
   slug?: string;

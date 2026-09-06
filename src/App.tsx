@@ -1455,6 +1455,7 @@ function AppInner() {
               currentTeacher={currentTeacher}
               userRole={currentUser.role}
               takenSlugs={teachers.filter((t) => t.id !== currentTeacher.id).map((t) => t.slug || slugify(t.name))}
+              company={companies.find((c) => c.id === currentTeacher.companyId) || null}
               onOpenPlans={() => setCurrentView('planos')}
               onUpdateTeacher={(updated) => {
                 setCurrentTeacher(updated);

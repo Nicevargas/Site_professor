@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { TeacherProfile, UserRole } from '../types';
+import { TeacherProfile, UserRole, Company } from '../types';
 import {
   Link2, Check, Copy, ExternalLink, Lock, AlertTriangle, ArrowUpRight, Globe, ShieldCheck,
 } from 'lucide-react';
 import {
-  PLANS, PLAN_ORDER, PlanTier, AddressingMode,
+  PLANS, PLAN_ORDER, PlanTier, AddressingMode, effectivePlan,
   getPlan, planAllows, planRequiredFor, nextPlan,
 } from '../utils/plans';
 import { buildPublicUrl, slugify, PLATFORM_HOST } from '../utils/tenant';
@@ -17,6 +17,8 @@ interface MyAddressViewProps {
   onOpenPlans: () => void;
   /** Identificadores já em uso, para avisar antes de salvar */
   takenSlugs?: string[];
+  /** Empresa do professor, quando ele pertence a uma; ela é quem assina */
+  company?: Company | null;
 }
 
 const platform = PLATFORM_HOST || 'aquagenda.com.br';
@@ -27,8 +29,11 @@ export const MyAddressView: React.FC<MyAddressViewProps> = ({
   onUpdateTeacher,
   onOpenPlans,
   takenSlugs = [],
+  company = null,
 }) => {
-  const plan = getPlan(currentTeacher.plan);
+  // A empresa manda quando existe: numa academia quem assina é a academia
+  const { plan, source: planSource, companyName } = effectivePlan(currentTeacher, company);
+  const planTier = plan.tier;
   const fallbackSlug = currentTeacher.slug || slugify(currentTeacher.name);
 
   const [slug, setSlug] = useState(fallbackSlug);
@@ -39,9 +44,9 @@ export const MyAddressView: React.FC<MyAddressViewProps> = ({
 
   const isAdmin = userRole === 'admin';
   const activeMode: AddressingMode =
-    currentTeacher.customDomain && planAllows(currentTeacher.plan, 'domain')
+    currentTeacher.customDomain && planAllows(planTier, 'domain')
       ? 'domain'
-      : planAllows(currentTeacher.plan, 'subdomain')
+      : planAllows(planTier, 'subdomain')
       ? 'subdomain'
       : 'path';
 
@@ -170,7 +175,11 @@ export const MyAddressView: React.FC<MyAddressViewProps> = ({
             </div>
           </div>
           <p className="text-xs text-[#45474c] mt-3 pt-3 border-t border-slate-100">
-            Plano <strong className="text-[#00687a]">{plan.name}</strong> &middot; {plan.addressingHint}
+            Plano <strong className="text-[#00687a]">{plan.name}</strong>
+            {planSource === 'empresa' && companyName ? (
+              <> &middot; assinatura de <strong>{companyName}</strong></>
+            ) : null}
+            {' '}&middot; {plan.addressingHint}
           </p>
         </section>
 
@@ -287,6 +296,13 @@ export const MyAddressView: React.FC<MyAddressViewProps> = ({
               : 'Cada plano libera um tipo de endereço.'}
           </p>
 
+          {planSource === 'empresa' && (
+            <p className="mb-3 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-[#45474c]">
+              Quem assina é <strong>{companyName}</strong>, e o plano vale para todos os professores da
+              academia. Para mudar de plano, fale com a administração.
+            </p>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             {PLAN_ORDER.map((tier) => {
               const def = PLANS[tier];
@@ -307,7 +323,7 @@ export const MyAddressView: React.FC<MyAddressViewProps> = ({
 
                   {isCurrent ? (
                     <p className="mt-2.5 text-[10px] font-bold uppercase tracking-wider text-[#00687a]">Plano atual</p>
-                  ) : isAdmin ? (
+                  ) : planSource === 'empresa' ? null : isAdmin ? (
                     <button
                       onClick={() => handleChangePlan(tier)}
                       className="mt-2.5 w-full py-1.5 rounded-lg border border-slate-300 text-[11px] font-bold text-slate-700 hover:bg-slate-50 transition-colors"

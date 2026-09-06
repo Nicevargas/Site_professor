@@ -51,9 +51,37 @@ export function isPlanTier(value: unknown): value is PlanTier {
   return value === 'start' || value === 'pro' || value === 'premium';
 }
 
-/** Plano de um professor, tolerando registros antigos sem o campo. */
+/** Plano a partir do identificador, tolerando registros antigos sem o campo. */
 export function getPlan(tier?: string | null): PlanDefinition {
   return isPlanTier(tier) ? PLANS[tier] : PLANS.start;
+}
+
+/** De onde vem a assinatura que vale para este professor. */
+export type PlanSource = 'empresa' | 'professor';
+
+export interface EffectivePlan {
+  plan: PlanDefinition;
+  source: PlanSource;
+  /** Nome da academia, quando é ela quem assina */
+  companyName?: string;
+}
+
+/**
+ * Qual plano vale para um professor.
+ *
+ * A empresa manda quando existe: numa academia, quem assina é a academia, e
+ * cobrar cada professor separado seria errado. Professor autônomo continua
+ * com o plano dele. Espelha public.effective_plan() no banco -- os dois
+ * precisam concordar, senão a tela promete o que o banco recusa.
+ */
+export function effectivePlan(
+  teacher: { plan?: string | null; companyId?: string | null } | null | undefined,
+  company?: { id: string; name: string; plan?: string | null } | null
+): EffectivePlan {
+  if (company && teacher?.companyId && company.id === teacher.companyId) {
+    return { plan: getPlan(company.plan), source: 'empresa', companyName: company.name };
+  }
+  return { plan: getPlan(teacher?.plan), source: 'professor' };
 }
 
 const MODE_RANK: Record<AddressingMode, number> = { path: 0, subdomain: 1, domain: 2 };

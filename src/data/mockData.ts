@@ -27,6 +27,7 @@ export const INITIAL_COMPANIES: Company[] = [
     phone: '(11) 3000-1122',
     city: 'São Paulo - SP',
     status: 'ativa',
+    plan: 'pro',
     createdAt: '2026-01-05',
   },
 ];
