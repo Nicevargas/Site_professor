@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TeacherProfile, VacationModeConfig } from '../types';
+import { TeacherProfile, VacationModeConfig, ThemePresetId } from '../types';
 import { 
   User, 
   Save, 
@@ -58,7 +58,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [primaryColor, setPrimaryColor] = useState(currentTeacher.primaryColor || '#00687a');
   const [secondaryColor, setSecondaryColor] = useState(currentTeacher.secondaryColor || '#57dffe');
   const [accentColor, setAccentColor] = useState(currentTeacher.accentColor || '#004e5c');
-  const [themePreset, setThemePreset] = useState<string>(currentTeacher.themePreset || 'ocean-teal');
+  // 'ocean-teal' não existe em THEME_PRESETS: com ele nenhum tema aparecia
+  // marcado ao abrir a tela. O identificador certo é 'ocean'.
+  const [themePreset, setThemePreset] = useState<ThemePresetId>(currentTeacher.themePreset || 'ocean');
 
   // Vacation / Out of Office Mode
   const [vacationEnabled, setVacationEnabled] = useState(currentTeacher.vacationMode?.enabled || false);

@@ -1408,7 +1408,14 @@ function AppInner() {
               invoices={allInvoices}
               videos={videos}
               onOpenBookingWizard={() => setCurrentView('public-booking')}
-              onOpenPublicSite={() => setCurrentView('public-landing')}
+              onOpenWhatsApp={() => {
+                const phone = (currentTeacher.whatsapp || '').replace(/\D/g, '');
+                if (!phone) return;
+                const texto = encodeURIComponent(
+                  `Olá ${currentTeacher.name}, aqui é ${currentUser.name || 'seu aluno'}.`
+                );
+                window.open(`https://wa.me/${phone}?text=${texto}`, '_blank');
+              }}
             />
           )}
 

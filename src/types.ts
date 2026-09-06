@@ -314,6 +314,11 @@ export interface VacationModeConfig {
   notifyExistingAppointments?: boolean;
 }
 
+/** Identificadores em utils/themePresets.ts, mais 'custom' para cores livres. */
+export type ThemePresetId =
+  | 'ocean' | 'emerald' | 'indigo' | 'purple'
+  | 'sunset' | 'slate' | 'rose' | 'amber' | 'custom';
+
 export interface TeacherProfile {
   id: string;
   name: string;
@@ -351,7 +356,7 @@ export interface TeacherProfile {
   primaryColor?: string; // e.g. '#00687a'
   secondaryColor?: string; // e.g. '#57dffe'
   accentColor?: string; // e.g. '#004e5c'
-  themePreset?: 'ocean' | 'emerald' | 'indigo' | 'purple' | 'sunset' | 'slate' | 'rose' | 'custom';
+  themePreset?: ThemePresetId;
   // Vacation / Out of Office Mode
   vacationMode?: VacationModeConfig;
 }

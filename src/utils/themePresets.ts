@@ -1,5 +1,8 @@
+import { ThemePresetId } from '../types';
+
 export interface ColorThemePreset {
-  id: string;
+  /** Tipado para que um preset com id errado seja erro de compilação */
+  id: ThemePresetId;
   name: string;
   category: string;
   description: string;

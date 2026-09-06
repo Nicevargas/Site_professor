@@ -754,7 +754,7 @@ export const TutorialWizardView: React.FC<TutorialWizardViewProps> = ({
                   </div>
                   <div className="p-3 bg-slate-900 rounded-xl text-center">
                     <div className="font-bold text-white">{currentTeacher.name}</div>
-                    <div className="text-[11px] text-slate-400">{currentTeacher.headline || 'Professor Especialista'}</div>
+                    <div className="text-[11px] text-slate-400">{currentTeacher.specialty || currentTeacher.role || 'Professor Especialista'}</div>
                     <div className="mt-2 inline-block px-3 py-1 bg-emerald-600 text-white font-bold rounded-full text-[11px]">
                       Agendar Horário Online
                     </div>
