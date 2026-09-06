@@ -84,3 +84,32 @@ describe('governança de acesso por papel', () => {
     expect(sanitizeSelfDeclaredRole({ role: 'admin' })).toBe('professor');
   });
 });
+
+describe('gestor da empresa', () => {
+  it('não alcança as telas de um professor específico enquanto não há seletor', () => {
+    // Painel, agenda e alunos giram em torno de UM professor. Mostrá-los ao
+    // gestor exibiria um professor arbitrário da academia -- Fase 3.
+    expect(canAccessView('gestor', 'dashboard')).toBe(false);
+    expect(canAccessView('gestor', 'agenda')).toBe(false);
+    expect(canAccessView('gestor', 'alunos')).toBe(false);
+  });
+
+  it('alcança as telas que já funcionam certo para ele', () => {
+    expect(canAccessView('gestor', 'usuarios')).toBe(true);
+    expect(canAccessView('gestor', 'configuracoes')).toBe(true);
+    expect(getDefaultView('gestor')).toBe('usuarios');
+  });
+
+  it('não vê financeiro pelo app: quem libera isso é a empresa, no banco', () => {
+    expect(canViewFinances('gestor')).toBe(false);
+  });
+
+  it('não assume outro perfil: simular acesso é só do admin', () => {
+    expect(canSwitchProfiles('gestor')).toBe(false);
+  });
+
+  it('ninguém se cadastra como gestor sozinho', () => {
+    expect(sanitizeSelfDeclaredRole('gestor')).toBe('professor');
+    expect(sanitizeSelfDeclaredRole('admin')).toBe('professor');
+  });
+});

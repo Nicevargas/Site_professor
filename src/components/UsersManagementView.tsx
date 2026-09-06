@@ -118,6 +118,13 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
             <span>Administrador Geral</span>
           </span>
         );
+      case 'gestor':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+            <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Gestor da Empresa</span>
+          </span>
+        );
       case 'professor':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-cyan-50 text-[#00687a] border border-cyan-200">
@@ -800,6 +807,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                     <option value="professor">🎓 Professor / Instrutor / Mentor</option>
                     <option value="assistente">📋 Secretaria / Assistente / Atendimento</option>
                     <option value="aluno">🎒 Aluno / Cliente (Portal do Aluno)</option>
+                    <option value="gestor">🏢 Gestor da Empresa (toda a academia)</option>
                     <option value="admin">👑 Administrador Geral (Acesso Total)</option>
                   </select>
                 </div>
@@ -949,6 +957,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                       <option value="professor">🎓 Professor / Mentor</option>
                       <option value="assistente">📋 Secretaria / Assistente</option>
                       <option value="aluno">🎒 Aluno / Cliente</option>
+                      <option value="gestor">🏢 Gestor da Empresa</option>
                       <option value="admin">👑 Administrador Geral</option>
                     </select>
                   </div>

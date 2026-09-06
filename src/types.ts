@@ -16,7 +16,11 @@ export type ViewMode =
   | 'tutorial-wizard'
   | 'auth';
 
-export type UserRole = 'admin' | 'professor' | 'assistente' | 'aluno';
+/**
+ * admin    = plataforma inteira (só nós). gestor = uma empresa/academia.
+ * professor = dono do próprio tenant. assistente = secretaria dele. aluno = cliente.
+ */
+export type UserRole = 'admin' | 'gestor' | 'professor' | 'assistente' | 'aluno';
 
 /**
  * Empresa / escola: o "perfil principal" que agrupa vários professores.
