@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Appointment, ServiceItem, AppointmentStatus, TeacherProfile } from '../types';
+import { Appointment, ServiceItem, AppointmentStatus, TeacherProfile, WaitlistEntry } from '../types';
+import { ClassesAndWaitlistPanel } from './ClassesAndWaitlistPanel';
+import { ClassSlot } from '../utils/classes';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -37,6 +39,11 @@ interface AgendaViewProps {
   onOpenNewAppointmentModal: () => void;
   onOpenGoogleCalendarModal: (apt?: Appointment) => void;
   onOpenWhatsApp8hModal: () => void;
+  /** Fila de espera dos horários lotados deste professor */
+  waitlist?: WaitlistEntry[];
+  onOpenAttendance?: (slot: ClassSlot) => void;
+  onPromoteWaitlistEntry?: (entry: WaitlistEntry) => void;
+  onRemoveWaitlistEntry?: (id: string) => void;
 }
 
 export const AgendaView: React.FC<AgendaViewProps> = ({
@@ -53,6 +60,10 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
   onOpenNewAppointmentModal,
   onOpenGoogleCalendarModal,
   onOpenWhatsApp8hModal,
+  waitlist = [],
+  onOpenAttendance,
+  onPromoteWaitlistEntry,
+  onRemoveWaitlistEntry,
 }) => {
   const [statusFilter, setStatusFilter] = useState<'Todos' | 'Confirmado' | 'Pendente' | 'Cancelado'>('Todos');
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -594,6 +605,17 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
             </div>
           </div>
         </div>
+        )}
+
+        {onOpenAttendance && onPromoteWaitlistEntry && onRemoveWaitlistEntry && (
+          <ClassesAndWaitlistPanel
+            appointments={appointments}
+            services={services}
+            waitlist={waitlist}
+            onOpenAttendance={onOpenAttendance}
+            onPromoteWaitlistEntry={onPromoteWaitlistEntry}
+            onRemoveWaitlistEntry={onRemoveWaitlistEntry}
+          />
         )}
 
         {/* Histórico de cancelamentos: aulas canceladas ficam registradas, fora da grade */}

@@ -7,9 +7,26 @@
 -- Extensões úteis do PostgreSQL
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- 0. TABELA DE EMPRESAS / ESCOLAS (perfil principal que agrupa professores)
+CREATE TABLE IF NOT EXISTS public.companies (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    trade_name TEXT,
+    document TEXT,
+    email TEXT,
+    phone TEXT,
+    city TEXT,
+    logo_url TEXT,
+    notes TEXT,
+    status TEXT NOT NULL DEFAULT 'ativa' CHECK (status IN ('ativa', 'inativa')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- 1. TABELA DE PROFESSORES / INSTRUTORES (Tenants)
 CREATE TABLE IF NOT EXISTS public.teachers (
     id TEXT PRIMARY KEY,
+    company_id TEXT REFERENCES public.companies(id) ON DELETE SET NULL,
     name TEXT NOT NULL,
     role TEXT NOT NULL,
     specialty TEXT,
@@ -53,6 +70,7 @@ CREATE TABLE IF NOT EXISTS public.students (
     last_class TEXT,
     status TEXT DEFAULT 'Ativo',
     notes TEXT,
+    level TEXT CHECK (level IS NULL OR level IN ('iniciante', 'intermediario', 'avancado')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -62,6 +80,7 @@ CREATE TABLE IF NOT EXISTS public.system_users (
     id TEXT PRIMARY KEY,
     auth_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
     teacher_id TEXT REFERENCES public.teachers(id) ON DELETE SET NULL,
+    company_id TEXT REFERENCES public.companies(id) ON DELETE SET NULL,
     student_id TEXT REFERENCES public.students(id) ON DELETE SET NULL,
     name TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
@@ -88,6 +107,8 @@ CREATE TABLE IF NOT EXISTS public.services (
     badge TEXT,
     icon_name TEXT DEFAULT 'school',
     active BOOLEAN DEFAULT true,
+    capacity INTEGER NOT NULL DEFAULT 1 CHECK (capacity >= 1), -- 1 = aula individual
+    levels TEXT[],
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -115,6 +136,10 @@ CREATE TABLE IF NOT EXISTS public.appointments (
     notes TEXT,
     client_since TEXT,
     price NUMERIC(10, 2) DEFAULT 150.00,
+    capacity INTEGER CHECK (capacity IS NULL OR capacity >= 1), -- limite só deste horário
+    attendance TEXT CHECK (attendance IS NULL OR attendance IN ('presente', 'falta', 'justificada')),
+    attendance_note TEXT,
+    attendance_marked_at TIMESTAMP WITH TIME ZONE,
     reminder_8h_sent BOOLEAN DEFAULT false,
     google_calendar_event_id TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
@@ -272,6 +297,24 @@ CREATE TABLE IF NOT EXISTS public.integrations_config (
     whatsapp_api_token TEXT,
     webhook_url TEXT,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 15. TABELA DE LISTA DE ESPERA (turmas lotadas)
+CREATE TABLE IF NOT EXISTS public.waitlist (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT REFERENCES public.teachers(id) ON DELETE CASCADE,
+    service_id TEXT,
+    service_name TEXT NOT NULL DEFAULT '',
+    date TEXT NOT NULL, -- YYYY-MM-DD
+    start_time TEXT NOT NULL, -- HH:MM
+    student_id TEXT,
+    student_name TEXT NOT NULL,
+    student_phone TEXT,
+    student_email TEXT,
+    status TEXT NOT NULL DEFAULT 'aguardando' CHECK (status IN ('aguardando', 'convocado', 'matriculado', 'removido')),
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    called_at TIMESTAMP WITH TIME ZONE
 );
 
 -- 16. VIEW 'invoices' COMPATÍVEL

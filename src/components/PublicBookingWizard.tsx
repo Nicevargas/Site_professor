@@ -2,7 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { TeacherProfile, ServiceItem, Appointment } from '../types';
 import confetti from 'canvas-confetti';
 import { nextBusinessDays, formatMonthYearPtBR } from '../utils/dates';
-import { findConflict, addMinutes } from './NewAppointmentModal';
+import { addMinutes, checkBooking } from '../utils/schedule';
+import { availability } from '../utils/classes';
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -29,6 +30,16 @@ interface PublicBookingWizardProps {
   /** Agenda do professor: horários já ocupados não são oferecidos ao visitante */
   existingAppointments?: Appointment[];
   onBookingComplete: (newApt: Appointment) => void;
+  /** Turma lotada: em vez de sumir com o horário, o visitante entra na fila */
+  onJoinWaitlist?: (entry: {
+    serviceId: string;
+    serviceName: string;
+    date: string;
+    startTime: string;
+    studentName: string;
+    studentPhone?: string;
+    studentEmail?: string;
+  }) => void;
   onBackToLanding: () => void;
   onBackToDashboard: () => void;
 }
@@ -39,6 +50,7 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
   preSelectedServiceId,
   existingAppointments = [],
   onBookingComplete,
+  onJoinWaitlist,
   onBackToLanding,
   onBackToDashboard,
 }) => {
@@ -60,6 +72,7 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
   const [isSuccess, setIsSuccess] = useState(false);
   const [slotTakenError, setSlotTakenError] = useState<string | null>(null);
   const [createdAppointment, setCreatedAppointment] = useState<Appointment | null>(null);
+  const [joinedWaitlist, setJoinedWaitlist] = useState(false);
 
   const selectedService = services.find((s) => s.id === selectedServiceId) || services[0];
 
@@ -77,19 +90,39 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
   // Primeiro dia da lista quando ainda não há escolha
   const activeDate = selectedDate || availableDays[0]?.date || '';
 
-  // Um horário some da lista se colidir com uma aula ou bloqueio já existente
+  /**
+   * Um horário só some da lista quando bate com outra aula ou com um bloqueio.
+   * Turma cheia continua aparecendo: dali o visitante entra na lista de espera.
+   */
   const availableTimeSlots = useMemo(() => {
     const duration = selectedService?.durationMinutes || 60;
-    return allTimeSlots.filter(
-      (ts) => !findConflict({ date: activeDate, startTime: ts.time, endTime: addMinutes(ts.time, duration) }, existingAppointments)
-    );
+    return allTimeSlots
+      .map((ts) => {
+        const check = checkBooking(
+          {
+            serviceId: selectedService?.id,
+            date: activeDate,
+            startTime: ts.time,
+            endTime: addMinutes(ts.time, duration),
+          },
+          existingAppointments,
+          selectedService
+        );
+        return { ...ts, isFull: check.reason === 'lotado', slot: check.availability, blocked: !check.ok && check.reason !== 'lotado' };
+      })
+      .filter((ts) => !ts.blocked);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeDate, existingAppointments, selectedService?.durationMinutes]);
+  }, [activeDate, existingAppointments, selectedService?.id, selectedService?.durationMinutes, selectedService?.capacity]);
 
   const activeTimeSlot =
     selectedTimeSlot && availableTimeSlots.some((ts) => ts.time === selectedTimeSlot)
       ? selectedTimeSlot
       : availableTimeSlots[0]?.time || '';
+
+  const activeSlotState = selectedService && activeDate && activeTimeSlot
+    ? availability(existingAppointments, { serviceId: selectedService.id, date: activeDate, startTime: activeTimeSlot }, selectedService)
+    : null;
+  const isActiveSlotFull = Boolean(activeSlotState?.isFull);
 
   const handleConfirmBooking = (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,8 +133,41 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
     const chosenDay = availableDays.find((d) => d.date === activeDate) || availableDays[0];
 
     // Alguém pode ter reservado o mesmo horário enquanto o visitante preenchia o formulário
-    if (findConflict({ date: activeDate, startTime: activeTimeSlot, endTime }, existingAppointments)) {
-      setSlotTakenError('Esse horário acabou de ser reservado. Escolha outro horário disponível.');
+    const check = checkBooking(
+      {
+        serviceId: selectedService.id,
+        date: activeDate,
+        startTime: activeTimeSlot,
+        endTime,
+        studentName: studentName.trim(),
+      },
+      existingAppointments,
+      selectedService
+    );
+
+    // Turma lotada não é erro: é a fila de espera
+    if (!check.ok && check.reason === 'lotado') {
+      if (!onJoinWaitlist) {
+        setSlotTakenError('Esse horário lotou. Escolha outro horário disponível.');
+        setStep(2);
+        return;
+      }
+      onJoinWaitlist({
+        serviceId: selectedService.id,
+        serviceName: selectedService.name,
+        date: activeDate,
+        startTime: activeTimeSlot,
+        studentName: studentName.trim(),
+        studentPhone: studentPhone.trim() || undefined,
+        studentEmail: studentEmail.trim() || undefined,
+      });
+      setJoinedWaitlist(true);
+      setIsSuccess(true);
+      return;
+    }
+
+    if (!check.ok) {
+      setSlotTakenError(check.message || 'Esse horário acabou de ser reservado. Escolha outro horário disponível.');
       setStep(2);
       return;
     }
@@ -124,6 +190,7 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
       notes: studentNotes.trim() || 'Agendamento realizado pelo site.',
       clientSince: `Novo aluno (${formatMonthYearPtBR(new Date())})`,
       price: selectedService.price,
+      capacity: check.availability.capacity,
     };
 
     onBookingComplete(newApt);
@@ -225,7 +292,35 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
 
       {/* Main Form Flow */}
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-8">
-        {isSuccess && createdAppointment ? (
+        {isSuccess && joinedWaitlist ? (
+          /* Entrou na fila de espera de uma turma lotada */
+          <div className="bg-white rounded-2xl p-6 md:p-8 shadow-elevated border border-[#eceef0] text-center animate-in zoom-in-95">
+            <div className="w-16 h-16 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Clock className="w-10 h-10" />
+            </div>
+            <h2 className="text-2xl font-bold text-[#091426] mb-2">Você entrou na lista de espera</h2>
+            <p className="text-sm text-[#45474c] mb-6">
+              A turma de <b>{selectedService?.name}</b> em {activeDate.split('-').reverse().join('/')} às{' '}
+              <b>{activeTimeSlot}</b> já está com todas as vagas ocupadas.
+            </p>
+
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-left mb-6">
+              <p className="text-xs text-amber-900">
+                Guardamos seu nome na fila. Assim que alguém desmarcar, <b>{teacher.name}</b> chama você
+                pelo WhatsApp <b>{studentPhone.trim() || 'informado'}</b> para confirmar a vaga.
+                Nada é cobrado enquanto você estiver esperando.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={onBackToLanding}
+              className="w-full py-3 rounded-xl bg-[#00687a] hover:bg-[#004e5c] text-white font-bold text-sm"
+            >
+              Voltar para o site
+            </button>
+          </div>
+        ) : isSuccess && createdAppointment ? (
           /* Confirmation Success Screen */
           <div className="bg-white rounded-2xl p-6 md:p-8 shadow-elevated border border-[#eceef0] text-center animate-in zoom-in-95">
             <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -412,6 +507,12 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
                       {slotTakenError}
                     </div>
                   )}
+                  {availableTimeSlots.length > 0 && availableTimeSlots.every((ts) => ts.isFull) && (
+                    <p className="mb-2.5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
+                      Todas as turmas deste dia estão lotadas. Você pode entrar na lista de espera de um horário
+                      ou escolher outra data.
+                    </p>
+                  )}
                   {availableTimeSlots.length === 0 ? (
                     <p className="p-4 rounded-xl bg-slate-50 border border-dashed border-slate-300 text-xs text-slate-600">
                       Não há horários livres neste dia. Escolha outra data ou fale com o professor no WhatsApp.
@@ -426,16 +527,31 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
                         className={`py-3 px-2 rounded-xl text-center border transition-all ${
                           activeTimeSlot === ts.time
                             ? 'bg-[#091426] text-white border-[#091426] font-bold shadow-sm'
+                            : ts.isFull
+                            ? 'bg-amber-50 text-amber-900 border-amber-300 hover:border-amber-500'
                             : 'bg-white text-[#191c1e] border-[#c5c6cd] hover:border-[#091426]'
                         }`}
                       >
                         <span className="text-sm block">{ts.time}</span>
-                        <span className={`text-[10px] block ${activeTimeSlot === ts.time ? 'text-slate-300' : 'text-slate-400'}`}>{ts.period}</span>
+                        <span className={`text-[10px] block ${activeTimeSlot === ts.time ? 'text-slate-300' : ts.isFull ? 'text-amber-700 font-semibold' : 'text-slate-400'}`}>
+                          {ts.isFull
+                            ? 'Lista de espera'
+                            : ts.slot.capacity > 1
+                            ? `${ts.slot.spotsLeft} vaga(s)`
+                            : ts.period}
+                        </span>
                       </button>
                     ))}
                   </div>
                   )}
                 </div>
+
+                {isActiveSlotFull && (
+                  <div role="status" className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
+                    <b>Turma lotada nesse horário</b> ({activeSlotState?.enrolled} de {activeSlotState?.capacity} vagas).
+                    Se você continuar, entra na <b>lista de espera</b> e é chamado assim que abrir uma vaga.
+                  </div>
+                )}
 
                 {/* Modality selector */}
                 <div>

@@ -12,14 +12,30 @@ import {
   FaqItem, 
   MessageTemplate, 
   PaymentInvoice,
-  SystemUser
+  SystemUser,
+  Company,
+  WaitlistEntry
 } from '../types';
 import { relativeDate } from '../utils/dates';
+
+export const INITIAL_COMPANIES: Company[] = [
+  {
+    id: 'comp-aquavida',
+    name: 'Centro Esportivo Aqua Vida',
+    document: '12.345.678/0001-90',
+    email: 'contato@aquavida.com.br',
+    phone: '(11) 3000-1122',
+    city: 'São Paulo - SP',
+    status: 'ativa',
+    createdAt: '2026-01-05',
+  },
+];
 
 export const INITIAL_TEACHER_PROFILES: TeacherProfile[] = [
   {
     id: 'prof-roberto',
     name: 'Prof. Roberto Almeida',
+    companyId: 'comp-aquavida',
     role: 'Personal Trainer & Especialista',
     specialty: 'Especialista em Performance, Reabilitação e Treinamento Inteligente',
     bio: 'Transforme sua rotina de treinos com uma metodologia focada em resultados reais, prevenção de lesões e alta performance. Treinamento inteligente para quem busca excelência.',
@@ -44,6 +60,7 @@ export const INITIAL_TEACHER_PROFILES: TeacherProfile[] = [
   {
     id: 'prof-carlos',
     name: 'Carlos Silva',
+    companyId: 'comp-aquavida',
     role: 'Instrutor e Educador',
     specialty: 'Matemática Avançada, Física & Preparação para Vestibulares',
     bio: 'Aulas particulares focadas no desenvolvimento do raciocínio lógico e resolução prática de exercícios dos principais vestibulares do país.',
@@ -77,7 +94,8 @@ export const INITIAL_SERVICES: ServiceItem[] = [
     durationMinutes: 60,
     active: true,
     modality: 'Online / Presencial',
-    iconName: 'fitness_center'
+    iconName: 'fitness_center',
+    capacity: 1
   },
   {
     id: 'serv-2',
@@ -88,7 +106,9 @@ export const INITIAL_SERVICES: ServiceItem[] = [
     durationMinutes: 45,
     active: true,
     modality: 'Presencial',
-    iconName: 'pool'
+    iconName: 'pool',
+    capacity: 6,
+    levels: ['iniciante', 'intermediario']
   },
   {
     id: 'serv-3',
@@ -149,7 +169,8 @@ export const INITIAL_STUDENTS: Student[] = [
     totalClasses: 18,
     status: 'Ativo',
     notes: 'Focar em conversação avançada e preparo para entrevista de emprego.',
-    lastClass: '14/11/2024'
+    lastClass: '14/11/2024',
+    level: 'avancado'
   },
   {
     id: 'std-2',
@@ -162,7 +183,8 @@ export const INITIAL_STUDENTS: Student[] = [
     totalClasses: 12,
     status: 'Ativo',
     notes: 'Preparação para vestibular de Medicina. Foco em Geometria Espacial.',
-    lastClass: '15/11/2024'
+    lastClass: '15/11/2024',
+    level: 'intermediario'
   },
   {
     id: 'std-3',
@@ -175,7 +197,8 @@ export const INITIAL_STUDENTS: Student[] = [
     totalClasses: 9,
     status: 'Ativo',
     notes: 'Treinamento de conversação e termos de negócios.',
-    lastClass: '16/11/2024'
+    lastClass: '16/11/2024',
+    level: 'iniciante'
   },
   {
     id: 'std-4',
@@ -883,6 +906,7 @@ export const INITIAL_SYSTEM_USERS: SystemUser[] = [
     avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBAI63loLl-GarxR8nRCM0QR_UD9OOriq4QTFT68JOsd_926nwPUc3YQ07yVmhVMAAPYJ89Jk-h5GpttNyLMUKD4WJPNozVv5lOrRdBNWMLDFdJiooTvn2t5PA6mb_GGnUILVGezO-aIVc_7VRKB4Y9zIkR4WIpESk7H5VQbPXLr0Yc6P1uJtXayeFWG6nJcZukPp1IRYyxFma22VT0nZr1gy1JyGPPk1usK9JBwJk1dapBCXIb2Nh8Ig',
     phone: '(11) 99988-7766',
     teacherId: 'prof-roberto',
+    companyId: 'comp-aquavida',
     status: 'ativo',
     createdAt: '2026-02-01',
     lastLogin: 'Hoje às 11:20',
@@ -897,6 +921,7 @@ export const INITIAL_SYSTEM_USERS: SystemUser[] = [
     avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAzOpE1WBXepMUm3G21XYxME_H53gwFI01_uuNwk9BOF1CTTxYb4qTbeVUbV38GDICoCEU9kpzLs1nDsZxn0yxfFYrS76Dvpzz5yVPLUVK1W4yolwLDAoSUnc8m6Izd8DLb67DRvju6h-eYiJKdwXw4wwOhv8eCGdftyvFgDia9qy7kMHgSs_Yym3aNph20qDJ2S6iB4equOLDfHGfwqs4poutwgneY-qeEJqz9XoSvikiN8bWwky29MQ',
     phone: '(11) 98877-6655',
     teacherId: 'prof-carlos',
+    companyId: 'comp-aquavida',
     status: 'ativo',
     createdAt: '2026-03-15',
     lastLogin: 'Ontem às 18:30',
@@ -911,6 +936,7 @@ export const INITIAL_SYSTEM_USERS: SystemUser[] = [
     avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
     phone: '(11) 98111-2233',
     teacherId: 'prof-roberto',
+    companyId: 'comp-aquavida',
     status: 'ativo',
     createdAt: '2026-04-10',
     lastLogin: 'Hoje às 09:15',
@@ -950,3 +976,6 @@ export const INITIAL_SYSTEM_USERS: SystemUser[] = [
 ];
 
 
+
+/** A fila de espera nasce vazia: só entra quem realmente tentou agendar numa turma lotada. */
+export const INITIAL_WAITLIST: WaitlistEntry[] = [];

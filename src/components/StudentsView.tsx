@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Student } from '../types';
+import { Student, StudentLevel, STUDENT_LEVEL_LABELS } from '../types';
 import { 
   Users, 
   Search, 
@@ -18,20 +18,25 @@ interface StudentsViewProps {
   students: Student[];
   onAddStudent: (student: Omit<Student, 'id' | 'totalClasses' | 'joinedDate'>) => void;
   onSelectStudentToSchedule: (student: Student) => void;
+  /** Ajuste rápido do nível direto no card */
+  onUpdateStudent?: (id: string, updates: Partial<Student>) => void;
 }
 
 export const StudentsView: React.FC<StudentsViewProps> = ({
   students,
   onAddStudent,
   onSelectStudentToSchedule,
+  onUpdateStudent,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'Todos' | 'Ativo' | 'Inativo'>('Todos');
+  const [levelFilter, setLevelFilter] = useState<'Todos' | StudentLevel>('Todos');
   const [showAddModal, setShowAddModal] = useState(false);
   const [newStudentName, setNewStudentName] = useState('');
   const [newStudentEmail, setNewStudentEmail] = useState('');
   const [newStudentPhone, setNewStudentPhone] = useState('');
   const [newStudentNotes, setNewStudentNotes] = useState('');
+  const [newStudentLevel, setNewStudentLevel] = useState<StudentLevel>('iniciante');
 
   const filteredStudents = students.filter((s) => {
     const matchesSearch = 
@@ -39,7 +44,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
       s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.phone.includes(searchTerm);
     const matchesStatus = statusFilter === 'Todos' || s.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesLevel = levelFilter === 'Todos' || s.level === levelFilter;
+    return matchesSearch && matchesStatus && matchesLevel;
   });
 
   const handleCreateStudent = (e: React.FormEvent) => {
@@ -52,6 +58,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
       phone: newStudentPhone.trim() || '(11) 98888-7777',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
       status: 'Ativo',
+      level: newStudentLevel,
       notes: newStudentNotes.trim() || 'Novo aluno cadastrado.',
     });
 
@@ -59,7 +66,14 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
     setNewStudentEmail('');
     setNewStudentPhone('');
     setNewStudentNotes('');
+    setNewStudentLevel('iniciante');
     setShowAddModal(false);
+  };
+
+  const LEVEL_STYLES: Record<StudentLevel, string> = {
+    iniciante: 'bg-sky-50 text-sky-700 border-sky-200',
+    intermediario: 'bg-amber-50 text-amber-800 border-amber-200',
+    avancado: 'bg-violet-50 text-violet-700 border-violet-200',
   };
 
   const handleOpenWhatsApp = (student: Student) => {
@@ -119,6 +133,18 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                 {st === 'Todos' ? 'Todos os Alunos' : st}
               </button>
             ))}
+
+            <select
+              aria-label="Filtrar por nível"
+              value={levelFilter}
+              onChange={(e) => setLevelFilter(e.target.value as 'Todos' | StudentLevel)}
+              className="px-3 py-2 rounded-lg text-xs font-semibold bg-[#eceef0] text-[#45474c] border border-transparent focus:outline-none focus:border-[#00687a]"
+            >
+              <option value="Todos">Todos os níveis</option>
+              {(Object.keys(STUDENT_LEVEL_LABELS) as StudentLevel[]).map((lvl) => (
+                <option key={lvl} value={lvl}>{STUDENT_LEVEL_LABELS[lvl]}</option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -143,15 +169,24 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                       <span className="text-xs text-[#75777d]">Desde {std.joinedDate}</span>
                     </div>
                   </div>
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                      std.status === 'Ativo'
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        : 'bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    {std.status}
-                  </span>
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    <span
+                      className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                        std.status === 'Ativo'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {std.status}
+                    </span>
+                    <span
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${
+                        std.level ? LEVEL_STYLES[std.level] : 'bg-slate-50 text-slate-500 border-slate-200'
+                      }`}
+                    >
+                      {std.level ? STUDENT_LEVEL_LABELS[std.level] : 'Sem nível'}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="space-y-2 text-xs text-[#45474c] mb-4 bg-[#f7f9fb] p-3.5 rounded-xl border border-[#eceef0]">
@@ -167,6 +202,26 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                     <GraduationCap className="w-3.5 h-3.5 text-[#00687a]" />
                     <span><b>{std.totalClasses}</b> aulas realizadas</span>
                   </p>
+                  {onUpdateStudent && (
+                    <p className="flex items-center gap-2 pt-1">
+                      <label htmlFor={`level-${std.id}`} className="text-slate-500">Nível:</label>
+                      <select
+                        id={`level-${std.id}`}
+                        value={std.level || ''}
+                        onChange={(e) =>
+                          onUpdateStudent(std.id, {
+                            level: (e.target.value || undefined) as StudentLevel | undefined,
+                          })
+                        }
+                        className="flex-1 bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-[#00687a]"
+                      >
+                        <option value="">Não definido</option>
+                        {(Object.keys(STUDENT_LEVEL_LABELS) as StudentLevel[]).map((lvl) => (
+                          <option key={lvl} value={lvl}>{STUDENT_LEVEL_LABELS[lvl]}</option>
+                        ))}
+                      </select>
+                    </p>
+                  )}
                 </div>
 
                 {std.notes && (
@@ -238,6 +293,20 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                       className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-[#00687a]"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label htmlFor="new-student-level" className="block text-xs font-semibold text-[#191c1e] mb-1">Nível do aluno</label>
+                  <select
+                    id="new-student-level"
+                    value={newStudentLevel}
+                    onChange={(e) => setNewStudentLevel(e.target.value as StudentLevel)}
+                    className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:border-[#00687a]"
+                  >
+                    {(Object.keys(STUDENT_LEVEL_LABELS) as StudentLevel[]).map((lvl) => (
+                      <option key={lvl} value={lvl}>{STUDENT_LEVEL_LABELS[lvl]}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>

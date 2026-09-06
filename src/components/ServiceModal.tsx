@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ServiceItem } from '../types';
+import { ServiceItem, StudentLevel, STUDENT_LEVEL_LABELS } from '../types';
 import { X, Dumbbell, Waves, Activity, GraduationCap, Calculator, Sparkles } from 'lucide-react';
 
 interface ServiceModalProps {
@@ -24,6 +24,8 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
   const [modality, setModality] = useState(editingService?.modality || 'Online / Presencial');
   const [iconName, setIconName] = useState<ServiceItem['iconName']>(editingService?.iconName || 'school');
   const [active, setActive] = useState(editingService ? editingService.active : true);
+  const [capacity, setCapacity] = useState(editingService?.capacity || 1);
+  const [levels, setLevels] = useState<StudentLevel[]>(editingService?.levels || []);
 
   useEffect(() => {
     if (editingService) {
@@ -34,6 +36,8 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
       setModality(editingService.modality);
       setIconName(editingService.iconName);
       setActive(editingService.active);
+      setCapacity(editingService.capacity || 1);
+      setLevels(editingService.levels || []);
     } else {
       setName('');
       setDescription('');
@@ -42,6 +46,8 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
       setModality('Online / Presencial');
       setIconName('school');
       setActive(true);
+      setCapacity(1);
+      setLevels([]);
     }
   }, [editingService]);
 
@@ -58,6 +64,8 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
       modality: modality as any,
       iconName,
       active,
+      capacity: Math.max(1, Number(capacity) || 1),
+      levels: levels.length ? levels : undefined,
     };
 
     onSave(savedService);
@@ -134,6 +142,58 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
                 <option value={90}>90 min (1h30)</option>
                 <option value={120}>120 min (2h)</option>
               </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="svc-capacity" className="block text-xs font-semibold text-slate-700 mb-1">
+                Limite de alunos por horário
+              </label>
+              <input
+                id="svc-capacity"
+                type="number"
+                min="1"
+                max="60"
+                value={capacity}
+                onChange={(e) => setCapacity(Math.max(1, Number(e.target.value) || 1))}
+                className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-[#00687a]"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                1 = aula individual. Acima disso o horário vira turma e, ao lotar, os próximos entram na lista de espera.
+              </p>
+            </div>
+
+            <div>
+              <span className="block text-xs font-semibold text-slate-700 mb-1">Níveis atendidos</span>
+              <div className="flex flex-wrap gap-2">
+                {(Object.keys(STUDENT_LEVEL_LABELS) as StudentLevel[]).map((lvl) => {
+                  const checked = levels.includes(lvl);
+                  return (
+                    <label
+                      key={lvl}
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold border cursor-pointer ${
+                        checked
+                          ? 'bg-[#00687a] text-white border-[#00687a]'
+                          : 'bg-white text-slate-600 border-slate-300 hover:border-[#00687a]'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={checked}
+                        onChange={() =>
+                          setLevels((prev) =>
+                            prev.includes(lvl) ? prev.filter((l) => l !== lvl) : [...prev, lvl]
+                          )
+                        }
+                      />
+                      {STUDENT_LEVEL_LABELS[lvl]}
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Nenhum marcado = aberto a todos os níveis.</p>
             </div>
           </div>
 

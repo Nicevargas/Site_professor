@@ -14,7 +14,10 @@ import {
   AuthUser,
   SystemUser,
   UserRole,
-  SiteAdminTab
+  SiteAdminTab,
+  Company,
+  WaitlistEntry,
+  AttendanceStatus
 } from './types';
 import { 
   INITIAL_TEACHER_PROFILES, 
@@ -28,9 +31,14 @@ import {
   INITIAL_PHOTOS,
   DEFAULT_SITE_FAQS,
   INITIAL_PAYMENT_INVOICES,
-  INITIAL_SYSTEM_USERS
+  INITIAL_SYSTEM_USERS,
+  INITIAL_COMPANIES,
+  INITIAL_WAITLIST
 } from './data/mockData';
 
+import { AttendanceModal } from './components/AttendanceModal';
+import { availability, ClassSlot } from './utils/classes';
+import { addMinutes } from './utils/schedule';
 import { SideNav, SidebarMode } from './components/SideNav';
 import { TopAppBar } from './components/TopAppBar';
 import { DashboardView } from './components/DashboardView';
@@ -123,6 +131,13 @@ function AppInner() {
     return INITIAL_SYSTEM_USERS;
   });
 
+  // Empresas / escolas: o perfil principal que agrupa professores
+  const [companies, setCompanies] = useState<Company[]>(INITIAL_COMPANIES);
+
+  // Fila de espera das turmas lotadas e a chamada aberta no momento
+  const [allWaitlist, setAllWaitlist] = useState<WaitlistEntry[]>(INITIAL_WAITLIST);
+  const [attendanceSlot, setAttendanceSlot] = useState<ClassSlot | null>(null);
+
   // Endereço pedido pelo visitante: caminho, subdomínio ou domínio próprio
   const [tenantRef] = useState(() => resolveTenant(window.location));
 
@@ -196,6 +211,10 @@ function AppInner() {
   const reminders = useMemo(() => {
     return allReminders.filter(r => !r.teacherId || r.teacherId === currentTeacher.id);
   }, [allReminders, currentTeacher.id]);
+
+  const waitlist = useMemo(() => {
+    return allWaitlist.filter(w => !w.teacherId || w.teacherId === currentTeacher.id);
+  }, [allWaitlist, currentTeacher.id]);
 
   const invoices = useMemo(() => {
     return allInvoices.filter(inv => !inv.teacherId || inv.teacherId === currentTeacher.id);
@@ -373,7 +392,9 @@ function AppInner() {
           dbVideos,
           dbPhotos,
           dbFaqs,
-          dbSystemUsers
+          dbSystemUsers,
+          dbCompanies,
+          dbWaitlist
         ] = await Promise.all([
           supabaseService.getTeachers(),
           supabaseService.getServices(),
@@ -387,6 +408,8 @@ function AppInner() {
           supabaseService.getPhotos(),
           supabaseService.getFaqs(),
           supabaseService.getSystemUsers(),
+          supabaseService.getCompanies(),
+          supabaseService.getWaitlist(),
         ]);
 
         if (dbTeachers && dbTeachers.length > 0) {
@@ -412,6 +435,8 @@ function AppInner() {
         if (dbVideos && dbVideos.length > 0) setVideos(dbVideos);
         if (dbPhotos && dbPhotos.length > 0) setPhotos(dbPhotos);
         if (dbFaqs && dbFaqs.length > 0) setFaqs(dbFaqs);
+        if (dbCompanies && dbCompanies.length > 0) setCompanies(dbCompanies);
+        if (dbWaitlist) setAllWaitlist(dbWaitlist);
         if (dbSystemUsers && dbSystemUsers.length > 0) {
           setSystemUsers(dbSystemUsers);
           localStorage.setItem('agenda_prof_system_users', JSON.stringify(dbSystemUsers));
@@ -537,6 +562,24 @@ function AppInner() {
       id: `user-${Date.now()}`,
       createdAt: toLocalDateKey(new Date()),
     };
+
+    // Professor cujo vínculo não existe ganha um perfil de verdade: sem isso o
+    // teacherId ficaria apontando para o vazio e a conta não teria agenda.
+    if (newUser.role === 'professor' && newUser.teacherId && !teachers.some((t) => t.id === newUser.teacherId)) {
+      const profile: TeacherProfile = {
+        ...INITIAL_TEACHER_PROFILES[0],
+        id: newUser.teacherId,
+        companyId: newUser.companyId,
+        name: newUser.name,
+        email: newUser.email,
+        whatsapp: (newUser.phone || '').replace(/\D/g, ''),
+        bio: newUser.bio || '',
+        slug: undefined,
+        customDomain: undefined,
+      };
+      setTeachers((prev) => [profile, ...prev]);
+      supabaseService.saveTeacher(profile);
+    }
     setSystemUsers((prev) => {
       const updated = [newUser, ...prev];
       localStorage.setItem('agenda_prof_system_users', JSON.stringify(updated));
@@ -730,6 +773,17 @@ function AppInner() {
   const handleReopenAppointment = (id: string) => {
     const target = allAppointments.find((a) => a.id === id);
     if (!target) return;
+
+    // Reabrir não pode furar o limite: no meio-tempo a turma pode ter enchido
+    const service = allServices.find((sv) => sv.id === target.serviceId);
+    const slot = availability(allAppointments, target, service, { ignoreAppointmentId: target.id });
+    if (slot.isFull) {
+      window.alert(
+        `Não dá para reabrir: a turma de ${target.serviceName} às ${target.startTime} já está com ${slot.enrolled} de ${slot.capacity} vagas ocupadas.`
+      );
+      return;
+    }
+
     const restored: Appointment = {
       ...target,
       status: 'Confirmado',
@@ -747,6 +801,155 @@ function AppInner() {
     setAllAppointments((prev) => prev.filter((apt) => apt.id !== id));
     supabaseService.deleteAppointment(id);
     setSelectedAppointment(null);
+  };
+
+  // ==========================================================
+  // EMPRESAS: o perfil principal que agrupa professores e usuários
+  // ==========================================================
+  const handleSaveCompany = (company: Company) => {
+    setCompanies((prev) => {
+      const exists = prev.some((c) => c.id === company.id);
+      return exists ? prev.map((c) => (c.id === company.id ? company : c)) : [company, ...prev];
+    });
+    supabaseService.saveCompany(company);
+  };
+
+  const handleDeleteCompany = (id: string) => {
+    setCompanies((prev) => prev.filter((c) => c.id !== id));
+    // Quem apontava para esta empresa fica sem vínculo, em vez de apontar para o vazio
+    setSystemUsers((prev) => {
+      const updated = prev.map((u) => (u.companyId === id ? { ...u, companyId: undefined } : u));
+      localStorage.setItem('agenda_prof_system_users', JSON.stringify(updated));
+      return updated;
+    });
+    supabaseService.deleteCompany(id);
+  };
+
+  // ==========================================================
+  // LISTA DE ESPERA das turmas lotadas
+  // ==========================================================
+  const persistWaitlistEntry = (entry: WaitlistEntry) => {
+    setAllWaitlist((prev) => {
+      const exists = prev.some((e) => e.id === entry.id);
+      return exists ? prev.map((e) => (e.id === entry.id ? entry : e)) : [...prev, entry];
+    });
+    supabaseService.saveWaitlistEntry(entry, entry.teacherId || currentTeacher.id);
+  };
+
+  const handleAddToWaitlist = (data: {
+    serviceId: string;
+    serviceName: string;
+    date: string;
+    startTime: string;
+    studentId?: string;
+    studentName: string;
+    studentPhone?: string;
+    studentEmail?: string;
+  }) => {
+    const entry: WaitlistEntry = {
+      ...data,
+      id: `wait-${Date.now()}`,
+      teacherId: currentTeacher.id,
+      status: 'aguardando',
+      createdAt: new Date().toISOString(),
+    };
+    persistWaitlistEntry(entry);
+    return entry;
+  };
+
+  const handleRemoveWaitlistEntry = (id: string) => {
+    setAllWaitlist((prev) => prev.filter((e) => e.id !== id));
+    supabaseService.deleteWaitlistEntry(id);
+  };
+
+  /** Chamar da fila: vira aula de verdade, se a vaga ainda existir. */
+  const handlePromoteWaitlistEntry = (entry: WaitlistEntry) => {
+    const service = allServices.find((sv) => sv.id === entry.serviceId);
+    const slot = availability(allAppointments, entry, service);
+    if (slot.isFull) {
+      window.alert(
+        `A vaga já foi preenchida: ${slot.enrolled} de ${slot.capacity} lugares ocupados em ${entry.serviceName} às ${entry.startTime}.`
+      );
+      return;
+    }
+
+    const duration = service?.durationMinutes || 60;
+    const dayOfWeek = new Date(`${entry.date}T00:00:00`).getDay();
+    const appointment: Appointment = {
+      id: `apt-${Date.now()}`,
+      teacherId: currentTeacher.id,
+      studentId: entry.studentId,
+      studentName: entry.studentName,
+      studentInitials: entry.studentName.trim().split(/\s+/).map((n) => n[0]).join('').slice(0, 2).toUpperCase(),
+      studentPhone: entry.studentPhone,
+      studentEmail: entry.studentEmail,
+      serviceId: entry.serviceId,
+      serviceName: entry.serviceName || service?.name || 'Aula',
+      date: entry.date,
+      dayOfWeek: isNaN(dayOfWeek) ? 1 : dayOfWeek,
+      startTime: entry.startTime,
+      endTime: addMinutes(entry.startTime, duration),
+      durationMinutes: duration,
+      modality: (service?.modality === 'Presencial' ? 'Presencial' : 'Online (Google Meet)') as Appointment['modality'],
+      status: 'Confirmado',
+      price: service?.price ?? 0,
+      capacity: slot.capacity,
+      notes: 'Matriculado a partir da lista de espera.',
+    };
+
+    setAllAppointments((prev) => [appointment, ...prev]);
+    supabaseService.saveAppointment(appointment, currentTeacher.id);
+    dispatchAppointmentWebhook(appointment, currentTeacher, 'created');
+
+    const promoted: WaitlistEntry = { ...entry, status: 'matriculado', calledAt: new Date().toISOString() };
+    setAllWaitlist((prev) => prev.map((e) => (e.id === entry.id ? promoted : e)));
+    supabaseService.saveWaitlistEntry(promoted, currentTeacher.id);
+  };
+
+  // ==========================================================
+  // LISTA DE CHAMADA: a presença fica gravada na própria aula
+  // ==========================================================
+  const handleSaveAttendance = (
+    marks: { appointmentId: string; attendance?: AttendanceStatus; attendanceNote?: string }[]
+  ) => {
+    const markedAt = new Date().toISOString();
+    const byId = new Map(marks.map((m) => [m.appointmentId, m]));
+
+    setAllAppointments((prev) =>
+      prev.map((apt) => {
+        const mark = byId.get(apt.id);
+        if (!mark) return apt;
+        return {
+          ...apt,
+          attendance: mark.attendance,
+          attendanceNote: mark.attendance === 'justificada' ? mark.attendanceNote : undefined,
+          attendanceMarkedAt: mark.attendance ? markedAt : undefined,
+        };
+      })
+    );
+
+    marks.forEach((mark) => {
+      const apt = allAppointments.find((a) => a.id === mark.appointmentId);
+      if (!apt) return;
+      supabaseService.saveAppointment(
+        {
+          ...apt,
+          attendance: mark.attendance,
+          attendanceNote: mark.attendance === 'justificada' ? mark.attendanceNote : undefined,
+          attendanceMarkedAt: mark.attendance ? markedAt : undefined,
+        },
+        currentTeacher.id
+      );
+    });
+  };
+
+  /** Ajuste de dados do aluno feito pelo professor (hoje: o nível). */
+  const handleUpdateStudent = (id: string, updates: Partial<Student>) => {
+    const target = allStudents.find((s) => s.id === id);
+    if (!target) return;
+    const updated = { ...target, ...updates };
+    setAllStudents((prev) => prev.map((s) => (s.id === id ? updated : s)));
+    supabaseService.saveStudent(updated, updated.teacherId || currentTeacher.id);
   };
 
   // Service actions
@@ -913,6 +1116,7 @@ function AppInner() {
         preSelectedServiceId={bookingServiceId}
         existingAppointments={appointments}
         onBookingComplete={handleBookingCompleted}
+        onJoinWaitlist={handleAddToWaitlist}
         onBackToLanding={() => setCurrentView('public-landing')}
         onBackToDashboard={() => {
           if (currentUser?.role === 'aluno') {
@@ -1070,6 +1274,10 @@ function AppInner() {
                 setIsGoogleCalendarModalOpen(true);
               }}
               onOpenWhatsApp8hModal={() => setIsWhatsApp8hModalOpen(true)}
+              waitlist={waitlist}
+              onOpenAttendance={setAttendanceSlot}
+              onPromoteWaitlistEntry={handlePromoteWaitlistEntry}
+              onRemoveWaitlistEntry={handleRemoveWaitlistEntry}
             />
           )}
 
@@ -1095,6 +1303,7 @@ function AppInner() {
               students={students}
               onAddStudent={handleAddStudent}
               onSelectStudentToSchedule={handleScheduleForStudent}
+              onUpdateStudent={handleUpdateStudent}
             />
           )}
 
@@ -1119,6 +1328,9 @@ function AppInner() {
             <UsersManagementView
               users={systemUsers}
               teachers={teachers}
+              companies={companies}
+              onSaveCompany={currentUser.role === 'admin' ? handleSaveCompany : undefined}
+              onDeleteCompany={currentUser.role === 'admin' ? handleDeleteCompany : undefined}
               currentUser={currentUser}
               onAddUser={handleAddUser}
               onUpdateUser={handleUpdateUser}
@@ -1228,6 +1440,14 @@ function AppInner() {
         preSelectedStudent={preSelectedStudent}
         existingAppointments={appointments}
         editingAppointment={reschedulingAppointment}
+        onAddToWaitlist={handleAddToWaitlist}
+      />
+
+      <AttendanceModal
+        slot={attendanceSlot}
+        students={students}
+        onClose={() => setAttendanceSlot(null)}
+        onSave={handleSaveAttendance}
       />
 
       <BlockTimeModal

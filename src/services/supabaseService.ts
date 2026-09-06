@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { syncResult, reportSyncError } from '../utils/syncNotifier';
-import { TeacherProfile, ServiceItem, Appointment, Student, Reminder, PaymentInvoice, TestimonialItem, CurriculumItem, PhotoItem, FaqItem, SystemUser } from '../types';
+import { TeacherProfile, ServiceItem, Appointment, Student, Reminder, PaymentInvoice, TestimonialItem, CurriculumItem, PhotoItem, FaqItem, SystemUser, Company, WaitlistEntry } from '../types';
 
 export const supabaseService = {
   /**
@@ -14,6 +14,7 @@ export const supabaseService = {
       return data.map((t: any) => ({
         id: t.id,
         name: t.name,
+        companyId: t.company_id || undefined,
         role: t.role || 'professor',
         specialty: t.specialty || '',
         bio: t.bio || '',
@@ -103,6 +104,7 @@ export const supabaseService = {
       const { error } = await supabase.from('teachers').upsert({
         id: teacher.id,
         name: teacher.name,
+        company_id: teacher.companyId || null,
         role: teacher.role || 'professor',
         specialty: teacher.specialty || '',
         bio: teacher.bio || '',
@@ -176,6 +178,8 @@ export const supabaseService = {
         modality: s.modality,
         iconName: s.icon_name || 'school',
         active: Boolean(s.active),
+        capacity: s.capacity ? Number(s.capacity) : 1,
+        levels: Array.isArray(s.levels) && s.levels.length ? s.levels : undefined,
       }));
     } catch (err) {
       console.warn('Erro ao buscar serviços no Supabase:', err);
@@ -198,6 +202,8 @@ export const supabaseService = {
         modality: service.modality || 'Online / Presencial',
         icon_name: service.iconName || 'school',
         active: service.active ?? true,
+        capacity: Math.max(1, Number(service.capacity) || 1),
+        levels: service.levels && service.levels.length ? service.levels : null,
         teacher_id: teacherId || 'prof-roberto',
       });
       return syncResult(error, 'serviço');
@@ -251,6 +257,11 @@ export const supabaseService = {
         clientSince: a.client_since || undefined,
         cancelledAt: a.cancelled_at || undefined,
         cancellationReason: a.cancellation_reason || undefined,
+        studentId: a.student_id || undefined,
+        capacity: a.capacity ? Number(a.capacity) : undefined,
+        attendance: a.attendance || undefined,
+        attendanceNote: a.attendance_note || undefined,
+        attendanceMarkedAt: a.attendance_marked_at || undefined,
       }));
     } catch (err) {
       console.warn('Erro ao buscar agendamentos no Supabase:', err);
@@ -286,6 +297,10 @@ export const supabaseService = {
         client_since: apt.clientSince || null,
         cancelled_at: apt.cancelledAt || null,
         cancellation_reason: apt.cancellationReason || null,
+        capacity: apt.capacity ? Math.max(1, Number(apt.capacity)) : null,
+        attendance: apt.attendance || null,
+        attendance_note: apt.attendanceNote || null,
+        attendance_marked_at: apt.attendanceMarkedAt || null,
       });
       return syncResult(error, 'agendamento');
     } catch (err) {
@@ -329,6 +344,7 @@ export const supabaseService = {
         lastClass: s.last_class || '',
         status: s.status || 'Ativo',
         notes: s.notes || '',
+        level: s.level || undefined,
       }));
     } catch (err) {
       console.warn('Erro ao buscar alunos no Supabase:', err);
@@ -354,6 +370,7 @@ export const supabaseService = {
         last_class: student.lastClass || '',
         status: student.status || 'Ativo',
         notes: student.notes || '',
+        level: student.level || null,
       });
       return syncResult(error, 'aluno');
     } catch (err) {
@@ -818,6 +835,7 @@ export const supabaseService = {
         avatarUrl: u.avatar_url || undefined,
         phone: u.phone || undefined,
         teacherId: u.teacher_id || undefined,
+        companyId: u.company_id || undefined,
         studentId: u.student_id || undefined,
         status: u.status || 'ativo',
         createdAt: u.created_at ? String(u.created_at).split('T')[0] : '',
@@ -828,6 +846,133 @@ export const supabaseService = {
     } catch (err) {
       console.warn('Erro ao buscar usuários do sistema:', err);
       return null;
+    }
+  },
+
+  /**
+   * Empresas / escolas: o perfil principal que agrupa professores e usuários.
+   */
+  async getCompanies(): Promise<Company[] | null> {
+    if (!isSupabaseConfigured || !supabase) return null;
+    try {
+      const { data, error } = await supabase.from('companies').select('*').order('name');
+      if (error || !data || data.length === 0) return null;
+      return data.map((c: any): Company => ({
+        id: c.id,
+        name: c.name,
+        tradeName: c.trade_name || undefined,
+        document: c.document || undefined,
+        email: c.email || undefined,
+        phone: c.phone || undefined,
+        city: c.city || undefined,
+        logoUrl: c.logo_url || undefined,
+        notes: c.notes || undefined,
+        status: c.status === 'inativa' ? 'inativa' : 'ativa',
+        createdAt: c.created_at ? String(c.created_at).split('T')[0] : '',
+      }));
+    } catch (err) {
+      console.warn('Erro ao buscar empresas no Supabase:', err);
+      return null;
+    }
+  },
+
+  async saveCompany(company: Company): Promise<boolean> {
+    if (!isSupabaseConfigured || !supabase) return false;
+    try {
+      const { error } = await supabase.from('companies').upsert({
+        id: company.id,
+        name: company.name,
+        trade_name: company.tradeName || null,
+        document: company.document || null,
+        email: company.email ? company.email.trim().toLowerCase() : null,
+        phone: company.phone || null,
+        city: company.city || null,
+        logo_url: company.logoUrl || null,
+        notes: company.notes || null,
+        status: company.status || 'ativa',
+      });
+      return syncResult(error, 'empresa');
+    } catch (err) {
+      reportSyncError('empresa', err);
+      return false;
+    }
+  },
+
+  async deleteCompany(id: string): Promise<boolean> {
+    if (!isSupabaseConfigured || !supabase) return false;
+    try {
+      const { error } = await supabase.from('companies').delete().eq('id', id);
+      return syncResult(error, 'exclusão da empresa');
+    } catch (err) {
+      reportSyncError('exclusão da empresa', err);
+      return false;
+    }
+  },
+
+  /**
+   * Lista de espera das turmas lotadas.
+   */
+  async getWaitlist(): Promise<WaitlistEntry[] | null> {
+    if (!isSupabaseConfigured || !supabase) return null;
+    try {
+      const { data, error } = await supabase.from('waitlist').select('*').order('created_at');
+      if (error || !data) return null;
+      return data.map((w: any): WaitlistEntry => ({
+        id: w.id,
+        teacherId: w.teacher_id || undefined,
+        serviceId: w.service_id,
+        serviceName: w.service_name || '',
+        date: w.date,
+        startTime: w.start_time,
+        studentId: w.student_id || undefined,
+        studentName: w.student_name,
+        studentPhone: w.student_phone || undefined,
+        studentEmail: w.student_email || undefined,
+        status: w.status || 'aguardando',
+        notes: w.notes || undefined,
+        createdAt: w.created_at || new Date().toISOString(),
+        calledAt: w.called_at || undefined,
+      }));
+    } catch (err) {
+      console.warn('Erro ao buscar lista de espera no Supabase:', err);
+      return null;
+    }
+  },
+
+  async saveWaitlistEntry(entry: WaitlistEntry, teacherId?: string): Promise<boolean> {
+    if (!isSupabaseConfigured || !supabase) return false;
+    try {
+      const { error } = await supabase.from('waitlist').upsert({
+        id: entry.id,
+        teacher_id: teacherId || entry.teacherId || null,
+        service_id: entry.serviceId,
+        service_name: entry.serviceName,
+        date: entry.date,
+        start_time: entry.startTime,
+        student_id: entry.studentId || null,
+        student_name: entry.studentName,
+        student_phone: entry.studentPhone || null,
+        student_email: entry.studentEmail ? entry.studentEmail.trim().toLowerCase() : null,
+        status: entry.status || 'aguardando',
+        notes: entry.notes || null,
+        created_at: entry.createdAt,
+        called_at: entry.calledAt || null,
+      });
+      return syncResult(error, 'lista de espera');
+    } catch (err) {
+      reportSyncError('lista de espera', err);
+      return false;
+    }
+  },
+
+  async deleteWaitlistEntry(id: string): Promise<boolean> {
+    if (!isSupabaseConfigured || !supabase) return false;
+    try {
+      const { error } = await supabase.from('waitlist').delete().eq('id', id);
+      return syncResult(error, 'exclusão da lista de espera');
+    } catch (err) {
+      reportSyncError('exclusão da lista de espera', err);
+      return false;
     }
   },
 
@@ -1017,6 +1162,7 @@ export const supabaseService = {
     avatarUrl?: string;
     phone?: string;
     teacherId?: string;
+    companyId?: string;
     studentId?: string;
     status?: string;
     permissions?: string[];
@@ -1034,6 +1180,7 @@ export const supabaseService = {
         avatar_url: user.avatarUrl || null,
         phone: user.phone || null,
         teacher_id: user.teacherId || null,
+        company_id: user.companyId || null,
         student_id: user.studentId || null,
         status: user.status || 'ativo',
         bio: user.bio || null,

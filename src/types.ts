@@ -18,6 +18,64 @@ export type ViewMode =
 
 export type UserRole = 'admin' | 'professor' | 'assistente' | 'aluno';
 
+/**
+ * Empresa / escola: o "perfil principal" que agrupa vários professores.
+ * Um professor autônomo simplesmente não tem empresa (companyId indefinido).
+ */
+export interface Company {
+  id: string;
+  name: string;
+  /** Nome curto usado em crachás e listas */
+  tradeName?: string;
+  document?: string; // CNPJ
+  email?: string;
+  phone?: string;
+  city?: string;
+  logoUrl?: string;
+  notes?: string;
+  status: 'ativa' | 'inativa';
+  createdAt: string;
+}
+
+/** Nível do aluno, usado para montar turmas e filtrar a lista de alunos. */
+export type StudentLevel = 'iniciante' | 'intermediario' | 'avancado';
+
+export const STUDENT_LEVEL_LABELS: Record<StudentLevel, string> = {
+  iniciante: 'Iniciante',
+  intermediario: 'Intermediário',
+  avancado: 'Avançado',
+};
+
+/** Presença marcada na lista de chamada da aula. */
+export type AttendanceStatus = 'presente' | 'falta' | 'justificada';
+
+export const ATTENDANCE_LABELS: Record<AttendanceStatus, string> = {
+  presente: 'Presente',
+  falta: 'Falta',
+  justificada: 'Falta justificada',
+};
+
+export type WaitlistStatus = 'aguardando' | 'convocado' | 'matriculado' | 'removido';
+
+/** Interessado numa aula que já bateu o limite de alunos. */
+export interface WaitlistEntry {
+  id: string;
+  teacherId?: string;
+  serviceId: string;
+  serviceName: string;
+  date: string; // YYYY-MM-DD
+  startTime: string; // "14:00"
+  studentId?: string;
+  studentName: string;
+  studentPhone?: string;
+  studentEmail?: string;
+  status: WaitlistStatus;
+  notes?: string;
+  createdAt: string; // ISO
+  /** Preenchido quando o professor chama a pessoa para a vaga aberta */
+  calledAt?: string;
+}
+
 /** Seções da tela "Meu Site" (também aparecem como sub-itens na barra lateral). */
 export type SiteAdminTab = 'branding' | 'testimonials' | 'curriculum' | 'videos' | 'photos' | 'faqs';
 
@@ -28,7 +86,8 @@ export interface SystemUser {
   role: UserRole;
   avatarUrl?: string;
   phone?: string;
-  teacherId?: string; // If assistant or student is linked to a teacher/school
+  teacherId?: string; // Professor responsável (perfil principal do usuário)
+  companyId?: string; // Empresa / escola à qual o usuário pertence
   studentId?: string; // If role === 'aluno'
   status: 'ativo' | 'inativo' | 'pendente';
   createdAt: string;
@@ -45,6 +104,7 @@ export interface AuthUser {
   role: UserRole;
   phone?: string;
   teacherId?: string;
+  companyId?: string;
   studentId?: string;
   isDemo?: boolean;
 }
@@ -179,6 +239,15 @@ export interface Appointment {
   cancelledAt?: string;
   /** Motivo informado no cancelamento, exibido no histórico. */
   cancellationReason?: string;
+  /**
+   * Limite de alunos deste horário. Quando ausente vale o limite do serviço.
+   * Todas as matrículas do mesmo slot (serviço + data + hora) compartilham o limite.
+   */
+  capacity?: number;
+  /** Presença marcada na lista de chamada. */
+  attendance?: AttendanceStatus;
+  attendanceNote?: string;
+  attendanceMarkedAt?: string; // ISO
 }
 
 export interface ServiceItem {
@@ -192,6 +261,10 @@ export interface ServiceItem {
   modality: 'Online / Presencial' | 'Apenas Online' | 'Presencial' | 'Online';
   badge?: string;
   iconName: 'fitness_center' | 'pool' | 'sports_martial_arts' | 'school' | 'calculate' | 'menu_book' | 'videocam';
+  /** Quantos alunos cabem por horário. 1 = aula individual (padrão). */
+  capacity?: number;
+  /** Níveis atendidos por este serviço. Vazio = todos. */
+  levels?: StudentLevel[];
 }
 
 export interface Student {
@@ -206,6 +279,8 @@ export interface Student {
   status: 'Ativo' | 'Inativo';
   notes?: string;
   lastClass?: string;
+  /** Nível técnico do aluno (iniciante / intermediário / avançado). */
+  level?: StudentLevel;
 }
 
 export interface Reminder {
@@ -232,6 +307,8 @@ export interface VacationModeConfig {
 export interface TeacherProfile {
   id: string;
   name: string;
+  /** Empresa / escola dona deste professor. Vazio = professor autônomo. */
+  companyId?: string;
   /** Assinatura do professor com o Aquagenda: define o endereço que ele pode usar */
   plan?: 'start' | 'pro' | 'premium';
   /** Identificador do endereço público: "roberto-almeida" */

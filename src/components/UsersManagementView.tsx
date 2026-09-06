@@ -3,7 +3,8 @@ import {
   SystemUser, 
   UserRole, 
   TeacherProfile, 
-  AuthUser 
+  AuthUser,
+  Company
 } from '../types';
 import { 
   Users, 
@@ -28,7 +29,9 @@ import {
   Check,
   Eye,
   Settings,
-  DollarSign
+  DollarSign,
+  Building2,
+  Plus
 } from 'lucide-react';
 
 interface UsersManagementViewProps {
@@ -39,7 +42,13 @@ interface UsersManagementViewProps {
   onSwitchUser: (user: SystemUser) => void;
   currentUser: AuthUser | null;
   teachers: TeacherProfile[];
+  companies?: Company[];
+  onSaveCompany?: (company: Company) => void;
+  onDeleteCompany?: (id: string) => void;
 }
+
+/** Opção do seletor de professor que cria um perfil novo em vez de reaproveitar um existente. */
+export const NEW_TEACHER_OPTION = '__novo_professor__';
 
 export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
   users,
@@ -49,10 +58,13 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
   onSwitchUser,
   currentUser,
   teachers,
+  companies = [],
+  onSaveCompany,
+  onDeleteCompany,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'todos' | UserRole>('todos');
-  const [activeTab, setActiveTab] = useState<'usuarios' | 'permissoes'>('usuarios');
+  const [activeTab, setActiveTab] = useState<'usuarios' | 'empresas' | 'permissoes'>('usuarios');
   
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -63,9 +75,14 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<UserRole>('professor');
   const [phone, setPhone] = useState('');
-  const [teacherId, setTeacherId] = useState<string>(teachers[0]?.id || 'prof-roberto');
+  const [teacherId, setTeacherId] = useState<string>(teachers[0]?.id || NEW_TEACHER_OPTION);
+  const [companyId, setCompanyId] = useState<string>('');
   const [password, setPassword] = useState('');
   const [bio, setBio] = useState('');
+
+  // Empresas
+  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
 
   const countAdmin = users.filter((u) => u.role === 'admin').length;
   const countProfessor = users.filter((u) => u.role === 'professor').length;
@@ -80,6 +97,17 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
     const matchesRole = roleFilter === 'todos' || u.role === roleFilter;
     return matchesSearch && matchesRole;
   });
+
+  const teacherName = (id?: string) => teachers.find((t) => t.id === id)?.name;
+  const companyName = (id?: string) => companies.find((c) => c.id === id)?.name;
+
+  /** Empresa e professor aos quais o usuário responde, para a coluna "Vínculo". */
+  const describeLink = (user: SystemUser): { company?: string; teacher?: string; orphan: boolean } => {
+    if (user.role === 'admin') return { orphan: false };
+    const company = companyName(user.companyId) || companyName(teachers.find((t) => t.id === user.teacherId)?.companyId);
+    const teacher = teacherName(user.teacherId);
+    return { company, teacher, orphan: Boolean(user.teacherId) && !teacher };
+  };
 
   const getRoleBadge = (userRole: UserRole) => {
     switch (userRole) {
@@ -123,7 +151,8 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
       email: email.trim().toLowerCase(),
       role: role,
       phone: phone.trim() || '(11) 98888-0000',
-      teacherId: role === 'assistente' || role === 'aluno' ? teacherId : role === 'professor' ? `prof-${Date.now()}` : undefined,
+      teacherId: role === 'admin' ? undefined : teacherId === NEW_TEACHER_OPTION ? `prof-${Date.now()}` : teacherId,
+      companyId: role === 'admin' ? undefined : companyId || undefined,
       status: 'ativo',
       lastLogin: 'Nunca',
       bio: bio.trim() || `Usuário do tipo ${role} cadastrado no sistema.`,
@@ -145,6 +174,8 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
     setPhone('');
     setPassword('');
     setBio('');
+    setCompanyId('');
+    setTeacherId(teachers[0]?.id || NEW_TEACHER_OPTION);
     setIsAddModalOpen(false);
   };
 
@@ -159,6 +190,8 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
       phone: editingUser.phone,
       status: editingUser.status,
       bio: editingUser.bio,
+      teacherId: editingUser.role === 'admin' ? undefined : editingUser.teacherId,
+      companyId: editingUser.role === 'admin' ? undefined : editingUser.companyId,
     });
 
     setEditingUser(null);
@@ -255,6 +288,19 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
             <Users className="w-4 h-4" />
             <span>Lista de Usuários da Equipe ({filteredUsers.length})</span>
           </button>
+          {onSaveCompany && (
+            <button
+              onClick={() => setActiveTab('empresas')}
+              className={`pb-3 text-sm font-bold transition-all flex items-center gap-2 ${
+                activeTab === 'empresas'
+                  ? 'text-[#00687a] border-b-2 border-[#00687a]'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Building2 className="w-4 h-4" />
+              <span>Empresas / Escolas ({companies.length})</span>
+            </button>
+          )}
           <button
             onClick={() => setActiveTab('permissoes')}
             className={`pb-3 text-sm font-bold transition-all flex items-center gap-2 ${
@@ -348,6 +394,7 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                     <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
                       <th className="py-3.5 px-5">Usuário</th>
                       <th className="py-3.5 px-4">Nível de Acesso (Cargo)</th>
+                      <th className="py-3.5 px-4">Vínculo (Empresa / Professor)</th>
                       <th className="py-3.5 px-4">Status</th>
                       <th className="py-3.5 px-4">Contato</th>
                       <th className="py-3.5 px-4">Último Acesso</th>
@@ -388,6 +435,54 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                           {/* Role */}
                           <td className="py-4 px-4">
                             {getRoleBadge(user.role)}
+                          </td>
+
+                          {/* Vínculo */}
+                          <td className="py-4 px-4">
+                            {(() => {
+                              const link = describeLink(user);
+                              if (user.role === 'admin') {
+                                return <span className="text-slate-400">Plataforma (sem vínculo)</span>;
+                              }
+                              if (link.orphan) {
+                                return (
+                                  <button
+                                    onClick={() => setEditingUser(user)}
+                                    className="inline-flex items-center gap-1 text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-full font-bold"
+                                  >
+                                    <AlertCircle className="w-3.5 h-3.5" />
+                                    Vínculo quebrado — corrigir
+                                  </button>
+                                );
+                              }
+                              if (!link.company && !link.teacher) {
+                                return (
+                                  <button
+                                    onClick={() => setEditingUser(user)}
+                                    className="inline-flex items-center gap-1 text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full font-bold"
+                                  >
+                                    <AlertCircle className="w-3.5 h-3.5" />
+                                    Sem vínculo — definir
+                                  </button>
+                                );
+                              }
+                              return (
+                                <div className="space-y-0.5">
+                                  {link.company && (
+                                    <p className="flex items-center gap-1.5 font-semibold text-slate-700">
+                                      <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                                      {link.company}
+                                    </p>
+                                  )}
+                                  {link.teacher && (
+                                    <p className="flex items-center gap-1.5 text-slate-500">
+                                      <GraduationCap className="w-3.5 h-3.5 text-slate-400" />
+                                      {link.teacher}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </td>
 
                           {/* Status */}
@@ -469,6 +564,101 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
         )}
 
         {/* Tab Permissions Matrix */}
+        {activeTab === 'empresas' && onSaveCompany && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <p className="text-sm text-slate-500">
+                A empresa é o perfil principal: agrupa vários professores e os usuários que respondem a eles.
+                Professor autônomo simplesmente não fica em nenhuma empresa.
+              </p>
+              <button
+                onClick={() => { setEditingCompany(null); setIsCompanyModalOpen(true); }}
+                className="flex items-center justify-center gap-2 bg-[#00687a] hover:bg-[#004e5c] text-white px-5 py-2.5 rounded-full font-bold text-sm shadow-sm transition-all shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Nova Empresa</span>
+              </button>
+            </div>
+
+            {companies.length === 0 && (
+              <div className="bg-white rounded-3xl border border-slate-200/80 p-10 text-center">
+                <Building2 className="w-8 h-8 text-slate-300 mx-auto mb-3" />
+                <p className="text-sm font-bold text-slate-700">Nenhuma empresa cadastrada</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Cadastre uma empresa para vincular vários professores e a equipe deles ao mesmo perfil principal.
+                </p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              {companies.map((company) => {
+                const companyTeachers = teachers.filter((t) => t.companyId === company.id);
+                const companyUsers = users.filter(
+                  (u) => u.companyId === company.id || companyTeachers.some((t) => t.id === u.teacherId)
+                );
+                return (
+                  <div key={company.id} className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 flex flex-col">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-sm text-[#091426] truncate">{company.name}</h3>
+                        <p className="text-xs text-slate-400 truncate">{company.document || 'Sem CNPJ informado'}</p>
+                      </div>
+                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 ${
+                        company.status === 'ativa'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {company.status === 'ativa' ? 'Ativa' : 'Inativa'}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 space-y-1.5 text-xs text-slate-600">
+                      {company.email && <p className="truncate">{company.email}</p>}
+                      {company.phone && <p>{company.phone}</p>}
+                      {company.city && <p className="text-slate-400">{company.city}</p>}
+                    </div>
+
+                    <div className="mt-4 flex gap-2 text-[11px]">
+                      <span className="px-2.5 py-1 rounded-full bg-cyan-50 text-[#00687a] border border-cyan-200 font-bold">
+                        {companyTeachers.length} professor(es)
+                      </span>
+                      <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 font-bold">
+                        {companyUsers.length} usuário(s)
+                      </span>
+                    </div>
+
+                    <div className="mt-5 pt-4 border-t border-slate-100 flex gap-2">
+                      <button
+                        onClick={() => { setEditingCompany(company); setIsCompanyModalOpen(true); }}
+                        className="flex-1 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold"
+                      >
+                        Editar
+                      </button>
+                      {onDeleteCompany && (
+                        <button
+                          onClick={() => {
+                            if (companyTeachers.length > 0) {
+                              window.alert(
+                                'Esta empresa ainda tem professores vinculados. Troque a empresa deles antes de excluir.'
+                              );
+                              return;
+                            }
+                            if (window.confirm(`Excluir a empresa "${company.name}"?`)) onDeleteCompany(company.id);
+                          }}
+                          aria-label={`Excluir ${company.name}`}
+                          className="px-3 py-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'permissoes' && (
           <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 md:p-8 space-y-6">
             <div>
@@ -561,8 +751,9 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
 
               <form onSubmit={handleCreateUser} className="space-y-4 mt-4 text-xs">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Nome Completo *</label>
+                  <label htmlFor="add-name" className="block font-bold text-slate-700 mb-1">Nome Completo *</label>
                   <input
+                    id="add-name"
                     type="text"
                     required
                     value={name}
@@ -574,8 +765,9 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">E-mail de Acesso *</label>
+                    <label htmlFor="add-email" className="block font-bold text-slate-700 mb-1">E-mail de Acesso *</label>
                     <input
+                      id="add-email"
                       type="email"
                       required
                       value={email}
@@ -585,8 +777,9 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">WhatsApp / Telefone</label>
+                    <label htmlFor="add-phone" className="block font-bold text-slate-700 mb-1">WhatsApp / Telefone</label>
                     <input
+                      id="add-phone"
                       type="text"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
@@ -597,8 +790,9 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Nível de Acesso (Cargo) *</label>
+                  <label htmlFor="add-role" className="block font-bold text-slate-700 mb-1">Nível de Acesso (Cargo) *</label>
                   <select
+                    id="add-role"
                     value={role}
                     onChange={(e) => setRole(e.target.value as UserRole)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#00687a] focus:outline-none font-medium bg-white"
@@ -610,24 +804,60 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                   </select>
                 </div>
 
-                {(role === 'assistente' || role === 'aluno') && (
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1">Vincular ao Professor Responsável</label>
-                    <select
-                      value={teacherId}
-                      onChange={(e) => setTeacherId(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#00687a] focus:outline-none font-medium bg-white"
-                    >
-                      {teachers.map((t) => (
-                        <option key={t.id} value={t.id}>{t.name} ({t.role})</option>
-                      ))}
-                    </select>
+                {role !== 'admin' && (
+                  <div className="space-y-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                    <p className="font-bold text-slate-700 flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-[#00687a]" />
+                      Vínculo com o perfil principal
+                    </p>
+
+                    <div>
+                      <label htmlFor="add-company" className="block font-bold text-slate-700 mb-1">
+                        Empresa / Escola
+                      </label>
+                      <select
+                        id="add-company"
+                        value={companyId}
+                        onChange={(e) => setCompanyId(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#00687a] focus:outline-none font-medium bg-white"
+                      >
+                        <option value="">Sem empresa (professor autônomo)</option>
+                        {companies.map((c) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label htmlFor="add-teacher" className="block font-bold text-slate-700 mb-1">
+                        {role === 'professor' ? 'Perfil de professor' : 'Professor responsável'}
+                      </label>
+                      <select
+                        id="add-teacher"
+                        value={teacherId}
+                        onChange={(e) => setTeacherId(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#00687a] focus:outline-none font-medium bg-white"
+                      >
+                        {role === 'professor' && (
+                          <option value={NEW_TEACHER_OPTION}>Criar um perfil novo para esta pessoa</option>
+                        )}
+                        {teachers.map((t) => (
+                          <option key={t.id} value={t.id}>{t.name} ({t.role})</option>
+                        ))}
+                      </select>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        {role === 'professor'
+                          ? 'Vincule a um perfil de professor que já existe (agenda, serviços e site dele) ou crie um novo.'
+                          : 'Define de qual professor esta pessoa enxerga agenda, alunos e cobranças.'}
+                      </p>
+                    </div>
                   </div>
                 )}
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Senha Inicial Provisória</label>
+                  <label htmlFor="add-password" className="block font-bold text-slate-700 mb-1">Senha Inicial Provisória</label>
                   <input
+                    id="add-password"
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -672,8 +902,9 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
 
               <form onSubmit={handleSaveEdit} className="space-y-4 mt-4 text-xs">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Nome Completo</label>
+                  <label htmlFor="edit-name" className="block font-bold text-slate-700 mb-1">Nome Completo</label>
                   <input
+                    id="edit-name"
                     type="text"
                     required
                     value={editingUser.name}
@@ -684,8 +915,9 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">E-mail</label>
+                    <label htmlFor="edit-email" className="block font-bold text-slate-700 mb-1">E-mail</label>
                     <input
+                      id="edit-email"
                       type="email"
                       required
                       value={editingUser.email}
@@ -694,8 +926,9 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">WhatsApp / Telefone</label>
+                    <label htmlFor="edit-phone" className="block font-bold text-slate-700 mb-1">WhatsApp / Telefone</label>
                     <input
+                      id="edit-phone"
                       type="text"
                       value={editingUser.phone || ''}
                       onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
@@ -706,8 +939,9 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Cargo / Nível de Acesso</label>
+                    <label htmlFor="edit-role" className="block font-bold text-slate-700 mb-1">Cargo / Nível de Acesso</label>
                     <select
+                      id="edit-role"
                       value={editingUser.role}
                       onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as UserRole })}
                       className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#00687a] focus:outline-none bg-white font-medium"
@@ -719,8 +953,9 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                     </select>
                   </div>
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Status da Conta</label>
+                    <label htmlFor="edit-status" className="block font-bold text-slate-700 mb-1">Status da Conta</label>
                     <select
+                      id="edit-status"
                       value={editingUser.status}
                       onChange={(e) => setEditingUser({ ...editingUser, status: e.target.value as 'ativo' | 'inativo' })}
                       className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#00687a] focus:outline-none bg-white font-medium"
@@ -730,6 +965,59 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                     </select>
                   </div>
                 </div>
+
+                {editingUser.role !== 'admin' && (
+                  <div className="space-y-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                    <p className="font-bold text-slate-700 flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-[#00687a]" />
+                      Vínculo com o perfil principal
+                    </p>
+
+                    <div>
+                      <label htmlFor="edit-company" className="block font-bold text-slate-700 mb-1">
+                        Empresa / Escola
+                      </label>
+                      <select
+                        id="edit-company"
+                        value={editingUser.companyId || ''}
+                        onChange={(e) => setEditingUser({ ...editingUser, companyId: e.target.value || undefined })}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#00687a] focus:outline-none font-medium bg-white"
+                      >
+                        <option value="">Sem empresa (professor autônomo)</option>
+                        {companies.map((c) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label htmlFor="edit-teacher" className="block font-bold text-slate-700 mb-1">
+                        {editingUser.role === 'professor' ? 'Perfil de professor' : 'Professor responsável'}
+                      </label>
+                      <select
+                        id="edit-teacher"
+                        value={editingUser.teacherId || ''}
+                        onChange={(e) => setEditingUser({ ...editingUser, teacherId: e.target.value || undefined })}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#00687a] focus:outline-none font-medium bg-white"
+                      >
+                        <option value="">Nenhum (sem professor responsável)</option>
+                        {teachers.map((t) => (
+                          <option key={t.id} value={t.id}>{t.name} ({t.role})</option>
+                        ))}
+                        {editingUser.teacherId && !teachers.some((t) => t.id === editingUser.teacherId) && (
+                          <option value={editingUser.teacherId}>
+                            {editingUser.teacherId} (perfil não encontrado)
+                          </option>
+                        )}
+                      </select>
+                      {editingUser.teacherId && !teachers.some((t) => t.id === editingUser.teacherId) && (
+                        <p className="text-[11px] text-rose-600 mt-1">
+                          Este usuário aponta para um perfil de professor que não existe. Escolha um da lista para corrigir.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
                   <button
@@ -744,6 +1032,137 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
                     className="px-5 py-2 rounded-xl bg-[#00687a] hover:bg-[#004e5c] text-white font-bold transition-colors"
                   >
                     Salvar Alterações
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL EMPRESA */}
+        {isCompanyModalOpen && onSaveCompany && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4" onClick={() => setIsCompanyModalOpen(false)}>
+            <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-elevated border border-slate-200" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-center pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-[#00687a]" />
+                  <h3 className="font-bold text-base text-[#091426]">
+                    {editingCompany ? `Editar: ${editingCompany.name}` : 'Nova Empresa / Escola'}
+                  </h3>
+                </div>
+                <button onClick={() => setIsCompanyModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-700 rounded-full">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form
+                className="space-y-4 mt-4 text-xs"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const form = e.currentTarget;
+                  const value = (field: string) =>
+                    (form.elements.namedItem(field) as HTMLInputElement | HTMLSelectElement | null)?.value.trim() || '';
+                  const name = value('company-name');
+                  if (!name) return;
+                  onSaveCompany({
+                    id: editingCompany?.id || `comp-${Date.now()}`,
+                    name,
+                    document: value('company-document') || undefined,
+                    email: value('company-email') || undefined,
+                    phone: value('company-phone') || undefined,
+                    city: value('company-city') || undefined,
+                    status: value('company-status') === 'inativa' ? 'inativa' : 'ativa',
+                    createdAt: editingCompany?.createdAt || new Date().toISOString().slice(0, 10),
+                  });
+                  setIsCompanyModalOpen(false);
+                  setEditingCompany(null);
+                }}
+              >
+                <div>
+                  <label htmlFor="company-name" className="block font-bold text-slate-700 mb-1">Nome da empresa *</label>
+                  <input
+                    id="company-name"
+                    name="company-name"
+                    required
+                    defaultValue={editingCompany?.name || ''}
+                    placeholder="Ex: Academia Aqua Vida"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#00687a] focus:outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="company-document" className="block font-bold text-slate-700 mb-1">CNPJ</label>
+                    <input
+                      id="company-document"
+                      name="company-document"
+                      defaultValue={editingCompany?.document || ''}
+                      placeholder="00.000.000/0001-00"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#00687a] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="company-city" className="block font-bold text-slate-700 mb-1">Cidade</label>
+                    <input
+                      id="company-city"
+                      name="company-city"
+                      defaultValue={editingCompany?.city || ''}
+                      placeholder="São Paulo - SP"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#00687a] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="company-email" className="block font-bold text-slate-700 mb-1">E-mail</label>
+                    <input
+                      id="company-email"
+                      name="company-email"
+                      type="email"
+                      defaultValue={editingCompany?.email || ''}
+                      placeholder="contato@empresa.com.br"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#00687a] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="company-phone" className="block font-bold text-slate-700 mb-1">Telefone</label>
+                    <input
+                      id="company-phone"
+                      name="company-phone"
+                      defaultValue={editingCompany?.phone || ''}
+                      placeholder="(11) 3000-0000"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#00687a] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="company-status" className="block font-bold text-slate-700 mb-1">Status</label>
+                  <select
+                    id="company-status"
+                    name="company-status"
+                    defaultValue={editingCompany?.status || 'ativa'}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#00687a] focus:outline-none bg-white font-medium"
+                  >
+                    <option value="ativa">Ativa</option>
+                    <option value="inativa">Inativa</option>
+                  </select>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsCompanyModalOpen(false)}
+                    className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-[#00687a] hover:bg-[#004e5c] text-white font-bold transition-colors"
+                  >
+                    {editingCompany ? 'Salvar Empresa' : 'Cadastrar Empresa'}
                   </button>
                 </div>
               </form>
