@@ -468,13 +468,18 @@ function AppInner() {
    * Endereço sem vitrine não é beco sem saída.
    *
    * Quando o endereço não corresponde a professor nem academia, não há o que
-   * mostrar de público ali -- mas o sistema continua sendo o mesmo. Manda-se
-   * quem chegou para dentro: login para quem não entrou, painel para quem já
-   * está. Uma página de erro só devolveria a pessoa para lugar nenhum.
+   * mostrar de público ali -- mas o sistema continua sendo o mesmo.
+   *
+   * Visitante vai para a página da plataforma, não para o login: quem chegou
+   * por um endereço qualquer pode nem ter conta, e um formulário seco não diz
+   * onde ele caiu nem o que isso aqui é. A página tem o botão de entrar, então
+   * quem já é cliente perde um clique e ganha um destino que faz sentido.
+   *
+   * Quem já está logado vai direto para o próprio painel.
    */
   useEffect(() => {
     if (statusEndereco !== 'nao-encontrado' || currentView !== 'public-landing') return;
-    setCurrentView(currentUser ? getDefaultView(currentUser.role) : 'auth');
+    setCurrentView(currentUser ? getDefaultView(currentUser.role) : 'plataforma');
   }, [statusEndereco, currentView, currentUser]);
 
   /**
