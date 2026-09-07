@@ -1302,10 +1302,19 @@ function AppInner() {
     );
   }
 
-  // O endereço não existir não pode trancar a porta: a tela de login vem
-  // antes, senão o botão "Entrar na minha conta" muda a URL e devolve a
-  // mesma página de erro -- e parece que não faz nada.
-  if (statusEndereco === 'nao-encontrado' && !currentUser && currentView !== 'auth') {
+  /**
+   * Endereço que não é de ninguém: no lugar da VITRINE, e só dela.
+   *
+   * O endereço não existir diz que não há vitrine para mostrar ali -- não que
+   * o app inteiro esteja fechado. Quando este portão valia para qualquer
+   * tela, ele engolia o login e o painel: a URL mudava para #/entrar ou
+   * #/painel e o render devolvia a mesma página de erro, como se os botões
+   * não fizessem nada.
+   *
+   * Fora da vitrine, o fluxo normal decide -- e ele já manda quem não está
+   * logado para a tela de entrar.
+   */
+  if (currentView === 'public-landing' && statusEndereco === 'nao-encontrado' && !currentUser) {
     return (
       <AddressNotFoundView
         endereco={tenantRef.domain || window.location.hostname}
