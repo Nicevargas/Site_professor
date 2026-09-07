@@ -1,4 +1,6 @@
 export type ViewMode = 
+  /** Página de vendas da plataforma: o que aparece quando ninguém foi pedido pelo endereço */
+  | 'plataforma'
   | 'dashboard'
   | 'agenda'
   | 'servicos'

@@ -83,6 +83,7 @@ import { SyncErrorToast } from './components/SyncErrorToast';
 import { MyAddressView } from './components/MyAddressView';
 import { resolveTenant, slugify, buildPublicUrl, slugFromRoute, PLATFORM_HOST } from './utils/tenant';
 import { PERFIL_EM_BRANCO, perfilVazio } from './utils/perfilEmBranco';
+import { PlatformLandingView } from './components/PlatformLandingView';
 import { getPlan, planAllows } from './utils/plans';
 
 
@@ -119,7 +120,10 @@ function AppInner() {
     } catch {
       // ignore
     }
-    return 'public-landing';
+    // Sem endereço de professor ou academia, quem chega é visitante da
+    // plataforma, não de uma vitrine. Antes caía em 'public-landing' e via o
+    // site de um professor qualquer do banco.
+    return resolveTenant(window.location).mode === 'none' ? 'plataforma' : 'public-landing';
   });
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [siteAdminTab, setSiteAdminTab] = useState<SiteAdminTab>('branding');
@@ -479,6 +483,17 @@ function AppInner() {
       if (el) el.setAttribute(attr, value);
     };
 
+    // A página da plataforma não é a vitrine de ninguém: sem isto, ela herdava
+    // o título do último professor carregado, ou o do HTML.
+    if (currentView === 'plataforma') {
+      document.title = 'Aquagenda | Agenda, alunos e site para quem ensina';
+      return;
+    }
+
+    // Enquanto o professor não chegou do banco não há nome para pôr: escrever
+    // um agora seria escrever o de outra pessoa.
+    if (perfilVazio(currentTeacher) && !addressedCompany) return;
+
     // Na página da academia, quem dá nome ao link é a academia -- senão o
     // compartilhamento mostraria o nome de um professor qualquer dela.
     if (addressedCompany && !pickedTeacherFromCompany) {
@@ -525,7 +540,7 @@ function AppInner() {
         platformHost: PLATFORM_HOST,
       }
     ));
-  }, [currentTeacher, addressedCompany, pickedTeacherFromCompany]);
+  }, [currentTeacher, addressedCompany, pickedTeacherFromCompany, currentView]);
 
   // URL: mantém #/rota sincronizada com a tela (botão voltar e links compartilháveis)
   useEffect(() => {
@@ -1311,6 +1326,16 @@ function AppInner() {
       <div className="min-h-screen bg-[#f7f9fb] flex items-center justify-center" role="status" aria-label="Carregando">
         <div className="w-8 h-8 rounded-full border-2 border-slate-200 border-t-[#00687a] animate-spin" />
       </div>
+    );
+  }
+
+  // A página que vende o Aquagenda: fora de qualquer vitrine, e antes do login
+  if (currentView === 'plataforma' && !currentUser) {
+    return (
+      <PlatformLandingView
+        onEnterApp={() => setCurrentView('auth')}
+        onCreateAccount={() => setCurrentView('auth')}
+      />
     );
   }
 

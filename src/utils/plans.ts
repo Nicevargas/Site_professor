@@ -159,3 +159,12 @@ export function planForUsers(users: number): PlanDefinition | null {
   const tier = PLAN_ORDER.find((t) => PLANS[t].maxUsers >= users);
   return tier ? PLANS[tier] : null;
 }
+
+/**
+ * Quanto dura o teste grátis, em dias.
+ *
+ * Fica aqui para a página de vendas e o app dizerem o mesmo número. Hoje é
+ * só a oferta: nada no sistema conta os dias nem bloqueia o acesso ao fim --
+ * enquanto não há cobrança, não há o que bloquear.
+ */
+export const DIAS_DE_TESTE = 30;

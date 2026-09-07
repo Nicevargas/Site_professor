@@ -14,6 +14,7 @@ import { SiteAdminTab, ViewMode } from '../types';
  * sessão tinha expirado.
  */
 const HASH_BY_VIEW: Record<ViewMode, string> = {
+  plataforma: '/conheca',
   'public-landing': '/site',
   'public-booking': '/agendar',
   auth: '/entrar',
@@ -33,6 +34,7 @@ const HASH_BY_VIEW: Record<ViewMode, string> = {
 };
 
 export const VIEW_TITLES: Record<ViewMode, string> = {
+  plataforma: 'Conheça o Aquagenda',
   'public-landing': 'Site público',
   'public-booking': 'Agendar aula',
   auth: 'Entrar',

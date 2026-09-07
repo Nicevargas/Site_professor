@@ -23,11 +23,14 @@ function openAt(hash: string) {
 }
 
 describe('App: rotas e guarda por papel', () => {
-  it('visitante sem sessão cai no site público', async () => {
+  it('visitante sem endereço de professor vê a página da plataforma, não a vitrine de alguém', async () => {
     openAt('');
-    expect(await screen.findByRole('heading', { level: 1, name: /roberto almeida/i })).toBeInTheDocument();
-    // A vitrine tem rota própria: '/' significa "sem rota escolhida"
-    expect(window.location.hash).toBe('#/site');
+    // Antes, a raiz mostrava o professor de demonstração: quem chegava achava
+    // que tinha caído no site de uma pessoa, e não na porta do produto.
+    expect(await screen.findByRole('heading', { level: 1, name: /sua agenda, seus alunos/i })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: /roberto almeida/i })).not.toBeInTheDocument();
+    // A página tem rota própria: '/' continua significando "sem rota escolhida"
+    expect(window.location.hash).toBe('#/conheca');
   });
 
   it('visitante que abre uma tela interna vê a tela de login', async () => {
