@@ -17,6 +17,7 @@ import {
   WaitlistEntry
 } from '../types';
 import { relativeDate } from '../utils/dates';
+import { PLANS, PLAN_ORDER, PlanTier } from '../utils/plans';
 
 export const INITIAL_COMPANIES: Company[] = [
   {
@@ -412,47 +413,53 @@ export const INITIAL_REMEMBERS: Reminder[] = [
   }
 ];
 
-export const PRICING_PLANS: PricingPlan[] = [
-  {
-    id: 'plan-start',
-    name: 'Start',
-    priceMonth: 79,
-    description: 'Essencial para quem está começando.',
-    features: [
-      'Website Básico',
-      'Agenda Integrada',
-      'Integração WhatsApp'
-    ],
-    ctaText: 'Começar Start'
+/**
+ * Tabela de preços da plataforma, derivada de utils/plans.ts.
+ *
+ * Os valores viviam escritos aqui À MÃO, iguais aos de PLANS -- dois lugares
+ * com o mesmo número, garantindo que uma atualização esquecesse o outro.
+ * Agora o preço e a faixa de usuários vêm da fonte única; só o texto de
+ * venda mora aqui.
+ *
+ * Não confundir com a tabela pricing_plans do Supabase, que guarda os planos
+ * que o PROFESSOR vende aos alunos dele.
+ */
+const SALES_COPY: Record<PlanTier, Pick<PricingPlan, 'description' | 'featuresHeader' | 'features' | 'ctaText'> & { isPopular?: boolean }> = {
+  start: {
+    description: 'Para quem atende sozinho e quer sair do caderno.',
+    features: ['Agenda e turmas', 'Portal do aluno', 'Lembretes por WhatsApp'],
+    ctaText: 'Começar Start',
   },
-  {
-    id: 'plan-pro',
-    name: 'Pro',
-    priceMonth: 129,
-    description: 'Para professores que querem se destacar.',
+  pro: {
+    description: 'Para o estúdio que passou do ponto de controlar na planilha.',
     isPopular: true,
     featuresHeader: 'TUDO DO START, MAIS:',
-    features: [
-      'Site Personalizado',
-      'Otimização SEO',
-      'Domínio Customizado'
-    ],
-    ctaText: 'Assinar Pro'
+    features: ['Endereço com o seu nome', 'Cobranças e Pix', 'Vários professores'],
+    ctaText: 'Assinar Pro',
   },
-  {
-    id: 'plan-premium',
-    name: 'Premium',
-    priceMonth: 199,
-    description: 'A solução completa para sua carreira.',
+  premium: {
+    description: 'Para a academia que precisa de operação e marca próprias.',
     featuresHeader: 'TUDO DO PRO, MAIS:',
-    features: [
-      'Pagamentos Online',
-      'Área do Aluno',
-      'Relatórios Financeiros Avançados'
-    ],
-    ctaText: 'Ser Premium'
-  }
-];
+    features: ['Domínio próprio', 'Painel da academia', 'Gestor com visão de todos'],
+    ctaText: 'Ser Premium',
+  },
+};
+
+export const PRICING_PLANS: PricingPlan[] = PLAN_ORDER.map((tier) => {
+  const plano = PLANS[tier];
+  const copy = SALES_COPY[tier];
+  return {
+    id: `plan-${tier}`,
+    name: plano.name,
+    priceMonth: plano.priceMonth,
+    description: copy.description,
+    isPopular: copy.isPopular,
+    featuresHeader: copy.featuresHeader,
+    // A faixa de usuários é o que separa os planos: abre a lista
+    features: [plano.usersLabel, ...copy.features],
+    ctaText: copy.ctaText,
+  };
+});
 
 export const FAQ_ITEMS = [
   {

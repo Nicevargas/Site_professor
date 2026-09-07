@@ -12,6 +12,12 @@ export interface PlanDefinition {
   tier: PlanTier;
   name: string;
   priceMonth: number;
+  /** Quantos usuários cabem na conta: professores, secretaria e alunos somados */
+  maxUsers: number;
+  /** Faixa escrita como aparece na tabela de preços */
+  usersLabel: string;
+  /** Para quem o plano é */
+  audience: string;
   /** Modo de endereço mais alto que o plano libera */
   addressing: AddressingMode;
   addressingLabel: string;
@@ -22,7 +28,10 @@ export const PLANS: Record<PlanTier, PlanDefinition> = {
   start: {
     tier: 'start',
     name: 'Start',
-    priceMonth: 79,
+    priceMonth: 99,
+    maxUsers: 10,
+    usersLabel: '1 a 10 usuários',
+    audience: 'Estúdios de Personal e professores autônomos',
     addressing: 'path',
     addressingLabel: 'Endereço dentro do Aquagenda',
     addressingHint: 'Sua vitrine fica em um endereço do Aquagenda, pronto para usar.',
@@ -30,7 +39,10 @@ export const PLANS: Record<PlanTier, PlanDefinition> = {
   pro: {
     tier: 'pro',
     name: 'Pro',
-    priceMonth: 129,
+    priceMonth: 180,
+    maxUsers: 100,
+    usersLabel: '11 a 100 usuários',
+    audience: 'Pequenos estúdios e assessorias em crescimento',
     addressing: 'subdomain',
     addressingLabel: 'Endereço com o seu nome',
     addressingHint: 'Seu nome vem antes do Aquagenda, sem precisar comprar domínio.',
@@ -38,7 +50,10 @@ export const PLANS: Record<PlanTier, PlanDefinition> = {
   premium: {
     tier: 'premium',
     name: 'Premium',
-    priceMonth: 199,
+    priceMonth: 350,
+    maxUsers: 500,
+    usersLabel: '101 a 500 usuários',
+    audience: 'Academias e estúdios de médio porte',
     addressing: 'domain',
     addressingLabel: 'Domínio próprio',
     addressingHint: 'Use o domínio que você comprou. O Aquagenda não aparece no endereço.',
@@ -102,4 +117,45 @@ export function nextPlan(tier: string | null | undefined): PlanDefinition | null
   const index = PLAN_ORDER.indexOf(getPlan(tier).tier);
   const next = PLAN_ORDER[index + 1];
   return next ? PLANS[next] : null;
+}
+
+/**
+ * Quantos usuários o plano permite. Conta todo mundo com acesso: professores,
+ * secretaria e alunos -- é o que a faixa "1 a 10 usuários" significa.
+ */
+export function userLimitOf(tier: string | null | undefined): number {
+  return getPlan(tier).maxUsers;
+}
+
+export interface QuotaStatus {
+  used: number;
+  limit: number;
+  remaining: number;
+  /** Não cabe mais ninguém: o cadastro é recusado */
+  isFull: boolean;
+  /** Últimos 10% ou menos das vagas, para avisar antes de travar */
+  isNearLimit: boolean;
+  /** Primeiro plano que comporta o tamanho atual, quando o de hoje não comporta */
+  suggested: PlanDefinition | null;
+}
+
+/** Situação da conta diante do limite do plano. */
+export function quotaStatus(tier: string | null | undefined, used: number): QuotaStatus {
+  const limit = userLimitOf(tier);
+  const remaining = Math.max(0, limit - used);
+  const isFull = used >= limit;
+  return {
+    used,
+    limit,
+    remaining,
+    isFull,
+    isNearLimit: !isFull && remaining <= Math.max(1, Math.ceil(limit * 0.1)),
+    suggested: isFull ? planForUsers(used + 1) : null,
+  };
+}
+
+/** Menor plano capaz de comportar esta quantidade de usuários. */
+export function planForUsers(users: number): PlanDefinition | null {
+  const tier = PLAN_ORDER.find((t) => PLANS[t].maxUsers >= users);
+  return tier ? PLANS[tier] : null;
 }

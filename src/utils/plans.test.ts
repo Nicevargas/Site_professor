@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   getPlan, planAllows, planRequiredFor, nextPlan, isPlanTier, PLANS, effectivePlan,
+  userLimitOf, quotaStatus, planForUsers,
 } from './plans';
+import { PRICING_PLANS } from '../data/mockData';
 
 describe('planos e o que cada um libera', () => {
   it('professor sem plano cai no Start, não no mais alto', () => {
@@ -43,10 +45,20 @@ describe('planos e o que cada um libera', () => {
     expect(nextPlan('premium')).toBeNull();
   });
 
-  it('os preços batem com a tabela mostrada na tela de planos', () => {
-    expect(PLANS.start.priceMonth).toBe(79);
-    expect(PLANS.pro.priceMonth).toBe(129);
-    expect(PLANS.premium.priceMonth).toBe(199);
+  it('a tela de planos mostra exatamente os preços da fonte única', () => {
+    // PRICING_PLANS repetia os valores à mão: dois lugares com o mesmo
+    // número, e uma atualização esquecia o outro. Agora é derivado.
+    const daTela = new Map(PRICING_PLANS.map((p) => [p.name, p.priceMonth]));
+    expect(daTela.get('Start')).toBe(PLANS.start.priceMonth);
+    expect(daTela.get('Pro')).toBe(PLANS.pro.priceMonth);
+    expect(daTela.get('Premium')).toBe(PLANS.premium.priceMonth);
+  });
+
+  it('a tela de planos abre pela faixa de usuários, que é o que separa os planos', () => {
+    const start = PRICING_PLANS.find((p) => p.name === 'Start');
+    expect(start?.features[0]).toBe('1 a 10 usuários');
+    expect(PRICING_PLANS.find((p) => p.name === 'Pro')?.features[0]).toBe('11 a 100 usuários');
+    expect(PRICING_PLANS.find((p) => p.name === 'Premium')?.features[0]).toBe('101 a 500 usuários');
   });
 });
 
@@ -91,5 +103,50 @@ describe('quem assina: a empresa vence o professor', () => {
 
     const autonomo = effectivePlan({ plan: 'start' }, null);
     expect(planAllows(autonomo.plan.tier, 'domain')).toBe(false);
+  });
+});
+
+describe('limite de usuários por plano', () => {
+  it('as faixas da tabela de preços', () => {
+    expect(PLANS.start).toMatchObject({ priceMonth: 99, maxUsers: 10 });
+    expect(PLANS.pro).toMatchObject({ priceMonth: 180, maxUsers: 100 });
+    expect(PLANS.premium).toMatchObject({ priceMonth: 350, maxUsers: 500 });
+  });
+
+  it('plano desconhecido cai no menor limite, nunca no maior', () => {
+    expect(userLimitOf(undefined)).toBe(10);
+    expect(userLimitOf('enterprise')).toBe(10);
+  });
+
+  it('a conta enche exatamente no limite, não depois', () => {
+    expect(quotaStatus('start', 9).isFull).toBe(false);
+    expect(quotaStatus('start', 10).isFull).toBe(true);
+    expect(quotaStatus('start', 10).remaining).toBe(0);
+  });
+
+  it('avisa antes de travar, nos últimos 10% das vagas', () => {
+    expect(quotaStatus('start', 8).isNearLimit).toBe(false);
+    expect(quotaStatus('start', 9).isNearLimit).toBe(true);
+    // Cheio não é "quase cheio": são estados diferentes na tela
+    expect(quotaStatus('start', 10).isNearLimit).toBe(false);
+  });
+
+  it('sugere o menor plano que comporta, e não o mais caro', () => {
+    expect(quotaStatus('start', 10).suggested?.tier).toBe('pro');
+    expect(quotaStatus('pro', 100).suggested?.tier).toBe('premium');
+    expect(planForUsers(11)?.tier).toBe('pro');
+    expect(planForUsers(101)?.tier).toBe('premium');
+  });
+
+  it('acima de 500 não há plano: é conversa de suporte', () => {
+    expect(planForUsers(501)).toBeNull();
+    expect(quotaStatus('premium', 500).suggested).toBeNull();
+  });
+
+  it('conta com folga não avisa nada', () => {
+    const q = quotaStatus('premium', 12);
+    expect(q.isFull).toBe(false);
+    expect(q.isNearLimit).toBe(false);
+    expect(q.remaining).toBe(488);
   });
 });

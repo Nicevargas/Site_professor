@@ -6,6 +6,7 @@ import {
   AuthUser,
   Company
 } from '../types';
+import { QuotaStatus } from '../utils/plans';
 import { 
   Users, 
   UserPlus, 
@@ -46,6 +47,9 @@ interface UsersManagementViewProps {
   companies?: Company[];
   /** Papel de quem está usando a tela; o gestor não cria admin nem outro gestor */
   currentRole?: UserRole;
+  /** Ocupação da conta diante do limite do plano */
+  quota?: QuotaStatus;
+  onOpenPlans?: () => void;
   onSaveCompany?: (company: Company) => void;
   onDeleteCompany?: (id: string) => void;
 }
@@ -63,6 +67,8 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
   teachers,
   companies = [],
   currentRole = 'admin',
+  quota,
+  onOpenPlans,
   onSaveCompany,
   onDeleteCompany,
 }) => {
@@ -188,6 +194,9 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim()) return;
+    // O banco recusaria de qualquer jeito (gatilho enforce_user_quota);
+    // parar aqui evita a ida perdida e explica o motivo.
+    if (quota?.isFull) return;
 
     onAddUser({
       name: name.trim(),
@@ -266,13 +275,58 @@ export const UsersManagementView: React.FC<UsersManagementViewProps> = ({
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center justify-center gap-2 bg-[#00687a] hover:bg-[#004e5c] text-white px-5 py-2.5 rounded-full font-bold text-sm shadow-sm transition-all"
+              disabled={quota?.isFull}
+              title={
+                quota?.isFull
+                  ? `O plano permite ${quota.limit} usuários e a conta já tem ${quota.used}.`
+                  : undefined
+              }
+              className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm shadow-sm transition-all ${
+                quota?.isFull
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  : 'bg-[#00687a] hover:bg-[#004e5c] text-white'
+              }`}
             >
               <UserPlus className="w-4 h-4" />
               <span>Novo Usuário</span>
             </button>
           </div>
         </div>
+
+        {quota && (quota.isFull || quota.isNearLimit) && (
+          <div
+            role="status"
+            className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center gap-3 ${
+              quota.isFull
+                ? 'bg-rose-50 border-rose-200'
+                : 'bg-amber-50 border-amber-200'
+            }`}
+          >
+            <div className="min-w-0 flex-1">
+              <p className={`text-sm font-bold ${quota.isFull ? 'text-rose-800' : 'text-amber-900'}`}>
+                {quota.isFull
+                  ? `Seu plano chegou ao limite de ${quota.limit} usuários`
+                  : `Faltam ${quota.remaining} usuário(s) para o limite do seu plano`}
+              </p>
+              <p className={`text-xs mt-0.5 ${quota.isFull ? 'text-rose-700' : 'text-amber-800'}`}>
+                {quota.used} de {quota.limit} usuários em uso.{' '}
+                {quota.isFull
+                  ? quota.suggested
+                    ? `Para cadastrar mais, mude para o ${quota.suggested.name} (${quota.suggested.usersLabel}, R$ ${quota.suggested.priceMonth}/mês).`
+                    : 'Fale com o suporte para uma conta acima de 500 usuários.'
+                  : 'Professores, secretaria e alunos contam para o limite.'}
+              </p>
+            </div>
+            {onOpenPlans && quota.suggested && (
+              <button
+                onClick={onOpenPlans}
+                className="px-4 py-2.5 rounded-xl bg-[#00687a] hover:bg-[#004e5c] text-white text-xs font-bold shrink-0"
+              >
+                Ver planos
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Top Summary Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

@@ -75,6 +75,7 @@ import { supabaseService } from './services/supabaseService';
 import { isSupabaseConfigured, supabase } from './lib/supabase';
 import { dispatchAppointmentWebhook, dispatchFormWebhook } from './utils/webhookDispatcher';
 import { canAccessView, getDefaultView, canSwitchProfiles, canViewFinances, canManageCompany, sanitizeSelfDeclaredRole } from './utils/permissions';
+import { quotaStatus } from './utils/plans';
 import { StudentProfileView } from './components/StudentProfileView';
 import { hashFromView, viewFromHash } from './utils/routes';
 import { formatMonthYearPtBR, toLocalDateKey } from './utils/dates';
@@ -249,6 +250,33 @@ function AppInner() {
     if (!isManager) return teachers;
     return teachers.filter((t) => t.companyId && t.companyId === currentCompanyId);
   }, [isManager, teachers, currentCompanyId]);
+
+  /**
+   * Ocupação da conta diante do limite do plano.
+   *
+   * "Usuário" é todo mundo com acesso -- professores, secretaria e alunos --
+   * porque é isso que a faixa "1 a 10 usuários" significa para um personal
+   * com nove alunos. Admin da plataforma não ocupa vaga de cliente.
+   *
+   * Espelha public.account_user_count(); quem realmente barra é o gatilho
+   * enforce_user_quota no banco. Aqui é só para avisar antes da ida perdida.
+   */
+  const accountQuota = useMemo(() => {
+    const idsDaEmpresa = new Set(
+      currentCompanyId
+        ? teachers.filter((t) => t.companyId === currentCompanyId).map((t) => t.id)
+        : [currentTeacher.id]
+    );
+    const usados = systemUsers.filter(
+      (u) =>
+        u.role !== 'admin' &&
+        ((currentCompanyId && u.companyId === currentCompanyId) ||
+          (u.teacherId && idsDaEmpresa.has(u.teacherId)))
+    ).length;
+
+    const tier = currentCompany?.plan || currentTeacher.plan;
+    return quotaStatus(tier, usados);
+  }, [systemUsers, teachers, currentCompanyId, currentCompany?.plan, currentTeacher.id, currentTeacher.plan]);
 
   /**
    * Usuários que o gestor administra: os da empresa dele, direto pelo
@@ -1480,6 +1508,8 @@ function AppInner() {
               teachers={teachersInScope}
               companies={isManager ? (currentCompany ? [currentCompany] : []) : companies}
               currentRole={currentUser.role}
+              quota={accountQuota}
+              onOpenPlans={() => setCurrentView('planos')}
               onSaveCompany={canManageCompany(currentUser.role) ? handleSaveCompany : undefined}
               onDeleteCompany={currentUser.role === 'admin' ? handleDeleteCompany : undefined}
               currentUser={currentUser}
