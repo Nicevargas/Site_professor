@@ -35,3 +35,10 @@ BEGIN
             );
     END IF;
 END $$;
+
+-- Nomes trocados pelo professor: { "servicos": "Modalidades" }.
+-- Só os alterados; o resto usa o padrão do código.
+ALTER TABLE public.teachers ADD COLUMN IF NOT EXISTS site_section_labels JSONB;
+
+COMMENT ON COLUMN public.teachers.site_section_labels IS
+    'Rótulos personalizados das seções da vitrine. Chave = id da seção. Ausente = nome padrão.';

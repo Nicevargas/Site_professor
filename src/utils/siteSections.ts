@@ -70,16 +70,58 @@ export function sectionHasContent(id: SiteSectionId, content: SiteContent): bool
 }
 
 /**
- * Seções escolhidas pelo professor, tolerando quem nunca escolheu.
- * Sem escolha gravada, valem todas -- ninguém perde seção por causa de um
- * campo novo. 'inicio' entra sempre.
+ * Seções escolhidas pelo professor, na ordem em que ele quer que apareçam.
+ *
+ * A ordem gravada É a ordem da página: quem move Depoimentos para cima quer
+ * ver os depoimentos antes. Sem escolha gravada valem todas, na ordem padrão
+ * -- ninguém perde seção nem ordem por causa de um campo novo.
+ *
+ * 'inicio' é a apresentação e fica sempre em primeiro, venha como vier.
  */
 export function chosenSections(saved?: string[] | null): SiteSectionId[] {
   if (!saved) return ALL_SECTION_IDS;
-  const validas = saved.filter(isSectionId);
-  const comInicio = validas.includes('inicio') ? validas : (['inicio', ...validas] as SiteSectionId[]);
-  // Mantém sempre a ordem da página, não a ordem em que foi salvo
-  return ALL_SECTION_IDS.filter((id) => comInicio.includes(id));
+
+  const vistas = new Set<SiteSectionId>();
+  const ordenadas: SiteSectionId[] = [];
+  for (const item of saved) {
+    if (!isSectionId(item) || item === 'inicio' || vistas.has(item)) continue;
+    vistas.add(item);
+    ordenadas.push(item);
+  }
+  return ['inicio', ...ordenadas];
+}
+
+/**
+ * Nome que aparece no menu: o do professor, quando ele trocou, ou o padrão.
+ * Rótulo em branco cai no padrão -- item de menu sem texto é item invisível.
+ */
+export function sectionLabel(
+  id: SiteSectionId,
+  overrides?: Record<string, string> | null,
+  field: 'menuLabel' | 'shortLabel' = 'menuLabel'
+): string {
+  const padrao = SITE_SECTIONS.find((s) => s.id === id);
+  const custom = (overrides?.[id] || '').trim();
+  return custom || padrao?.[field] || id;
+}
+
+/** Move uma seção uma posição para cima ou para baixo. 'inicio' não sai do topo. */
+export function moveSection(
+  ordem: SiteSectionId[],
+  id: SiteSectionId,
+  direcao: 'cima' | 'baixo'
+): SiteSectionId[] {
+  if (id === 'inicio') return ordem;
+  const i = ordem.indexOf(id);
+  if (i === -1) return ordem;
+
+  const destino = direcao === 'cima' ? i - 1 : i + 1;
+  // Não passa do fim, nem ultrapassa o 'inicio' que fica em 0
+  if (destino < 1 || destino >= ordem.length) return ordem;
+
+  const proxima = [...ordem];
+  [proxima[i], proxima[destino]] = [proxima[destino], proxima[i]];
+  return proxima;
 }
 
 /**
@@ -87,6 +129,6 @@ export function chosenSections(saved?: string[] | null): SiteSectionId[] {
  * conteúdo. Um link para uma seção vazia é pior do que não ter o link.
  */
 export function visibleSections(saved: string[] | null | undefined, content: SiteContent): SiteSectionId[] {
-  const escolhidas = chosenSections(saved);
-  return escolhidas.filter((id) => sectionHasContent(id, content));
+  // Preserva a ordem escolhida: filtrar não pode reordenar
+  return chosenSections(saved).filter((id) => sectionHasContent(id, content));
 }

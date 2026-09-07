@@ -16,6 +16,7 @@ export const supabaseService = {
         name: t.name,
         companyId: t.company_id || undefined,
         siteSections: Array.isArray(t.site_sections) && t.site_sections.length ? t.site_sections : undefined,
+        siteSectionLabels: t.site_section_labels || undefined,
         role: t.role || 'professor',
         specialty: t.specialty || '',
         bio: t.bio || '',
@@ -125,6 +126,7 @@ export const supabaseService = {
         accent_color: teacher.accentColor || '#004e5c',
         theme_preset: teacher.themePreset || 'ocean',
         site_sections: teacher.siteSections && teacher.siteSections.length ? teacher.siteSections : null,
+        site_section_labels: teacher.siteSectionLabels && Object.keys(teacher.siteSectionLabels).length ? teacher.siteSectionLabels : null,
         // Recebimento (Pix)
         pix_key: teacher.pixKey || null,
         pix_key_type: teacher.pixKeyType || 'email',

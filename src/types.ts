@@ -381,10 +381,12 @@ export interface TeacherProfile {
   // Vacation / Out of Office Mode
   vacationMode?: VacationModeConfig;
   /**
-   * Seções que aparecem no menu e na página da vitrine.
-   * Ausente = todas (quem nunca escolheu não perde nada). Ver utils/siteSections.
+   * Seções que aparecem no menu e na página da vitrine, NA ORDEM em que
+   * devem aparecer. Ausente = todas, na ordem padrão. Ver utils/siteSections.
    */
   siteSections?: string[];
+  /** Nomes trocados pelo professor: { servicos: 'Modalidades' }. Só os alterados. */
+  siteSectionLabels?: Record<string, string>;
 }
 
 export interface PricingPlan {

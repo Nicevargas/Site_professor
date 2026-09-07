@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   ALL_SECTION_IDS, chosenSections, isSectionId, sectionHasContent, SITE_SECTIONS, visibleSections,
+  moveSection,
+  sectionLabel,
 } from './siteSections';
 import { CurriculumItem, FaqItem, PhotoItem, ServiceItem, TestimonialItem, VideoItem } from '../types';
 
@@ -47,9 +49,13 @@ describe('escolha das seções do site', () => {
     expect(chosenSections(['videos'])[0]).toBe('inicio');
   });
 
-  it('a ordem é a da página, não a ordem em que foi salvo', () => {
+  it('a ordem salva É a ordem da página: quem move, move de verdade', () => {
     expect(chosenSections(['faq', 'curriculo', 'servicos']))
-      .toEqual(['inicio', 'curriculo', 'servicos', 'faq']);
+      .toEqual(['inicio', 'faq', 'curriculo', 'servicos']);
+  });
+
+  it('repetição no que foi salvo não duplica a seção', () => {
+    expect(chosenSections(['servicos', 'servicos', 'faq'])).toEqual(['inicio', 'servicos', 'faq']);
   });
 
   it('valor inválido gravado no banco é ignorado, não quebra a página', () => {
@@ -98,5 +104,50 @@ describe('definição das seções', () => {
 
   it('só o Início é obrigatório', () => {
     expect(SITE_SECTIONS.filter((s) => s.alwaysOn).map((s) => s.id)).toEqual(['inicio']);
+  });
+});
+
+describe('reordenar as seções', () => {
+  const ordem = ['inicio', 'curriculo', 'servicos', 'faq'] as const;
+
+  it('sobe e desce uma posição', () => {
+    expect(moveSection([...ordem], 'servicos', 'cima')).toEqual(['inicio', 'servicos', 'curriculo', 'faq']);
+    expect(moveSection([...ordem], 'curriculo', 'baixo')).toEqual(['inicio', 'servicos', 'curriculo', 'faq']);
+  });
+
+  it('nada ultrapassa o Início, que é a apresentação', () => {
+    expect(moveSection([...ordem], 'curriculo', 'cima')).toEqual(ordem);
+    expect(moveSection([...ordem], 'inicio', 'baixo')).toEqual(ordem);
+  });
+
+  it('a última não desce, e seção de fora não mexe em nada', () => {
+    expect(moveSection([...ordem], 'faq', 'baixo')).toEqual(ordem);
+    expect(moveSection([...ordem], 'galeria', 'cima')).toEqual(ordem);
+  });
+
+  it('não muda a lista recebida no lugar', () => {
+    const original = [...ordem];
+    moveSection(original, 'servicos', 'cima');
+    expect(original).toEqual(ordem);
+  });
+});
+
+describe('renomear os itens do menu', () => {
+  it('sem troca, vale o nome padrão', () => {
+    expect(sectionLabel('servicos')).toBe('Aulas & Serviços');
+    expect(sectionLabel('servicos', {})).toBe('Aulas & Serviços');
+  });
+
+  it('o nome do professor vence o padrão', () => {
+    expect(sectionLabel('servicos', { servicos: 'Modalidades' })).toBe('Modalidades');
+  });
+
+  it('nome em branco cai no padrão: item de menu sem texto é item invisível', () => {
+    expect(sectionLabel('servicos', { servicos: '   ' })).toBe('Aulas & Serviços');
+  });
+
+  it('o rodapé usa o nome curto, e também aceita troca', () => {
+    expect(sectionLabel('curriculo', undefined, 'shortLabel')).toBe('Currículo');
+    expect(sectionLabel('curriculo', { curriculo: 'Formação' }, 'shortLabel')).toBe('Formação');
   });
 });
