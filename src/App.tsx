@@ -83,6 +83,7 @@ import { SyncErrorToast } from './components/SyncErrorToast';
 import { MyAddressView } from './components/MyAddressView';
 import { resolveTenant, slugify, buildPublicUrl, slugFromRoute, PLATFORM_HOST } from './utils/tenant';
 import { AddressNotFoundView } from './components/AddressNotFoundView';
+import { PERFIL_EM_BRANCO, perfilVazio } from './utils/perfilEmBranco';
 import { getPlan, planAllows } from './utils/plans';
 
 
@@ -124,8 +125,30 @@ function AppInner() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [siteAdminTab, setSiteAdminTab] = useState<SiteAdminTab>('branding');
 
+  /**
+   * Com o Supabase ligado, o banco é a única verdade.
+   *
+   * Antes o estado começava nos dados de demonstração e o banco só os
+   * substituía quando respondia -- então a primeira tela era sempre a do
+   * professor de mentira, e quem tinha zero vídeos continuava vendo os
+   * vídeos do exemplo para sempre.
+   *
+   * Sem Supabase configurado os dados falsos voltam a valer: aí eles são o
+   * produto, não um resto.
+   */
+  const semear = <T,>(exemplo: T[]): T[] => (isSupabaseConfigured ? [] : exemplo);
+
+  /** Em que pé está a primeira carga do banco. Sem banco, não há o que esperar. */
+  const [cargaInicial, setCargaInicial] = useState<'carregando' | 'pronta' | 'falhou'>(
+    isSupabaseConfigured ? 'carregando' : 'pronta'
+  );
+
+
   // Multi-user & RBAC System Users State
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>(() => {
+    // O que o navegador guardou é sempre uma foto velha: serve para o modo
+    // sem banco, não para adiantar a tela de quem tem banco.
+    if (isSupabaseConfigured) return [];
     try {
       const saved = localStorage.getItem('agenda_prof_system_users');
       if (saved) return JSON.parse(saved);
@@ -136,10 +159,10 @@ function AppInner() {
   });
 
   // Empresas / escolas: o perfil principal que agrupa professores
-  const [companies, setCompanies] = useState<Company[]>(INITIAL_COMPANIES);
+  const [companies, setCompanies] = useState<Company[]>(() => semear(INITIAL_COMPANIES));
 
   // Fila de espera das turmas lotadas e a chamada aberta no momento
-  const [allWaitlist, setAllWaitlist] = useState<WaitlistEntry[]>(INITIAL_WAITLIST);
+  const [allWaitlist, setAllWaitlist] = useState<WaitlistEntry[]>(() => semear(INITIAL_WAITLIST));
   const [attendanceSlot, setAttendanceSlot] = useState<ClassSlot | null>(null);
 
   // Endereço pedido pelo visitante: caminho, subdomínio ou domínio próprio
@@ -161,15 +184,19 @@ function AppInner() {
   const [pickedTeacherFromCompany, setPickedTeacherFromCompany] = useState(false);
 
   // Core domain state
-  const [teachers, setTeachers] = useState<TeacherProfile[]>(INITIAL_TEACHER_PROFILES);
+  const [teachers, setTeachers] = useState<TeacherProfile[]>(() => semear(INITIAL_TEACHER_PROFILES));
   const [currentTeacher, setCurrentTeacher] = useState<TeacherProfile>(() => {
+    // Com banco, ninguém é semeado: o perfil chega de lá. Enquanto não chega,
+    // vale o molde em branco -- se algum caminho de render escapar da espera,
+    // aparece vazio, e não o nome de outra pessoa.
+    if (isSupabaseConfigured) return PERFIL_EM_BRANCO;
+
     try {
       const savedUser = localStorage.getItem('agenda_prof_current_user');
       if (savedUser) {
         const u = JSON.parse(savedUser);
         const match = INITIAL_TEACHER_PROFILES.find((t) => t.id === u.id || t.email === u.email || t.id === u.teacherId);
         if (match) return match;
-        // User custom teacher profile
         const savedTeacher = localStorage.getItem(`agenda_prof_teacher_${u.id}`);
         if (savedTeacher) return JSON.parse(savedTeacher);
         // Só um professor vira perfil de vitrine. Admin, secretaria e aluno olham
@@ -189,7 +216,7 @@ function AppInner() {
     } catch {
       // fallback
     }
-    // Visitante anônimo chegando por um endereço de professor
+
     const ref = resolveTenant(window.location);
     if (ref.mode !== 'none') {
       const byAddress = INITIAL_TEACHER_PROFILES.find((t) =>
@@ -201,18 +228,18 @@ function AppInner() {
   });
 
   // Data collections
-  const [allServices, setAllServices] = useState<ServiceItem[]>(INITIAL_SERVICES);
-  const [allAppointments, setAllAppointments] = useState<Appointment[]>(INITIAL_APPOINTMENTS);
-  const [allStudents, setAllStudents] = useState<Student[]>(INITIAL_STUDENTS);
-  const [allReminders, setAllReminders] = useState<Reminder[]>(INITIAL_REMEMBERS);
-  const [allInvoices, setAllInvoices] = useState<PaymentInvoice[]>(INITIAL_PAYMENT_INVOICES);
+  const [allServices, setAllServices] = useState<ServiceItem[]>(() => semear(INITIAL_SERVICES));
+  const [allAppointments, setAllAppointments] = useState<Appointment[]>(() => semear(INITIAL_APPOINTMENTS));
+  const [allStudents, setAllStudents] = useState<Student[]>(() => semear(INITIAL_STUDENTS));
+  const [allReminders, setAllReminders] = useState<Reminder[]>(() => semear(INITIAL_REMEMBERS));
+  const [allInvoices, setAllInvoices] = useState<PaymentInvoice[]>(() => semear(INITIAL_PAYMENT_INVOICES));
 
   // Marketing & Public Site Content State
-  const [testimonials, setTestimonials] = useState<Testimonial[]>(INITIAL_TESTIMONIALS);
-  const [curriculum, setCurriculum] = useState<CurriculumItem[]>(INITIAL_CURRICULUM);
-  const [videos, setVideos] = useState<VideoItem[]>(INITIAL_VIDEOS);
-  const [photos, setPhotos] = useState<PhotoItem[]>(INITIAL_PHOTOS);
-  const [faqs, setFaqs] = useState(DEFAULT_SITE_FAQS);
+  const [testimonials, setTestimonials] = useState<Testimonial[]>(() => semear(INITIAL_TESTIMONIALS));
+  const [curriculum, setCurriculum] = useState<CurriculumItem[]>(() => semear(INITIAL_CURRICULUM));
+  const [videos, setVideos] = useState<VideoItem[]>(() => semear(INITIAL_VIDEOS));
+  const [photos, setPhotos] = useState<PhotoItem[]>(() => semear(INITIAL_PHOTOS));
+  const [faqs, setFaqs] = useState(() => semear(DEFAULT_SITE_FAQS));
 
   // Filtered views based on current teacher/tenant
   const services = useMemo(() => {
@@ -561,8 +588,8 @@ function AppInner() {
           supabaseService.getWaitlist(),
         ]);
 
+        if (dbTeachers) setTeachers(dbTeachers);
         if (dbTeachers && dbTeachers.length > 0) {
-          setTeachers(dbTeachers);
           const currentExists = dbTeachers.find((t: TeacherProfile) => t.id === currentTeacher.id);
           const activeTeacher = currentExists || dbTeachers[0];
           setCurrentTeacher(activeTeacher);
@@ -574,24 +601,29 @@ function AppInner() {
           }
         }
 
-        if (dbServices && dbServices.length > 0) setAllServices(dbServices);
-        if (dbAppointments && dbAppointments.length > 0) setAllAppointments(dbAppointments);
-        if (dbStudents && dbStudents.length > 0) setAllStudents(dbStudents);
-        if (dbReminders && dbReminders.length > 0) setAllReminders(dbReminders);
-        if (dbInvoices && dbInvoices.length > 0) setAllInvoices(dbInvoices);
-        if (dbTestimonials && dbTestimonials.length > 0) setTestimonials(dbTestimonials);
-        if (dbCurriculum && dbCurriculum.length > 0) setCurriculum(dbCurriculum);
-        if (dbVideos && dbVideos.length > 0) setVideos(dbVideos);
-        if (dbPhotos && dbPhotos.length > 0) setPhotos(dbPhotos);
-        if (dbFaqs && dbFaqs.length > 0) setFaqs(dbFaqs);
-        if (dbCompanies && dbCompanies.length > 0) setCompanies(dbCompanies);
+        if (dbServices) setAllServices(dbServices);
+        if (dbAppointments) setAllAppointments(dbAppointments);
+        if (dbStudents) setAllStudents(dbStudents);
+        if (dbReminders) setAllReminders(dbReminders);
+        if (dbInvoices) setAllInvoices(dbInvoices);
+        if (dbTestimonials) setTestimonials(dbTestimonials);
+        if (dbCurriculum) setCurriculum(dbCurriculum);
+        if (dbVideos) setVideos(dbVideos);
+        if (dbPhotos) setPhotos(dbPhotos);
+        if (dbFaqs) setFaqs(dbFaqs);
+        if (dbCompanies) setCompanies(dbCompanies);
         if (dbWaitlist) setAllWaitlist(dbWaitlist);
-        if (dbSystemUsers && dbSystemUsers.length > 0) {
+        if (dbSystemUsers) {
           setSystemUsers(dbSystemUsers);
           localStorage.setItem('agenda_prof_system_users', JSON.stringify(dbSystemUsers));
         }
+        setCargaInicial('pronta');
       } catch (err) {
-        console.warn('Could not load from Supabase, using mock local data:', err);
+        // Não há mais dados de exemplo para cair de volta: quem não carrega
+        // fica sem nada, e a tela precisa dizer isso em vez de girar para
+        // sempre esperando um perfil que não vem.
+        console.warn('Não foi possível carregar do Supabase:', err);
+        setCargaInicial('falhou');
       }
     }
 
@@ -1231,6 +1263,45 @@ function AppInner() {
    * Só para visitante: quem está logado veio usar o sistema, e trocar a tela
    * dele por um erro de endereço seria tirá-lo do próprio painel.
    */
+  /**
+   * A vitrine não abre com o perfil em branco.
+   *
+   * Agora que nada é semeado com dados de exemplo, o intervalo entre abrir a
+   * página e o banco responder tem um perfil vazio. Renderizar isso seria
+   * trocar "site de outra pessoa" por "site sem nome" -- as duas erradas.
+   * Espera-se, e a página aparece uma vez só, certa.
+   */
+  if (currentView === 'public-landing' && !currentUser && perfilVazio(currentTeacher)
+      && !addressedCompany && statusEndereco !== 'nao-encontrado') {
+    // Carga que falhou não vira espera eterna: o visitante precisa saber que
+    // o problema é nosso, e poder tentar de novo.
+    if (cargaInicial === 'falhou') {
+      return (
+        <main className="min-h-screen bg-[#f7f9fb] flex items-center justify-center px-6 text-center">
+          <div className="max-w-sm">
+            <h1 className="text-xl font-bold text-[#091426] mb-2">Não foi possível carregar a página</h1>
+            <p className="text-sm text-[#45474c] mb-6">
+              O problema é do nosso lado. Tente novamente em alguns instantes.
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="px-5 py-3 rounded-xl bg-[#00687a] text-white font-medium hover:bg-[#004e5c] transition-colors"
+            >
+              Tentar de novo
+            </button>
+          </div>
+        </main>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-[#f7f9fb] flex items-center justify-center" role="status" aria-label="Carregando">
+        <div className="w-8 h-8 rounded-full border-2 border-slate-200 border-t-[#00687a] animate-spin" />
+      </div>
+    );
+  }
+
   if (statusEndereco === 'nao-encontrado' && !currentUser) {
     return (
       <AddressNotFoundView
