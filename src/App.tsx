@@ -1302,7 +1302,10 @@ function AppInner() {
     );
   }
 
-  if (statusEndereco === 'nao-encontrado' && !currentUser) {
+  // O endereço não existir não pode trancar a porta: a tela de login vem
+  // antes, senão o botão "Entrar na minha conta" muda a URL e devolve a
+  // mesma página de erro -- e parece que não faz nada.
+  if (statusEndereco === 'nao-encontrado' && !currentUser && currentView !== 'auth') {
     return (
       <AddressNotFoundView
         endereco={tenantRef.domain || window.location.hostname}
