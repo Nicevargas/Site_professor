@@ -82,7 +82,6 @@ import { formatMonthYearPtBR, toLocalDateKey } from './utils/dates';
 import { SyncErrorToast } from './components/SyncErrorToast';
 import { MyAddressView } from './components/MyAddressView';
 import { resolveTenant, slugify, buildPublicUrl, slugFromRoute, PLATFORM_HOST } from './utils/tenant';
-import { AddressNotFoundView } from './components/AddressNotFoundView';
 import { PERFIL_EM_BRANCO, perfilVazio } from './utils/perfilEmBranco';
 import { getPlan, planAllows } from './utils/plans';
 
@@ -459,6 +458,19 @@ function AppInner() {
 
     return () => { cancelled = true; };
   }, [tenantRef.mode, tenantRef.kind, tenantRef.slug, tenantRef.domain]);
+
+  /**
+   * Endereço sem vitrine não é beco sem saída.
+   *
+   * Quando o endereço não corresponde a professor nem academia, não há o que
+   * mostrar de público ali -- mas o sistema continua sendo o mesmo. Manda-se
+   * quem chegou para dentro: login para quem não entrou, painel para quem já
+   * está. Uma página de erro só devolveria a pessoa para lugar nenhum.
+   */
+  useEffect(() => {
+    if (statusEndereco !== 'nao-encontrado' || currentView !== 'public-landing') return;
+    setCurrentView(currentUser ? getDefaultView(currentUser.role) : 'auth');
+  }, [statusEndereco, currentView, currentUser]);
 
   // Título e prévia de link seguem a vitrine aberta, não um texto fixo no HTML
   useEffect(() => {
@@ -1302,34 +1314,12 @@ function AppInner() {
     );
   }
 
-  /**
-   * Endereço que não é de ninguém: no lugar da VITRINE, e só dela.
-   *
-   * O endereço não existir diz que não há vitrine para mostrar ali -- não que
-   * o app inteiro esteja fechado. Quando este portão valia para qualquer
-   * tela, ele engolia o login e o painel: a URL mudava para #/entrar ou
-   * #/painel e o render devolvia a mesma página de erro, como se os botões
-   * não fizessem nada.
-   *
-   * Fora da vitrine, o fluxo normal decide -- e ele já manda quem não está
-   * logado para a tela de entrar.
-   */
-  if (currentView === 'public-landing' && statusEndereco === 'nao-encontrado' && !currentUser) {
-    return (
-      <AddressNotFoundView
-        endereco={tenantRef.domain || window.location.hostname}
-        onEnterApp={() => setCurrentView('auth')}
-      />
-    );
-  }
-
   // Public views without admin sidebar layout
   if (currentView === 'auth') {
     return (
       <AuthView
         currentTeacher={currentTeacher}
         onLoginSuccess={handleLoginSuccess}
-        onBackToPublicSite={() => setCurrentView('public-landing')}
       />
     );
   }
@@ -1431,7 +1421,6 @@ function AppInner() {
       <AuthView
         currentTeacher={currentTeacher}
         onLoginSuccess={handleLoginSuccess}
-        onBackToPublicSite={() => setCurrentView('public-landing')}
       />
     );
   }

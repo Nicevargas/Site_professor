@@ -21,7 +21,7 @@ const teacher: TeacherProfile = {
 
 function renderAuth() {
   const onLoginSuccess = vi.fn();
-  render(<AuthView currentTeacher={teacher} onLoginSuccess={onLoginSuccess} onBackToPublicSite={() => {}} />);
+  render(<AuthView currentTeacher={teacher} onLoginSuccess={onLoginSuccess} />);
   return { onLoginSuccess };
 }
 

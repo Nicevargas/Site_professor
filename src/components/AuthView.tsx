@@ -4,7 +4,6 @@ import {
   Lock, 
   Mail, 
   User, 
-  ArrowLeft, 
   CheckCircle2, 
   AlertCircle, 
   Eye, 
@@ -36,7 +35,6 @@ async function hashPassword(value: string): Promise<string> {
 interface AuthViewProps {
   currentTeacher: TeacherProfile;
   onLoginSuccess: (user: AuthUser, teacherData?: Partial<TeacherProfile>) => void;
-  onBackToPublicSite: () => void;
 }
 
 interface LocalRegisteredUser {
@@ -52,7 +50,6 @@ interface LocalRegisteredUser {
 export const AuthView: React.FC<AuthViewProps> = ({
   currentTeacher,
   onLoginSuccess,
-  onBackToPublicSite,
 }) => {
   const [tab, setTab] = useState<'login' | 'signup' | 'forgot'>('login');
   
@@ -343,22 +340,6 @@ export const AuthView: React.FC<AuthViewProps> = ({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#091426] via-[#0d213a] to-[#003844] text-white flex flex-col justify-between p-4 md:p-8">
-      {/* Top Header */}
-      <div className="max-w-5xl mx-auto w-full flex flex-col sm:flex-row justify-between items-center gap-3 pb-4">
-        <button
-          onClick={onBackToPublicSite}
-          className="flex items-center gap-2 text-xs md:text-sm font-medium text-slate-300 hover:text-white bg-white/10 hover:bg-white/15 px-4 py-2 rounded-xl backdrop-blur-md transition-all shadow-xs"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Voltar ao Site Aberto do Professor</span>
-        </button>
-
-        <div className="flex items-center gap-2 text-xs text-cyan-300 font-semibold bg-cyan-950/70 border border-cyan-800/80 px-3.5 py-1.5 rounded-full shadow-xs">
-          <ShieldCheck className="w-4 h-4 text-cyan-400" />
-          <span>Acesso Multi-usuário com RBAC (Supabase + RLS)</span>
-        </div>
-      </div>
-
       {/* Main Form Container */}
       <div className="max-w-lg w-full mx-auto bg-white/95 text-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl backdrop-blur-xl border border-white/20 animate-in fade-in zoom-in-95 duration-200 my-auto space-y-5">
         
