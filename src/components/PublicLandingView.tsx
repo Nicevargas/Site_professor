@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { SafeImage } from './SafeImage';
+import { SITE_SECTIONS, SiteSectionId, visibleSections } from '../utils/siteSections';
 import { TeacherProfile, ServiceItem, TestimonialItem, CurriculumItem, VideoItem, PhotoItem, FaqItem } from '../types';
 import { 
   ArrowRight, 
@@ -80,6 +81,17 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
   const primaryColor = teacher.primaryColor || '#00687a';
   const secondaryColor = teacher.secondaryColor || '#57dffe';
   const accentColor = teacher.accentColor || '#004e5c';
+
+  /**
+   * Seções que a página realmente mostra: as escolhidas pelo professor E que
+   * têm conteúdo. Uma lista só governa o menu, o rodapé e o corpo da página --
+   * antes o menu era fixo e podia levar a um trecho em branco.
+   */
+  const secoesVisiveis = visibleSections(teacher.siteSections, {
+    curriculum, services, videos, photos, testimonials, faqs,
+  });
+  const mostra = (id: SiteSectionId) => secoesVisiveis.includes(id);
+  const secoesDoMenu = SITE_SECTIONS.filter((sec) => secoesVisiveis.includes(sec.id));
   const brandTitle = teacher.brandName || teacher.name;
 
   const [selectedPhotoCategory, setSelectedPhotoCategory] = useState<string>('todos');
@@ -262,28 +274,23 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
           </div>
 
             <nav className="hidden lg:flex items-center gap-6 font-medium text-xs text-[#45474c]">
-              <a href="#inicio" className="hover:text-slate-900 py-2 transition-colors">
-                Início
-              </a>
-              <a href="#curriculo" className="hover:text-slate-900 py-2 transition-colors">
-                Currículo & Títulos
-              </a>
-              <a href="#servicos" className="hover:text-slate-900 py-2 transition-colors">
-                Aulas & Serviços
-              </a>
-              <a href="#videos" className="hover:text-slate-900 py-2 transition-colors">
-                Vídeos & Aulas
-              </a>
-              <a href="#galeria" className="hover:text-slate-900 py-2 transition-colors">
-                Galeria
-              </a>
-              <a href="#depoimentos" className="hover:text-slate-900 py-2 transition-colors">
-                Depoimentos
-              </a>
-              <a href="#faq" className="hover:text-slate-900 py-2 transition-colors flex items-center gap-1 font-semibold" style={{ color: primaryColor }}>
-                <HelpCircle className="w-3.5 h-3.5" />
-                <span>Dúvidas (FAQ)</span>
-              </a>
+              {secoesDoMenu.map((sec) =>
+                sec.id === 'faq' ? (
+                  <a
+                    key={sec.id}
+                    href="#faq"
+                    className="hover:text-slate-900 py-2 transition-colors flex items-center gap-1 font-semibold"
+                    style={{ color: primaryColor }}
+                  >
+                    <HelpCircle className="w-3.5 h-3.5" />
+                    <span>{sec.menuLabel}</span>
+                  </a>
+                ) : (
+                  <a key={sec.id} href={`#${sec.id}`} className="hover:text-slate-900 py-2 transition-colors">
+                    {sec.menuLabel}
+                  </a>
+                )
+              )}
             </nav>
 
           <div className="flex items-center gap-2.5">
@@ -455,6 +462,7 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
       </section>
 
       {/* ================= SECTION: CURRÍCULO & FORMAÇÃO ================= */}
+      {mostra('curriculo') && (
       <section id="curriculo" className="py-16 md:py-24 max-w-7xl mx-auto px-4 md:px-10 w-full">
         <div className="text-center max-w-2xl mx-auto mb-14">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-cyan-50 rounded-full text-xs font-bold text-[#00687a] mb-3">
@@ -536,8 +544,10 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
           })}
         </div>
       </section>
+      )}
 
       {/* ================= SECTION: AULAS & SERVIÇOS ================= */}
+      {mostra('servicos') && (
       <section id="servicos" className="bg-white py-16 md:py-24 border-y border-[#eceef0] w-full">
         <div className="max-w-7xl mx-auto px-4 md:px-10">
           <div className="text-center max-w-2xl mx-auto mb-10">
@@ -684,8 +694,10 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
           )}
         </div>
       </section>
+      )}
 
       {/* ================= SECTION: MULTIMÍDIA - VÍDEOS, AULAS & PODCASTS ================= */}
+      {mostra('videos') && (
       <section id="videos" className="py-16 md:py-24 max-w-7xl mx-auto px-4 md:px-10 w-full">
         {(() => {
           // Display only active videos to visitors
@@ -932,8 +944,10 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
           );
         })()}
       </section>
+      )}
 
       {/* ================= SECTION: GALERIA DE FOTOS ================= */}
+      {mostra('galeria') && (
       <section id="galeria" className="bg-white py-16 md:py-24 border-y border-[#eceef0] w-full">
         <div className="max-w-7xl mx-auto px-4 md:px-10">
           <div className="text-center max-w-2xl mx-auto mb-10">
@@ -1008,8 +1022,10 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
           </div>
         </div>
       </section>
+      )}
 
       {/* ================= SECTION: DEPOIMENTOS ================= */}
+      {mostra('depoimentos') && (
       <section id="depoimentos" className="py-16 md:py-24 max-w-7xl mx-auto px-4 md:px-10 w-full">
         <div className="text-center max-w-2xl mx-auto mb-14">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 rounded-full text-xs font-bold text-amber-800 mb-3">
@@ -1063,8 +1079,10 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
           ))}
         </div>
       </section>
+      )}
 
       {/* ================= SECTION: PERGUNTAS FREQUENTES (FAQ) ================= */}
+      {mostra('faq') && (
       <section id="faq" className="py-16 md:py-24 max-w-5xl mx-auto px-4 md:px-10 w-full">
         <div className="text-center max-w-2xl mx-auto mb-12">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-cyan-50 rounded-full text-xs font-bold text-[#00687a] mb-3">
@@ -1152,6 +1170,7 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
           })}
         </div>
       </section>
+      )}
 
       {/* ================= FINAL CTA STRIP ================= */}
       <section 
@@ -1211,11 +1230,13 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
             <span className="text-xs font-normal text-slate-500">{teacher.role}</span>
           </div>
           <div className="flex flex-wrap items-center gap-4 sm:gap-6">
-            <a href="#curriculo" className="hover:text-slate-900">Currículo</a>
-            <a href="#servicos" className="hover:text-slate-900">Aulas</a>
-            <a href="#videos" className="hover:text-slate-900">Vídeos</a>
-            <a href="#galeria" className="hover:text-slate-900">Galeria</a>
-            <a href="#depoimentos" className="hover:text-slate-900">Depoimentos</a>
+            {secoesDoMenu
+              .filter((sec) => sec.id !== 'inicio' && sec.id !== 'faq')
+              .map((sec) => (
+                <a key={sec.id} href={`#${sec.id}`} className="hover:text-slate-900">
+                  {sec.shortLabel}
+                </a>
+              ))}
             {onOpenLogin && (
               <button
                 onClick={onOpenLogin}

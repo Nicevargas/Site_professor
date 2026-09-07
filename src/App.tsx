@@ -1566,6 +1566,7 @@ function AppInner() {
                 );
                 supabaseService.saveTeacher(updated);
               }}
+              services={services}
               onOpenPublicSite={() => setCurrentView('public-landing')}
               activeTab={siteAdminTab}
               onTabChange={setSiteAdminTab}

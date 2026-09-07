@@ -104,7 +104,7 @@ export interface WaitlistEntry {
 }
 
 /** Seções da tela "Meu Site" (também aparecem como sub-itens na barra lateral). */
-export type SiteAdminTab = 'branding' | 'testimonials' | 'curriculum' | 'videos' | 'photos' | 'faqs';
+export type SiteAdminTab = 'branding' | 'menu' | 'testimonials' | 'curriculum' | 'videos' | 'photos' | 'faqs';
 
 export interface SystemUser {
   id: string;
@@ -380,6 +380,11 @@ export interface TeacherProfile {
   themePreset?: ThemePresetId;
   // Vacation / Out of Office Mode
   vacationMode?: VacationModeConfig;
+  /**
+   * Seções que aparecem no menu e na página da vitrine.
+   * Ausente = todas (quem nunca escolheu não perde nada). Ver utils/siteSections.
+   */
+  siteSections?: string[];
 }
 
 export interface PricingPlan {

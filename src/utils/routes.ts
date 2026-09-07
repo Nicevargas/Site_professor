@@ -53,6 +53,7 @@ export const VIEW_TITLES: Record<ViewMode, string> = {
 
 export const SITE_ADMIN_SECTIONS: { id: SiteAdminTab; label: string }[] = [
   { id: 'branding', label: 'Identidade e cores' },
+  { id: 'menu', label: 'Seções do site' },
   { id: 'testimonials', label: 'Depoimentos' },
   { id: 'curriculum', label: 'Currículo' },
   { id: 'videos', label: 'Vídeos e podcasts' },

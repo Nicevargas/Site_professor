@@ -40,9 +40,17 @@ describe('rotas na URL', () => {
     }
   });
 
-  it('seções de Meu Site cobrem as seis abas sem repetição', () => {
+  it('seções de Meu Site cobrem todas as abas, sem repetição', () => {
     const ids = SITE_ADMIN_SECTIONS.map((s) => s.id);
-    expect(ids).toEqual(['branding', 'testimonials', 'curriculum', 'videos', 'photos', 'faqs']);
-    expect(new Set(ids).size).toBe(6);
+    expect(ids).toEqual(['branding', 'menu', 'testimonials', 'curriculum', 'videos', 'photos', 'faqs']);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('a raiz não pertence a tela nenhuma: quem decide é o papel de quem chega', () => {
+    expect(viewFromHash('#/')).toBeNull();
+    expect(viewFromHash('')).toBeNull();
+    // A vitrine tem rota propria, para quem quiser abri-la de proposito
+    expect(viewFromHash('#/site')).toBe('public-landing');
+    expect(hashFromView('public-landing')).toBe('/site');
   });
 });

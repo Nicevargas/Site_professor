@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { TeacherProfile, TestimonialItem, CurriculumItem, VideoItem, PhotoItem, FaqItem, SiteAdminTab } from '../types';
+import { TeacherProfile, TestimonialItem, CurriculumItem, VideoItem, PhotoItem, FaqItem, ServiceItem, SiteAdminTab } from '../types';
+import { SiteMenuSection } from './site-admin/SiteMenuSection';
 import {
   Globe,
   MessageSquare,
@@ -10,7 +11,8 @@ import {
   Eye,
   CheckCircle2,
   HelpCircle,
-  Palette
+  Palette,
+  LayoutList
 } from 'lucide-react';
 import { SiteBrandingCustomizer } from './SiteBrandingCustomizer';
 import { TestimonialsSection } from './site-admin/TestimonialsSection';
@@ -30,6 +32,8 @@ interface SiteAdminViewProps {
   videos: VideoItem[];
   photos: PhotoItem[];
   faqs?: FaqItem[];
+  /** Serviços ativos decidem se a seção "Aulas" tem o que mostrar */
+  services?: ServiceItem[];
   onUpdateTestimonials: (items: TestimonialItem[]) => void;
   onUpdateCurriculum: (items: CurriculumItem[]) => void;
   onUpdateVideos: (items: VideoItem[]) => void;
@@ -49,6 +53,7 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
   videos,
   photos,
   faqs = [],
+  services = [],
   onUpdateTestimonials,
   onUpdateCurriculum,
   onUpdateVideos,
@@ -235,6 +240,18 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('menu')}
+            className={`flex items-center gap-2 pb-3 px-4 text-sm font-semibold border-b-2 transition-all shrink-0 ${
+              activeTab === 'menu'
+                ? 'border-[#00687a] text-[#00687a]'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <LayoutList className="w-4 h-4" />
+            <span>Seções do site</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('testimonials')}
             className={`flex items-center gap-2 pb-3 px-4 text-sm font-semibold border-b-2 transition-all shrink-0 ${
               activeTab === 'testimonials'
@@ -304,6 +321,22 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
               showToast('Identidade visual e logo atualizadas!');
             }}
             onOpenPublicSite={onOpenPublicSite}
+          />
+        )}
+
+        {activeTab === 'menu' && (
+          <SiteMenuSection
+            currentTeacher={currentTeacher}
+            curriculum={curriculum}
+            services={services}
+            videos={videos}
+            photos={photos}
+            testimonials={testimonials}
+            faqs={faqs}
+            onUpdateTeacher={(updated) => {
+              onUpdateTeacher(updated);
+              showToast('Seções do site atualizadas!');
+            }}
           />
         )}
 
