@@ -26,7 +26,8 @@ describe('App: rotas e guarda por papel', () => {
   it('visitante sem sessão cai no site público', async () => {
     openAt('');
     expect(await screen.findByRole('heading', { level: 1, name: /roberto almeida/i })).toBeInTheDocument();
-    expect(window.location.hash).toBe('#/');
+    // A vitrine tem rota própria: '/' significa "sem rota escolhida"
+    expect(window.location.hash).toBe('#/site');
   });
 
   it('visitante que abre uma tela interna vê a tela de login', async () => {
@@ -73,5 +74,41 @@ describe('App: rotas e guarda por papel', () => {
     expect(await screen.findByRole('heading', { level: 1, name: /meus dados/i })).toBeInTheDocument();
     expect(screen.queryByText(/configurações do professor/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/chave pix/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('a sessão fica de pé até o logout', () => {
+  it('voltar na raiz leva quem está logado ao painel, não à vitrine', async () => {
+    // O bug: o profissional abria o próprio site, o hash virava #/ e toda
+    // visita seguinte caía na vitrine -- parecendo que a sessão expirou.
+    loginAs({ role: 'professor', teacherId: 'prof-roberto' });
+    openAt('#/');
+    expect(await screen.findByRole('heading', { name: /painel/i })).toBeInTheDocument();
+  });
+
+  it('sem hash nenhum também abre o painel', async () => {
+    loginAs({ role: 'professor', teacherId: 'prof-roberto' });
+    openAt('');
+    expect(await screen.findByRole('heading', { name: /painel/i })).toBeInTheDocument();
+  });
+
+  it('o aluno volta para o portal dele, não para o site', async () => {
+    loginAs({ role: 'aluno', studentId: 'std-1', name: 'Mariana Costa' });
+    openAt('#/');
+    // 'Portal do Aluno' aparece no menu e no cabeçalho: a saudação é única
+    expect(await screen.findByRole('heading', { name: /olá, mariana/i })).toBeInTheDocument();
+  });
+
+  it('ver a vitrine continua possível, por rota explícita', async () => {
+    loginAs({ role: 'professor', teacherId: 'prof-roberto' });
+    openAt('#/site');
+    expect(await screen.findByRole('heading', { level: 1, name: /roberto almeida/i })).toBeInTheDocument();
+  });
+
+  it('a sessão só some no logout, não ao voltar', async () => {
+    loginAs({ role: 'professor', teacherId: 'prof-roberto' });
+    openAt('#/');
+    await screen.findByRole('heading', { name: /painel/i });
+    expect(localStorage.getItem('agenda_prof_current_user')).not.toBeNull();
   });
 });

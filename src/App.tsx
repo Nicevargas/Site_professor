@@ -81,7 +81,7 @@ import { hashFromView, viewFromHash } from './utils/routes';
 import { formatMonthYearPtBR, toLocalDateKey } from './utils/dates';
 import { SyncErrorToast } from './components/SyncErrorToast';
 import { MyAddressView } from './components/MyAddressView';
-import { resolveTenant, slugify, buildPublicUrl, PLATFORM_HOST } from './utils/tenant';
+import { resolveTenant, slugify, buildPublicUrl, slugFromRoute, PLATFORM_HOST } from './utils/tenant';
 import { getPlan, planAllows } from './utils/plans';
 
 
@@ -473,6 +473,12 @@ function AppInner() {
 
   // URL: mantém #/rota sincronizada com a tela (botão voltar e links compartilháveis)
   useEffect(() => {
+    // Link de vitrine no hash (#/p/<slug>, #/e/<slug>) é o endereço que a
+    // pessoa compartilha: sobrescrever tiraria o professor da URL, e quem
+    // copiasse da barra mandaria o link errado.
+    const enderecoDeVitrine = slugFromRoute('', window.location.hash);
+    if (enderecoDeVitrine && currentView === 'public-landing') return;
+
     const path = hashFromView(currentView);
     if (window.location.hash !== `#${path}`) {
       window.history.pushState(null, '', `#${path}`);

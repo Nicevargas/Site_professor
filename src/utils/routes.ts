@@ -4,8 +4,17 @@ import { SiteAdminTab, ViewMode } from '../types';
  * Rotas na URL (hash) e títulos das telas.
  * Ex.: #/agenda abre a Agenda; o botão voltar do navegador funciona entre telas.
  */
+/**
+ * '/' de propósito NÃO pertence a nenhuma tela.
+ *
+ * A raiz significa "sem rota escolhida", e quem decide o destino é o papel
+ * de quem chega: visitante vê a vitrine, quem está logado vai para o painel.
+ * Enquanto '/' apontava para a vitrine, bastava o profissional abrir o
+ * próprio site uma vez para toda visita seguinte cair lá -- e parecer que a
+ * sessão tinha expirado.
+ */
 const HASH_BY_VIEW: Record<ViewMode, string> = {
-  'public-landing': '/',
+  'public-landing': '/site',
   'public-booking': '/agendar',
   auth: '/entrar',
   dashboard: '/painel',
