@@ -706,10 +706,6 @@ export const AuthView: React.FC<AuthViewProps> = ({
 
       </div>
 
-      {/* Footer info */}
-      <div className="max-w-md mx-auto text-center text-xs text-slate-400 pt-3">
-        © {new Date().getFullYear()} Plataforma Multi-usuários • Proteção com Row Level Security (RLS)
-      </div>
     </div>
   );
 };

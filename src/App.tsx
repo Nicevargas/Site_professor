@@ -75,15 +75,16 @@ import { supabaseService } from './services/supabaseService';
 import { isSupabaseConfigured, supabase } from './lib/supabase';
 import { dispatchAppointmentWebhook, dispatchFormWebhook } from './utils/webhookDispatcher';
 import { canAccessView, getDefaultView, canSwitchProfiles, canViewFinances, canManageCompany, sanitizeSelfDeclaredRole } from './utils/permissions';
-import { quotaStatus } from './utils/plans';
+import { quotaStatus, PLANS, PLAN_ORDER, DIAS_DE_TESTE } from './utils/plans';
 import { StudentProfileView } from './components/StudentProfileView';
-import { hashFromView, viewFromHash } from './utils/routes';
+import { hashFromView, viewFromHash, VIEW_TITLES } from './utils/routes';
 import { formatMonthYearPtBR, toLocalDateKey } from './utils/dates';
 import { SyncErrorToast } from './components/SyncErrorToast';
 import { MyAddressView } from './components/MyAddressView';
 import { resolveTenant, slugify, buildPublicUrl, slugFromRoute, PLATFORM_HOST } from './utils/tenant';
 import { PERFIL_EM_BRANCO, perfilVazio } from './utils/perfilEmBranco';
 import { PlatformLandingView } from './components/PlatformLandingView';
+import { aplicarSeo, estruturaAcademia, estruturaPlataforma, estruturaProfessor } from './utils/seo';
 import { getPlan, planAllows } from './utils/plans';
 
 
@@ -476,59 +477,77 @@ function AppInner() {
     setCurrentView(currentUser ? getDefaultView(currentUser.role) : 'auth');
   }, [statusEndereco, currentView, currentUser]);
 
-  // Título e prévia de link seguem a vitrine aberta, não um texto fixo no HTML
+  /**
+   * Título, prévia de link e dados estruturados seguem a página aberta.
+   *
+   * Tudo num efeito só, e sempre o conjunto inteiro: numa SPA o <head> é
+   * compartilhado, então quem não escreve um valor herda o da página
+   * anterior -- era assim que a vitrine de um professor saía com a descrição
+   * de outro no WhatsApp.
+   */
   useEffect(() => {
-    const setMeta = (selector: string, attr: string, value: string) => {
-      const el = document.head.querySelector(selector);
-      if (el) el.setAttribute(attr, value);
-    };
-
-    // A página da plataforma não é a vitrine de ninguém: sem isto, ela herdava
-    // o título do último professor carregado, ou o do HTML.
+    // A plataforma não é a vitrine de ninguém
     if (currentView === 'plataforma') {
-      document.title = 'Aquagenda | Agenda, alunos e site para quem ensina';
+      const url = PLATFORM_HOST ? `https://${PLATFORM_HOST}/` : window.location.origin + '/';
+      aplicarSeo({
+        titulo: 'Aquagenda | Agenda, alunos e site para quem ensina',
+        descricao:
+          'Sistema de agenda, alunos, pagamentos e site próprio para professores, estúdios e academias. '
+          + `Vagas por turma, lista de espera, chamada e cobrança por PIX. ${DIAS_DE_TESTE} dias grátis.`,
+        url,
+        estrutura: estruturaPlataforma(url, PLAN_ORDER.map((t) => PLANS[t])),
+      });
       return;
     }
 
-    // Enquanto o professor não chegou do banco não há nome para pôr: escrever
-    // um agora seria escrever o de outra pessoa.
+    // Painel, login e telas internas não pertencem ao índice de busca
+    if (currentView !== 'public-landing' && currentView !== 'public-booking') {
+      aplicarSeo({
+        titulo: `${VIEW_TITLES[currentView]} | Aquagenda`,
+        descricao: 'Área do sistema Aquagenda.',
+        indexavel: false,
+      });
+      return;
+    }
+
+    // Sem ninguém carregado ainda não há nome para pôr: escrever um agora
+    // seria escrever o de outra pessoa.
     if (perfilVazio(currentTeacher) && !addressedCompany) return;
 
     // Na página da academia, quem dá nome ao link é a academia -- senão o
     // compartilhamento mostraria o nome de um professor qualquer dela.
     if (addressedCompany && !pickedTeacherFromCompany) {
-      const nomeAcademia = addressedCompany.tradeName || addressedCompany.name;
-      const descricaoAcademia =
-        addressedCompany.bio ||
-        addressedCompany.headline ||
-        `Agende aulas com os professores da ${nomeAcademia}.`;
-      document.title = `${nomeAcademia}${addressedCompany.headline ? ` | ${addressedCompany.headline}` : ''}`;
-      setMeta('meta[name="description"]', 'content', descricaoAcademia);
-      setMeta('meta[property="og:title"]', 'content', nomeAcademia);
-      setMeta('meta[property="og:description"]', 'content', descricaoAcademia);
-      if (addressedCompany.heroImageUrl) {
-        setMeta('meta[property="og:image"]', 'content', addressedCompany.heroImageUrl);
-      }
-      setMeta('meta[property="og:url"]', 'content', buildPublicUrl(
-        addressedCompany.customDomain ? 'domain' : 'path',
-        {
-          slug: addressedCompany.slug,
-          domain: addressedCompany.customDomain,
-          kind: 'empresa',
-          platformHost: PLATFORM_HOST,
-        }
-      ));
+      const nome = addressedCompany.tradeName || addressedCompany.name;
+      const descricao =
+        addressedCompany.bio
+        || addressedCompany.headline
+        || `Agende aulas com os professores da ${nome}.`;
+      const url = buildPublicUrl(addressedCompany.customDomain ? 'domain' : 'path', {
+        slug: addressedCompany.slug,
+        domain: addressedCompany.customDomain,
+        kind: 'empresa',
+        platformHost: PLATFORM_HOST,
+      });
+
+      aplicarSeo({
+        titulo: `${nome}${addressedCompany.headline ? ` | ${addressedCompany.headline}` : ''}`,
+        descricao,
+        url,
+        imagem: addressedCompany.heroImageUrl,
+        estrutura: estruturaAcademia({
+          nome,
+          descricao,
+          url,
+          imagem: addressedCompany.heroImageUrl,
+          telefone: addressedCompany.phone,
+        }),
+      });
       return;
     }
 
-    const brand = currentTeacher.brandName || 'Aquagenda';
-    document.title = `${currentTeacher.name} | ${currentTeacher.specialty || brand}`;
-    const description = currentTeacher.bio || `Agende aulas com ${currentTeacher.name}.`;
-    setMeta('meta[name="description"]', 'content', description);
-    setMeta('meta[property="og:title"]', 'content', currentTeacher.name);
-    setMeta('meta[property="og:description"]', 'content', description);
-    if (currentTeacher.heroImageUrl) setMeta('meta[property="og:image"]', 'content', currentTeacher.heroImageUrl);
-    setMeta('meta[property="og:url"]', 'content', buildPublicUrl(
+    const marca = currentTeacher.brandName || 'Aquagenda';
+    const descricao = currentTeacher.bio || `Agende aulas com ${currentTeacher.name}.`;
+    const url = buildPublicUrl(
       currentTeacher.customDomain && planAllows(currentTeacher.plan, 'domain')
         ? 'domain'
         : planAllows(currentTeacher.plan, 'subdomain')
@@ -539,7 +558,23 @@ function AppInner() {
         domain: currentTeacher.customDomain,
         platformHost: PLATFORM_HOST,
       }
-    ));
+    );
+
+    aplicarSeo({
+      titulo: `${currentTeacher.name} | ${currentTeacher.specialty || marca}`,
+      descricao,
+      url,
+      imagem: currentTeacher.heroImageUrl || currentTeacher.avatarUrl,
+      tipo: 'profile',
+      estrutura: estruturaProfessor({
+        nome: currentTeacher.name,
+        descricao,
+        url,
+        imagem: currentTeacher.heroImageUrl || currentTeacher.avatarUrl,
+        especialidade: currentTeacher.specialty,
+        telefone: currentTeacher.whatsapp,
+      }),
+    });
   }, [currentTeacher, addressedCompany, pickedTeacherFromCompany, currentView]);
 
   // URL: mantém #/rota sincronizada com a tela (botão voltar e links compartilháveis)
