@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { SafeImage } from './SafeImage';
 import { TeacherProfile, ServiceItem, Appointment } from '../types';
 import confetti from 'canvas-confetti';
 import { nextBusinessDays, formatMonthYearPtBR } from '../utils/dates';
@@ -266,11 +267,10 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
       <section className="bg-white px-4 pt-6 pb-6 border-b border-[#eceef0]">
         <div className="max-w-2xl mx-auto flex flex-col items-center text-center">
           <div className="relative w-20 h-20 md:w-24 md:h-24 mb-3">
-            <img
+            <SafeImage
               src={teacher.avatarUrl}
               alt={teacher.name}
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-cover rounded-full shadow-ambient border-2 border-white"
+              className="w-full h-full object-cover rounded-full shadow-ambient border-2 border-white text-lg"
             />
             <div className="absolute bottom-0 right-0 w-6 h-6 bg-[#00687a] text-white rounded-full flex items-center justify-center border-2 border-white shadow-xs">
               <Check className="w-3.5 h-3.5" />

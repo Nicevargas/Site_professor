@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { SafeImage } from './SafeImage';
 import { TeacherProfile, ServiceItem, TestimonialItem, CurriculumItem, VideoItem, PhotoItem, FaqItem } from '../types';
 import { 
   ArrowRight, 
@@ -237,18 +238,16 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
         <div className="max-w-7xl mx-auto px-4 md:px-10 h-18 flex justify-between items-center">
           <div className="flex items-center gap-3">
             {teacher.showLogo !== false && teacher.logoUrl ? (
-              <img
+              <SafeImage
                 src={teacher.logoUrl}
                 alt={teacher.brandName || teacher.name}
-                referrerPolicy="no-referrer"
-                className="w-10 h-10 rounded-xl object-contain border border-slate-200 bg-white p-0.5 shadow-xs"
+                className="w-10 h-10 rounded-xl object-contain border border-slate-200 bg-white p-0.5 shadow-xs text-xs"
               />
             ) : (
-              <img
+              <SafeImage
                 src={teacher.avatarUrl}
                 alt={teacher.name}
-                referrerPolicy="no-referrer"
-                className="w-10 h-10 rounded-full object-cover border-2 shadow-xs"
+                className="w-10 h-10 rounded-full object-cover border-2 shadow-xs text-xs"
                 style={{ borderColor: `${primaryColor}40` }}
               />
             )}
@@ -420,11 +419,21 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
           {/* Hero Right Image */}
           <div className="w-full lg:w-1/2 flex justify-center lg:justify-end">
             <div className="relative w-full max-w-[440px] aspect-[4/5] rounded-3xl overflow-hidden shadow-elevated border-4 border-white">
-              <img
+              <SafeImage
                 src={teacher.heroImageUrl}
                 alt={teacher.name}
-                referrerPolicy="no-referrer"
                 className="object-cover w-full h-full"
+                fallback={
+                  <div
+                    className="w-full h-full flex flex-col items-center justify-center gap-3 text-white"
+                    style={{ background: `linear-gradient(135deg, ${accentColor} 0%, ${primaryColor} 100%)` }}
+                  >
+                    <span className="text-4xl font-extrabold tracking-tight">
+                      {(teacher.brandName || teacher.name).slice(0, 24)}
+                    </span>
+                    <span className="text-sm text-white/80">{teacher.specialty || teacher.role}</span>
+                  </div>
+                }
               />
 
               {/* Floating Experience Badge */}
@@ -1040,11 +1049,10 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
               </div>
 
               <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
-                <img
+                <SafeImage
                   src={t.avatarUrl}
                   alt={t.studentName}
-                  referrerPolicy="no-referrer"
-                  className="w-11 h-11 rounded-full object-cover border border-slate-200 shadow-xs"
+                  className="w-11 h-11 rounded-full object-cover border border-slate-200 shadow-xs text-xs"
                 />
                 <div>
                   <h4 className="text-xs md:text-sm font-bold text-[#091426]">{t.studentName}</h4>
