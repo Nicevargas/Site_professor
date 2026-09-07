@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { TeacherProfile, UserRole, Company } from '../types';
 import {
-  Link2, Check, Copy, ExternalLink, Lock, AlertTriangle, ArrowUpRight, Globe, ShieldCheck,
+  Link2, Check, Clock, Copy, ExternalLink, Lock, AlertTriangle, ArrowUpRight, Globe, ShieldCheck,
 } from 'lucide-react';
 import {
   PLANS, PLAN_ORDER, PlanTier, AddressingMode, effectivePlan,
@@ -40,7 +40,13 @@ export const MyAddressView: React.FC<MyAddressViewProps> = ({
   const [domain, setDomain] = useState(currentTeacher.customDomain || '');
   const [copied, setCopied] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  /**
+   * O que mostrar depois de salvar.
+   * 'esperando' é quando o endereço novo ainda não abre: subdomínio e domínio
+   * próprio precisam de certificado, e até ele sair o navegador dá erro de
+   * conexão. Quem não souber disso acha que quebrou.
+   */
+  const [saved, setSaved] = useState<null | 'pronto' | 'esperando'>(null);
 
   const isAdmin = userRole === 'admin';
   const activeMode: AddressingMode =
@@ -62,9 +68,11 @@ export const MyAddressView: React.FC<MyAddressViewProps> = ({
     setTimeout(() => setCopied(null), 2000);
   };
 
-  const flash = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+  // O aviso de espera fica mais tempo na tela: tem o que ler, e o que ele
+  // descreve leva mais que dois segundos e meio para acontecer.
+  const flash = (esperando = false) => {
+    setSaved(esperando ? 'esperando' : 'pronto');
+    setTimeout(() => setSaved(null), esperando ? 15000 : 2500);
   };
 
   const handleSaveSlug = (e: React.FormEvent) => {
@@ -84,7 +92,8 @@ export const MyAddressView: React.FC<MyAddressViewProps> = ({
     setError(null);
     setSlug(clean);
     onUpdateTeacher({ ...currentTeacher, slug: clean });
-    flash();
+    // No Start o endereço é /p/<slug>, que abre na hora: só o subdomínio espera
+    flash(planAllows(planTier, 'subdomain') && clean !== currentTeacher.slug);
   };
 
   const handleSaveDomain = (e: React.FormEvent) => {
@@ -101,7 +110,7 @@ export const MyAddressView: React.FC<MyAddressViewProps> = ({
       customDomain: clean || undefined,
       customDomainStatus: clean ? 'pendente' : 'nenhum',
     });
-    flash();
+    flash(!!clean && clean !== currentTeacher.customDomain);
   };
 
   const handleChangePlan = (tier: PlanTier) => {
@@ -135,10 +144,23 @@ export const MyAddressView: React.FC<MyAddressViewProps> = ({
           </p>
         </header>
 
-        {saved && (
+        {saved === 'pronto' && (
           <div role="status" className="flex items-center gap-2 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold">
             <Check className="w-4 h-4" />
             Endereço atualizado.
+          </div>
+        )}
+
+        {saved === 'esperando' && (
+          <div role="status" className="flex items-start gap-2 p-3 rounded-xl bg-cyan-50 border border-[#57dffe] text-[#00505e] text-xs">
+            <Clock className="w-4 h-4 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold">Endereço salvo. Ele abre em cerca de um minuto.</p>
+              <p className="mt-1 leading-relaxed">
+                É o tempo de emitir o certificado de segurança do endereço novo. Antes disso, o
+                navegador mostra erro de conexão — espere um pouco e recarregue.
+              </p>
+            </div>
           </div>
         )}
 
