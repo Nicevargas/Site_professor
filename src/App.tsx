@@ -82,6 +82,7 @@ import { formatMonthYearPtBR, toLocalDateKey } from './utils/dates';
 import { SyncErrorToast } from './components/SyncErrorToast';
 import { MyAddressView } from './components/MyAddressView';
 import { resolveTenant, slugify, buildPublicUrl, slugFromRoute, PLATFORM_HOST } from './utils/tenant';
+import { AddressNotFoundView } from './components/AddressNotFoundView';
 import { getPlan, planAllows } from './utils/plans';
 
 
@@ -150,6 +151,12 @@ function AppInner() {
    * o endereço pode ser de professor ou de academia, nunca dos dois.
    */
   const [addressedCompany, setAddressedCompany] = useState<Company | null>(null);
+  /**
+   * Em que pé está a busca do endereço pedido na URL.
+   * 'ocioso' vale para quem entrou pela raiz, sem pedir vitrine nenhuma.
+   */
+  const [statusEndereco, setStatusEndereco] =
+    useState<'ocioso' | 'procurando' | 'encontrado' | 'nao-encontrado'>('ocioso');
   /** O visitante já escolheu um professor dentro da página da academia */
   const [pickedTeacherFromCompany, setPickedTeacherFromCompany] = useState(false);
 
@@ -394,27 +401,37 @@ function AppInner() {
     if (achada) setAddressedCompany(achada);
   }, [companies, tenantRef.mode, tenantRef.kind, tenantRef.slug, tenantRef.domain]);
 
-  // ...e depois o banco, que é a fonte da verdade
+  /**
+   * ...e depois o banco, que é a fonte da verdade.
+   *
+   * As duas buscas ficam juntas de propósito. Separadas, nenhuma das duas
+   * sabia se a outra tinha achado algo, então "não encontrei" era
+   * indistinguível de "ainda estou procurando" -- e o endereço errado caía no
+   * professor de demonstração. Com o curinga no DNS isso deixou de ser raro:
+   * qualquer subdomínio digitado errado chega até aqui.
+   */
   useEffect(() => {
-    if (tenantRef.mode === 'none' || tenantRef.kind === 'professor' || !isSupabaseConfigured) return;
+    if (tenantRef.mode === 'none' || !isSupabaseConfigured) return;
     let cancelled = false;
-    supabaseService
-      .getCompanyByAddress({ slug: tenantRef.slug, domain: tenantRef.domain })
-      .then((found) => {
-        if (found && !cancelled) setAddressedCompany(found);
-      });
+    setStatusEndereco('procurando');
+
+    const ref = { slug: tenantRef.slug, domain: tenantRef.domain };
+    Promise.all([
+      tenantRef.kind === 'professor' ? Promise.resolve(null) : supabaseService.getCompanyByAddress(ref),
+      tenantRef.kind === 'empresa' ? Promise.resolve(null) : supabaseService.getTeacherByAddress(ref),
+    ]).then(([empresa, professor]) => {
+      if (cancelled) return;
+      if (empresa) setAddressedCompany(empresa);
+      if (professor) setCurrentTeacher(professor);
+      setStatusEndereco(empresa || professor ? 'encontrado' : 'nao-encontrado');
+    }).catch(() => {
+      // Banco fora do ar não é endereço inexistente: melhor mostrar o que
+      // temos em memória do que acusar de erro quem digitou certo.
+      if (!cancelled) setStatusEndereco('encontrado');
+    });
+
     return () => { cancelled = true; };
   }, [tenantRef.mode, tenantRef.kind, tenantRef.slug, tenantRef.domain]);
-
-  // A vitrine pedida pelo endereço vence a lista local assim que o banco responde
-  useEffect(() => {
-    if (tenantRef.mode === 'none' || tenantRef.kind === 'empresa' || !isSupabaseConfigured) return;
-    let cancelled = false;
-    supabaseService.getTeacherByAddress({ slug: tenantRef.slug, domain: tenantRef.domain }).then((found) => {
-      if (found && !cancelled) setCurrentTeacher(found);
-    });
-    return () => { cancelled = true; };
-  }, [tenantRef.mode, tenantRef.slug, tenantRef.domain]);
 
   // Título e prévia de link seguem a vitrine aberta, não um texto fixo no HTML
   useEffect(() => {
@@ -1207,6 +1224,21 @@ function AppInner() {
       svc.description.toLowerCase().includes(q)
     );
   });
+
+  /**
+   * Endereço que não é de ninguém.
+   *
+   * Só para visitante: quem está logado veio usar o sistema, e trocar a tela
+   * dele por um erro de endereço seria tirá-lo do próprio painel.
+   */
+  if (statusEndereco === 'nao-encontrado' && !currentUser) {
+    return (
+      <AddressNotFoundView
+        endereco={tenantRef.domain || window.location.hostname}
+        onEnterApp={() => setCurrentView('auth')}
+      />
+    );
+  }
 
   // Public views without admin sidebar layout
   if (currentView === 'auth') {
