@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { SafeImage } from './SafeImage';
 import { SITE_SECTIONS, SiteSectionId, sectionLabel, visibleSections } from '../utils/siteSections';
 import { TeacherProfile, ServiceItem, TestimonialItem, CurriculumItem, VideoItem, PhotoItem, FaqItem } from '../types';
+import { linkWhatsapp } from '../utils/whatsappLink';
 import { 
   ArrowRight, 
   CheckCircle2, 
@@ -900,7 +901,7 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
                           <div className="mt-3 flex items-center justify-between pt-2 text-[11px] text-slate-400">
                             <span className="capitalize font-medium">Categoria: {faq.category}</span>
                             <a
-                              href={`https://wa.me/${teacher.whatsapp}?text=${encodeURIComponent(`Olá, ainda tenho uma dúvida sobre: ${faq.question}`)}`}
+                              href={linkWhatsapp(teacher.whatsapp, `Olá, ainda tenho uma dúvida sobre: ${faq.question}`) || '#'}
                               target="_blank"
                               rel="noreferrer"
                               className="text-[#00687a] font-semibold hover:underline inline-flex items-center gap-1"
@@ -920,6 +921,21 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
   };
 
   const secoesDoCorpo = secoesVisiveis.filter((id) => id !== 'inicio');
+
+  /**
+   * O WhatsApp do professor, quando existe.
+   *
+   * Era montado cru em cinco lugares: número com máscara virava endereço
+   * quebrado, e número vazio virava `https://wa.me/`, que abre o aplicativo
+   * sem destinatário -- o visitante acha que falou com o professor e ninguém
+   * recebe nada. Sem número, os botões não aparecem.
+   */
+  const zap = linkWhatsapp(teacher.whatsapp);
+  const zapDuvidas = linkWhatsapp(
+    teacher.whatsapp,
+    'Olá, Prof! Gostaria de tirar dúvidas sobre as aulas e agendamentos.'
+  );
+
 
   return (
     <div className="min-h-screen bg-[#f7f9fb] text-[#191c1e] font-sans flex flex-col selection:bg-[#00687a] selection:text-white">
@@ -1006,15 +1022,17 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
             </nav>
 
           <div className="flex items-center gap-2.5">
-            <a
-              href={`https://wa.me/${teacher.whatsapp}`}
-              target="_blank"
-              rel="noreferrer"
-              className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl hover:bg-emerald-100 transition-colors"
-            >
-              <Phone className="w-3.5 h-3.5 text-emerald-600" />
-              <span>WhatsApp</span>
-            </a>
+            {zap && (
+              <a
+                href={zap}
+                target="_blank"
+                rel="noreferrer"
+                className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl hover:bg-emerald-100 transition-colors"
+              >
+                <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                <span>WhatsApp</span>
+              </a>
+            )}
 
             {isAuthenticated ? (
               <button
@@ -1219,15 +1237,17 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
               <ArrowRight className="w-4 h-4" />
             </button>
 
-            <a
-              href={`https://wa.me/${teacher.whatsapp}`}
-              target="_blank"
-              rel="noreferrer"
-              className="h-13 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-6 rounded-xl shadow-elevated transition-all flex items-center gap-2"
-            >
-              <Phone className="w-4 h-4" />
-              <span>Falar no WhatsApp</span>
-            </a>
+            {zap && (
+              <a
+                href={zap}
+                target="_blank"
+                rel="noreferrer"
+                className="h-13 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-6 rounded-xl shadow-elevated transition-all flex items-center gap-2"
+              >
+                <Phone className="w-4 h-4" />
+                <span>Falar no WhatsApp</span>
+              </a>
+            )}
           </div>
         </div>
       </section>
@@ -1397,9 +1417,10 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
       )}
 
       {/* ================= FLOATING WHATSAPP FAB BUTTON ================= */}
+      {zapDuvidas && (
       <div className="fixed bottom-6 right-6 z-40 flex items-center gap-3">
         <a
-          href={`https://wa.me/${teacher.whatsapp}?text=${encodeURIComponent('Olá, Prof! Gostaria de tirar dúvidas sobre as aulas e agendamentos.')}`}
+          href={zapDuvidas}
           target="_blank"
           rel="noreferrer"
           className="group flex items-center gap-3 bg-emerald-600 hover:bg-emerald-500 text-white p-3.5 sm:px-5 sm:py-3.5 rounded-full shadow-elevated transition-all duration-300 hover:scale-105 active:scale-95 border-2 border-white"
@@ -1416,6 +1437,7 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
           </div>
         </a>
       </div>
+      )}
 
     </div>
   );
