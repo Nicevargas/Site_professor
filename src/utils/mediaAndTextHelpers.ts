@@ -239,3 +239,59 @@ export function exportAppointmentsToCsv(appointments: Appointment[], teacherName
   link.click();
   document.body.removeChild(link);
 }
+
+/**
+ * Lê a imagem já reduzida ao tamanho que o site usa.
+ *
+ * As imagens do professor viram data URL dentro da linha dele no banco, sem
+ * passar por storage. Sem reduzir, uma foto de celular de 4000px vira uns
+ * 3 MB de texto que o banco guarda e TODO visitante baixa junto com a página
+ * -- para exibir num quadrado de 400px.
+ *
+ * Redimensiona pelo maior lado, mantendo proporção, e nunca amplia: imagem
+ * pequena continua do tamanho que é, só que recomprimida.
+ */
+export function readImageResized(
+  file: File,
+  maxSide = 1200,
+  quality = 0.82
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('O arquivo não parece ser uma imagem.'));
+      img.onload = () => {
+        const maior = Math.max(img.width, img.height);
+        const escala = maior > maxSide ? maxSide / maior : 1;
+        const largura = Math.round(img.width * escala);
+        const altura = Math.round(img.height * escala);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = largura;
+        canvas.height = altura;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          // Sem canvas (navegador antigo, teste sem DOM gráfico) fica o original:
+          // imagem grande é melhor que nenhuma imagem.
+          resolve(String(reader.result));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, largura, altura);
+
+        // PNG só quando a transparência importa (logo); foto vira JPEG
+        const temAlfa = file.type === 'image/png' || file.type === 'image/webp';
+        resolve(canvas.toDataURL(temAlfa ? 'image/webp' : 'image/jpeg', quality));
+      };
+      img.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/** Quantos KB um data URL ocupa, para avisar quando ficou grande demais. */
+export function dataUrlKb(dataUrl: string): number {
+  const base64 = dataUrl.split(',')[1] || '';
+  return Math.round((base64.length * 3) / 4 / 1024);
+}

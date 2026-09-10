@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { THEME_COLOR_PRESETS, PRESET_LOGO_OPTIONS, ColorThemePreset } from '../utils/themePresets';
 import { readFileAsDataUrl } from '../utils/mediaAndTextHelpers';
+import { ImageField } from './ImageField';
 
 interface SiteBrandingCustomizerProps {
   currentTeacher: TeacherProfile;
@@ -58,6 +59,11 @@ export const SiteBrandingCustomizer: React.FC<SiteBrandingCustomizerProps> = ({
     currentTeacher.showLogo ?? true
   );
 
+  // A foto do professor e a capa não tinham editor em lugar nenhum: ficavam
+  // nas iniciais, e trocá-las exigia mexer no banco.
+  const [avatarUrl, setAvatarUrl] = useState<string>(currentTeacher.avatarUrl || '');
+  const [heroImageUrl, setHeroImageUrl] = useState<string>(currentTeacher.heroImageUrl || '');
+
   const [isSaved, setIsSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<'colors' | 'logo' | 'preview'>('colors');
 
@@ -92,6 +98,8 @@ export const SiteBrandingCustomizer: React.FC<SiteBrandingCustomizerProps> = ({
       brandName: brandName.trim() || currentTeacher.name,
       logoUrl: logoUrl.trim(),
       showLogo,
+      avatarUrl: avatarUrl.trim(),
+      heroImageUrl: heroImageUrl.trim(),
     };
     onUpdateTeacher(updated);
     setIsSaved(true);
@@ -170,7 +178,7 @@ export const SiteBrandingCustomizer: React.FC<SiteBrandingCustomizerProps> = ({
           }`}
         >
           <ImageIcon className="w-4 h-4" />
-          <span>Logo & Nome da Marca</span>
+          <span>Imagens & Logo</span>
         </button>
 
         <button
@@ -378,11 +386,37 @@ export const SiteBrandingCustomizer: React.FC<SiteBrandingCustomizerProps> = ({
             <div>
               <h3 className="text-base font-bold text-[#091426] flex items-center gap-2">
                 <ImageIcon className="w-4 h-4 text-[#00687a]" />
-                <span>Configuração de Logo & Identidade</span>
+                <span>Imagens e identidade</span>
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Defina a logo oficial e o nome comercial que aparecem no topo e no rodapé do seu site.
+                As imagens que aparecem no seu site, a logo e o nome comercial.
               </p>
+            </div>
+
+            {/*
+              As duas imagens que o visitante vê primeiro: o rosto no topo e
+              a capa do lado direito. Vêm antes da logo porque é o que falta
+              na maioria dos perfis -- logo, muita gente não tem.
+            */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <ImageField
+                label="Foto do professor"
+                hint="Aparece no topo do site e ao lado do seu nome. Um retrato de rosto funciona melhor."
+                value={avatarUrl}
+                onChange={setAvatarUrl}
+                fallbackName={currentTeacher.name}
+                maxSide={600}
+                shape="circulo"
+              />
+              <ImageField
+                label="Imagem de capa"
+                hint="A imagem grande à direita, na abertura do site. Use uma foto larga, da sua aula ou do espaço."
+                value={heroImageUrl}
+                onChange={setHeroImageUrl}
+                fallbackName={currentTeacher.name}
+                maxSide={1600}
+                shape="largo"
+              />
             </div>
 
             {/* Brand Name Input */}
