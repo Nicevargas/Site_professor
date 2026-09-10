@@ -685,8 +685,22 @@ function AppInner() {
            * demais fica em branco: a tela vazia diz a verdade.
            */
           const meu = professorDoUsuario(currentUser, dbTeachers);
+
+          /**
+           * Visitante que PEDIU um endereço não recebe palpite nenhum.
+           *
+           * Este efeito e o do endereço correm juntos, e quem terminar por
+           * último vence. Escolher dbTeachers[0] aqui fazia /p/eunice-vargas
+           * abrir a vitrine do primeiro professor da lista quando esta
+           * consulta respondia depois -- o endereço estava certo, a página
+           * era de outra pessoa. Quem pediu um endereço já tem dono; o outro
+           * efeito o encontra.
+           */
+          const pediuEndereco = tenantRef.mode !== 'none';
           const activeTeacher =
-            meu || (podeVerOutroProfessor(currentUser) || !currentUser ? dbTeachers[0] : null);
+            meu
+            || (pediuEndereco ? null
+                : podeVerOutroProfessor(currentUser) || !currentUser ? dbTeachers[0] : null);
 
           if (activeTeacher) {
             setCurrentTeacher(activeTeacher);
