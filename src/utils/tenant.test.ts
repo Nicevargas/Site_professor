@@ -146,3 +146,31 @@ describe('endereço por caminho, do jeito que a hospedagem entrega', () => {
     expect(ref.mode).toBe('none');
   });
 });
+
+describe('onde cada endereço é servido', () => {
+  it('subdomínio pende do domínio-raiz, caminho vive no host do app', () => {
+    // Os dois papéis são incompatíveis quando a raiz do domínio é outro
+    // sistema: renato.dominio.com precisa da raiz, mas dominio.com/p/slug
+    // abriria o produto errado
+    expect(buildPublicUrl('subdomain', {
+      slug: 'renato', platformHost: 'plataformaeducar.net', appHost: 'app.plataformaeducar.net',
+    })).toBe('https://renato.plataformaeducar.net');
+
+    expect(buildPublicUrl('path', {
+      slug: 'eunice-vargas', platformHost: 'plataformaeducar.net', appHost: 'app.plataformaeducar.net',
+    })).toBe('https://app.plataformaeducar.net/p/eunice-vargas');
+  });
+
+  it('sem host de app, o caminho volta para o domínio-raiz', () => {
+    // Quem serve o app na própria raiz não precisa configurar nada
+    expect(buildPublicUrl('path', { slug: 'ana', platformHost: 'aquagenda.com.br' }))
+      .toBe('https://aquagenda.com.br/p/ana');
+  });
+
+  it('academia usa /e/ no caminho, também no host do app', () => {
+    expect(buildPublicUrl('path', {
+      slug: 'academia-x', kind: 'empresa',
+      platformHost: 'plataformaeducar.net', appHost: 'app.plataformaeducar.net',
+    })).toBe('https://app.plataformaeducar.net/e/academia-x');
+  });
+});

@@ -11,6 +11,24 @@ export const PLATFORM_HOST = (
   ((import.meta as any).env?.VITE_PLATFORM_HOST as string) || ''
 ).trim().toLowerCase();
 
+/**
+ * O host que REALMENTE serve o app, para o endereço por caminho.
+ *
+ * PLATFORM_HOST é o domínio-raiz, e ele precisa ser a raiz mesmo: o
+ * subdomínio de um professor tem que ficar a um nível dele
+ * (renato.dominio.com), porque dois níveis são recusados de propósito.
+ *
+ * Mas a raiz do domínio nem sempre é o Aquagenda. Em plataformaeducar.net
+ * ela é outro sistema, e o app diz ao professor do Start que o endereço dele
+ * é dominio.com/p/slug -- um link que abre o produto errado, com HTTP 200,
+ * porque aquele sistema devolve a própria página para qualquer caminho.
+ *
+ * Vazio, vale o PLATFORM_HOST: quem serve o app na raiz não precisa de nada.
+ */
+export const APP_HOST = (
+  ((import.meta as any).env?.VITE_APP_HOST as string) || ''
+).trim().toLowerCase();
+
 /** Subdomínios da plataforma que nunca são professores. */
 const RESERVED_SUBDOMAINS = new Set([
   'www', 'app', 'api', 'admin', 'painel', 'auth', 'cdn', 'static', 'assets', 'mail', 'blog', 'docs',
@@ -97,6 +115,8 @@ export function buildPublicUrl(
     slug?: string;
     domain?: string;
     platformHost?: string;
+    /** Host que serve o app; só afeta o endereço por caminho */
+    appHost?: string;
     protocol?: string;
     /** 'empresa' usa /e/ no caminho; o padrão continua sendo o professor */
     kind?: TenantKind;
@@ -105,9 +125,14 @@ export function buildPublicUrl(
   const platform = (opts.platformHost ?? PLATFORM_HOST) || 'aquagenda.com.br';
   const scheme = opts.protocol ?? 'https://';
   if (mode === 'domain' && opts.domain) return `${scheme}${opts.domain}`;
+
+  // Subdomínio pende do domínio-raiz, e só dele: dois níveis são recusados
   if (mode === 'subdomain' && opts.slug) return `${scheme}${opts.slug}.${platform}`;
+
+  // Caminho vive onde o app está servido, que pode não ser a raiz do domínio
+  const appHost = (opts.appHost ?? APP_HOST) || platform;
   const prefixo = opts.kind === 'empresa' ? 'e' : 'p';
-  return `${scheme}${platform}/${prefixo}/${opts.slug || ''}`;
+  return `${scheme}${appHost}/${prefixo}/${opts.slug || ''}`;
 }
 
 const TITLE_PREFIXES = /^(prof|profa|professor|professora|dr|dra|sr|sra)\.?\s+/i;
