@@ -300,22 +300,37 @@ function AppInner() {
    * Espelha public.account_user_count(); quem realmente barra é o gatilho
    * enforce_user_quota no banco. Aqui é só para avisar antes da ida perdida.
    */
+  /**
+   * Quanta gente já ocupa a conta.
+   *
+   * Contava só system_users -- ou seja, quem tem login. Mas o professor
+   * cadastra aluno em "Meus Alunos", e ali não nasce login nenhum: a conta
+   * ficava sempre perto de zero, e o limite do plano nunca chegava. O plano
+   * dizia "1 a 10 usuários" e aceitava mil.
+   *
+   * Aluno com login aparece nas duas listas, então é contado uma vez só.
+   */
   const accountQuota = useMemo(() => {
     const idsDaEmpresa = new Set(
       currentCompanyId
         ? teachers.filter((t) => t.companyId === currentCompanyId).map((t) => t.id)
         : [currentTeacher.id]
     );
-    const usados = systemUsers.filter(
+
+    const alunosDaConta = allStudents.filter((a) => a.teacherId && idsDaEmpresa.has(a.teacherId));
+    const idsDeAlunos = new Set(alunosDaConta.map((a) => a.id));
+
+    const logins = systemUsers.filter(
       (u) =>
         u.role !== 'admin' &&
+        !(u.studentId && idsDeAlunos.has(u.studentId)) &&
         ((currentCompanyId && u.companyId === currentCompanyId) ||
           (u.teacherId && idsDaEmpresa.has(u.teacherId)))
     ).length;
 
     const tier = currentCompany?.plan || currentTeacher.plan;
-    return quotaStatus(tier, usados);
-  }, [systemUsers, teachers, currentCompanyId, currentCompany?.plan, currentTeacher.id, currentTeacher.plan]);
+    return quotaStatus(tier, logins + alunosDaConta.length);
+  }, [systemUsers, allStudents, teachers, currentCompanyId, currentCompany?.plan, currentTeacher.id, currentTeacher.plan]);
 
   /**
    * Usuários que o gestor administra: os da empresa dele, direto pelo
@@ -1274,6 +1289,13 @@ function AppInner() {
 
   // Student actions
   const handleAddStudent = (newStudentData: Omit<Student, 'id' | 'totalClasses' | 'joinedDate'>) => {
+    // O limite do plano é sobre quanta gente cabe na conta. Bloquear só na
+    // tela "Usuários" não adiantava: o professor nem abre aquela tela, e é
+    // aqui que ele cadastra aluno.
+    // Trava de segurança: a tela já desabilita o botão e explica o motivo,
+    // mas quem chamar por outro caminho também não passa.
+    if (accountQuota.isFull) return;
+
     const newStudent: Student = {
       ...newStudentData,
       id: `std-${Date.now()}`,
@@ -1677,6 +1699,7 @@ function AppInner() {
             <StudentsView
               students={students}
               onAddStudent={handleAddStudent}
+              quota={accountQuota}
               onSelectStudentToSchedule={handleScheduleForStudent}
               onUpdateStudent={handleUpdateStudent}
             />

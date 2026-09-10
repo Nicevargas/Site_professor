@@ -150,3 +150,24 @@ describe('limite de usuários por plano', () => {
     expect(q.remaining).toBe(488);
   });
 });
+
+describe('o limite conta gente, não login', () => {
+  it('conta cheia recusa mais um', () => {
+    // O plano Start comporta 10; com 10 ocupados não entra aluno novo
+    const cheia = quotaStatus('start', 10);
+    expect(cheia.isFull).toBe(true);
+    expect(cheia.remaining).toBe(0);
+    expect(cheia.suggested?.tier).toBe('pro');
+  });
+
+  it('avisa antes de encher, para o botão não morrer sem explicação', () => {
+    expect(quotaStatus('start', 9).isNearLimit).toBe(true);
+    expect(quotaStatus('start', 9).isFull).toBe(false);
+    expect(quotaStatus('start', 4).isNearLimit).toBe(false);
+  });
+
+  it('no maior plano não há para onde subir', () => {
+    expect(quotaStatus('premium', 500).isFull).toBe(true);
+    expect(quotaStatus('premium', 500).suggested).toBeNull();
+  });
+});

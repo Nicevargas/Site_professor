@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Student, StudentLevel, STUDENT_LEVEL_LABELS } from '../types';
+import { QuotaStatus } from '../utils/plans';
 import { 
   Users, 
   Search, 
@@ -20,6 +21,8 @@ interface StudentsViewProps {
   onSelectStudentToSchedule: (student: Student) => void;
   /** Ajuste rápido do nível direto no card */
   onUpdateStudent?: (id: string, updates: Partial<Student>) => void;
+  /** Quanta gente cabe na conta. Cheia, não entra aluno novo. */
+  quota?: QuotaStatus;
 }
 
 export const StudentsView: React.FC<StudentsViewProps> = ({
@@ -27,6 +30,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
   onAddStudent,
   onSelectStudentToSchedule,
   onUpdateStudent,
+  quota,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'Todos' | 'Ativo' | 'Inativo'>('Todos');
@@ -99,12 +103,42 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="h-12 px-6 bg-[#00687a] hover:bg-[#004e5c] text-white font-semibold text-sm rounded-xl flex items-center justify-center gap-2 shadow-ambient hover:shadow-elevated transition-all"
+            disabled={quota?.isFull}
+            title={quota?.isFull ? 'Seu plano está cheio' : undefined}
+            className="h-12 px-6 bg-[#00687a] enabled:hover:bg-[#004e5c] text-white font-semibold text-sm rounded-xl flex items-center justify-center gap-2 shadow-ambient enabled:hover:shadow-elevated transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <UserPlus className="w-5 h-5" />
             <span>Cadastrar Aluno</span>
           </button>
         </div>
+
+        {/*
+          O limite do plano é sobre quanta gente cabe na conta -- equipe e
+          alunos somados. Avisar antes de encher evita a surpresa de o botão
+          morrer sem explicação no meio de um cadastro.
+        */}
+        {quota && (quota.isFull || quota.isNearLimit) && (
+          <div
+            role="status"
+            className={`p-4 rounded-xl border text-sm ${
+              quota.isFull
+                ? 'bg-rose-50 border-rose-200 text-rose-900'
+                : 'bg-amber-50 border-amber-200 text-amber-900'
+            }`}
+          >
+            <p className="font-semibold">
+              {quota.isFull
+                ? `Seu plano está cheio: ${quota.used} de ${quota.limit} pessoas.`
+                : `Faltam ${quota.remaining} vagas no seu plano (${quota.used} de ${quota.limit}).`}
+            </p>
+            <p className="mt-1 leading-relaxed">
+              O limite vale para equipe e alunos somados.
+              {quota.suggested
+                ? ` O plano ${quota.suggested.name} comporta ${quota.suggested.maxUsers} pessoas — a troca é feita em "Meu endereço".`
+                : ' Fale com a administração para ampliar a conta.'}
+            </p>
+          </div>
+        )}
 
         {/* Search & Filter Bar */}
         <div className="bg-white p-4 rounded-xl border border-[#eceef0] shadow-card flex flex-col md:flex-row justify-between gap-4">
