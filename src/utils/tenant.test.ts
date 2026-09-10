@@ -124,3 +124,25 @@ describe('vitrine da academia', () => {
       .toBe('https://academiaaquavida.com.br');
   });
 });
+
+describe('endereço por caminho, do jeito que a hospedagem entrega', () => {
+  it('lê /p/<slug> do caminho, não só do hash', () => {
+    // O código sempre soube ler isto; o que faltava era a Vercel devolver o
+    // index.html em vez de 404 para um caminho sem arquivo correspondente
+    const ref = resolveTenant({ hostname: 'localhost', pathname: '/p/eunice-vargas', hash: '' });
+    expect(ref.mode).toBe('path');
+    expect(ref.slug).toBe('eunice-vargas');
+    expect(ref.kind).toBe('professor');
+  });
+
+  it('lê /e/<slug> como academia', () => {
+    const ref = resolveTenant({ hostname: 'localhost', pathname: '/e/academia-x', hash: '' });
+    expect(ref.kind).toBe('empresa');
+    expect(ref.slug).toBe('academia-x');
+  });
+
+  it('caminho com prefixo antes do /p/ não vale: seria endereço de outro site', () => {
+    const ref = resolveTenant({ hostname: 'localhost', pathname: '/educar/p/eunice', hash: '' });
+    expect(ref.mode).toBe('none');
+  });
+});

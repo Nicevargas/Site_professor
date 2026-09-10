@@ -1,19 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TeacherProfile, TestimonialItem, CurriculumItem, VideoItem, PhotoItem, FaqItem, ServiceItem, SiteAdminTab } from '../types';
 import { SiteMenuSection } from './site-admin/SiteMenuSection';
-import {
-  Globe,
-  MessageSquare,
-  GraduationCap,
-  Video,
-  Image as ImageIcon,
-  ExternalLink,
-  Eye,
-  CheckCircle2,
-  HelpCircle,
-  Palette,
-  LayoutList
-} from 'lucide-react';
+import { Globe, MessageSquare, GraduationCap, Video, Image as ImageIcon, ExternalLink, Eye, CheckCircle2, HelpCircle, Palette, LayoutList, Copy, Check } from 'lucide-react';
 import { SiteBrandingCustomizer } from './SiteBrandingCustomizer';
 import { TestimonialsSection } from './site-admin/TestimonialsSection';
 import { CurriculumSection } from './site-admin/CurriculumSection';
@@ -25,6 +13,9 @@ import { FaqsSection } from './site-admin/FaqsSection';
  * Tela "Meu Site": cabeçalho, resumo e navegação entre seções.
  * Cada seção (depoimentos, currículo, vídeos, fotos, FAQ) vive em src/components/site-admin/.
  */
+import { buildPublicUrl, PLATFORM_HOST, slugify } from '../utils/tenant';
+import { planAllows } from '../utils/plans';
+
 interface SiteAdminViewProps {
   currentTeacher: TeacherProfile;
   testimonials: TestimonialItem[];
@@ -64,6 +55,35 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
   activeTab: requestedTab,
   onTabChange,
 }) => {
+  const [linkCopiado, setLinkCopiado] = React.useState(false);
+
+  /**
+   * O endereço público de verdade.
+   *
+   * Os botões daqui abrem a vitrine DENTRO do app, em #/site -- útil para
+   * conferir enquanto edita, mas não é o link que se manda para um aluno. O
+   * professor só encontrava o endereço real em "Meu endereço", numa tela
+   * que ele abre uma vez e nunca mais.
+   */
+  const enderecoPublico = buildPublicUrl(
+    currentTeacher.customDomain && planAllows(currentTeacher.plan, 'domain')
+      ? 'domain'
+      : planAllows(currentTeacher.plan, 'subdomain')
+      ? 'subdomain'
+      : 'path',
+    {
+      slug: currentTeacher.slug || slugify(currentTeacher.name),
+      domain: currentTeacher.customDomain,
+      platformHost: PLATFORM_HOST,
+    }
+  );
+
+  const copiarLink = () => {
+    navigator.clipboard?.writeText(enderecoPublico);
+    setLinkCopiado(true);
+    setTimeout(() => setLinkCopiado(false), 2000);
+  };
+
   const [activeTab, setActiveTabState] = useState<SiteAdminTab>(requestedTab || 'branding');
 
   useEffect(() => {
@@ -112,9 +132,42 @@ export const SiteAdminView: React.FC<SiteAdminViewProps> = ({
             className="flex items-center justify-center gap-2 px-5 py-3 bg-[#00687a] hover:bg-[#004e5c] text-white rounded-xl text-xs font-bold transition-all shadow-ambient hover:scale-[1.02] shrink-0"
           >
             <Eye className="w-4 h-4 text-cyan-300" />
-            <span>Visualizar Site Público</span>
-            <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+            <span>Ver prévia no app</span>
           </button>
+        </div>
+
+        {/* O link que o professor manda para os alunos, à vista e clicável */}
+        <div className="mt-4 p-3 rounded-xl bg-white/10 border border-white/20 flex flex-col sm:flex-row sm:items-center gap-2">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-200 shrink-0">
+            Endereço do seu site
+          </span>
+          <a
+            href={enderecoPublico}
+            target="_blank"
+            rel="noreferrer"
+            className="flex-1 min-w-0 text-xs font-mono text-white underline decoration-cyan-300/50 hover:decoration-cyan-300 truncate"
+          >
+            {enderecoPublico}
+          </a>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={copiarLink}
+              className="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-white text-[11px] font-bold inline-flex items-center gap-1.5 transition-colors"
+            >
+              {linkCopiado ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              {linkCopiado ? 'Copiado' : 'Copiar'}
+            </button>
+            <a
+              href={enderecoPublico}
+              target="_blank"
+              rel="noreferrer"
+              className="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-white text-[11px] font-bold inline-flex items-center gap-1.5 transition-colors"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              Abrir
+            </a>
+          </div>
         </div>
 
         {/* Metrics Summary Strip */}
