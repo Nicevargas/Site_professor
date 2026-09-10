@@ -15,6 +15,7 @@ import { SiteAdminTab, ViewMode } from '../types';
  */
 const HASH_BY_VIEW: Record<ViewMode, string> = {
   plataforma: '/conheca',
+  'admin-metricas': '/plataforma',
   'public-landing': '/site',
   'public-booking': '/agendar',
   auth: '/entrar',
@@ -35,6 +36,7 @@ const HASH_BY_VIEW: Record<ViewMode, string> = {
 
 export const VIEW_TITLES: Record<ViewMode, string> = {
   plataforma: 'Conheça o Aquagenda',
+  'admin-metricas': 'Painel da plataforma',
   'public-landing': 'Site público',
   'public-booking': 'Agendar aula',
   auth: 'Entrar',

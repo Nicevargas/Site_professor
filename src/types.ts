@@ -1,6 +1,8 @@
 export type ViewMode = 
   /** Página de vendas da plataforma: o que aparece quando ninguém foi pedido pelo endereço */
   | 'plataforma'
+  /** Painel da plataforma: só admin */
+  | 'admin-metricas'
   | 'dashboard'
   | 'agenda'
   | 'servicos'

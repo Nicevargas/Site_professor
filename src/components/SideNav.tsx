@@ -3,35 +3,7 @@ import { ViewMode, TeacherProfile, AuthUser, UserRole, SiteAdminTab } from '../t
 import { useAccessibility } from '../context/AccessibilityContext';
 import { SITE_ADMIN_SECTIONS } from '../utils/routes';
 import { AquagendaIcon } from './AquagendaLogo';
-import { 
-  LayoutDashboard, 
-  Calendar as CalendarIcon, 
-  Layers, 
-  Users, 
-  Settings, 
-  CreditCard,
-  ExternalLink, 
-  Zap, 
-  Globe, 
-  DollarSign,
-  ShieldCheck,
-  GraduationCap,
-  Headphones,
-  UserCheck,
-  BookmarkCheck,
-  Video,
-  HelpCircle,
-  PlayCircle,
-  X,
-  Pin,
-  PinOff,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Menu,
-  Smartphone,
-  Link2,
-  Building2,
-} from 'lucide-react';
+import { LayoutDashboard, Calendar as CalendarIcon, Layers, Users, Settings, CreditCard, ExternalLink, Zap, Globe, DollarSign, ShieldCheck, GraduationCap, Headphones, UserCheck, BookmarkCheck, Video, HelpCircle, PlayCircle, X, Pin, PinOff, PanelLeftClose, PanelLeftOpen, Menu, Smartphone, Link2, Building2, BarChart3 } from 'lucide-react';
 
 export type SidebarMode = 'drawer' | 'pinned' | 'compact';
 
@@ -76,6 +48,7 @@ export const SideNav: React.FC<SideNavProps> = ({
       case 'admin':
         return [
           { id: 'dashboard' as ViewMode, label: 'Dashboard Geral', icon: LayoutDashboard },
+          { id: 'admin-metricas' as ViewMode, label: 'Painel da Plataforma', icon: BarChart3 },
           { id: 'agenda' as ViewMode, label: 'Agenda Global', icon: CalendarIcon },
           { id: 'servicos' as ViewMode, label: 'Serviços', icon: Layers },
           { id: 'alunos' as ViewMode, label: 'Alunos & CRM', icon: Users },

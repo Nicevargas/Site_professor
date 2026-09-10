@@ -85,6 +85,7 @@ import { resolveTenant, slugify, buildPublicUrl, slugFromRoute, PLATFORM_HOST } 
 import { PERFIL_EM_BRANCO, perfilVazio } from './utils/perfilEmBranco';
 import { podeVerOutroProfessor, professorDoUsuario } from './utils/professorDoUsuario';
 import { PlatformLandingView } from './components/PlatformLandingView';
+import { AdminMetricsView } from './components/AdminMetricsView';
 import { aplicarSeo, estruturaAcademia, estruturaPlataforma, estruturaProfessor } from './utils/seo';
 import { getPlan, planAllows } from './utils/plans';
 
@@ -1718,6 +1719,23 @@ function AppInner() {
                   prev.map((t) => (t.id === updated.id ? updated : t))
                 );
                 supabaseService.saveTeacher(updated);
+              }}
+            />
+          )}
+
+          {currentView === 'admin-metricas' && (
+            <AdminMetricsView
+              systemUsers={systemUsers}
+              teachers={teachers}
+              companies={companies}
+              students={allStudents}
+              conteudo={{
+                services: allServices,
+                videos,
+                photos,
+                testimonials,
+                curriculum,
+                faqs,
               }}
             />
           )}

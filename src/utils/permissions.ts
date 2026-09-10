@@ -13,6 +13,8 @@ const VIEWS_BY_ROLE: Record<UserRole, ViewMode[]> = {
   admin: [
     'dashboard', 'agenda', 'servicos', 'alunos', 'pagamentos', 'usuarios',
     'site-admin', 'meu-endereco', 'planos', 'integracoes', 'configuracoes',
+    // Números da plataforma inteira: só quem administra a plataforma
+    'admin-metricas',
   ],
   professor: [
     'dashboard', 'agenda', 'servicos', 'alunos', 'pagamentos',
