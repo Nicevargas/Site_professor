@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Image as ImageIcon, Trash2, Upload } from 'lucide-react';
 import { dataUrlKb, readImageResized } from '../utils/mediaAndTextHelpers';
+import { supabaseService } from '../services/supabaseService';
+import { isSupabaseConfigured } from '../lib/supabase';
 import { SafeImage } from './SafeImage';
 
 interface ImageFieldProps {
@@ -15,6 +17,10 @@ interface ImageFieldProps {
   maxSide?: number;
   /** 'circulo' para foto de pessoa, 'largo' para capa */
   shape?: 'circulo' | 'largo';
+  /** Dono da imagem: define a pasta no Storage e a permissão de escrita */
+  teacherId?: string;
+  /** Nome do campo, para o arquivo ser reconhecível na pasta */
+  campo?: string;
 }
 
 /**
@@ -35,6 +41,8 @@ export const ImageField: React.FC<ImageFieldProps> = ({
   fallbackName,
   maxSide = 1200,
   shape = 'largo',
+  teacherId,
+  campo = 'imagem',
 }) => {
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
@@ -45,7 +53,28 @@ export const ImageField: React.FC<ImageFieldProps> = ({
     setErro(null);
     setCarregando(true);
     try {
-      onChange(await readImageResized(file, maxSide));
+      const preparada = await readImageResized(file, maxSide);
+
+      /**
+       * Storage primeiro; data URL só quando não há para onde subir.
+       *
+       * O data URL funciona, mas mora dentro da linha do professor: engorda
+       * toda consulta e viaja inteiro para cada visitante. Com o balde, o
+       * banco guarda um endereço curto e o arquivo vem por CDN.
+       */
+      if (isSupabaseConfigured && teacherId) {
+        const url = await supabaseService.uploadImage(preparada.file, teacherId, campo);
+        if (url) {
+          onChange(url);
+          return;
+        }
+        // Subir falhou (permissão, balde ausente, rede). Guardar embutido é
+        // pior, mas é melhor que perder a imagem que a pessoa acabou de
+        // escolher -- e o aviso diz o que aconteceu.
+        setErro('Não consegui enviar a imagem para o servidor; ela ficou salva dentro do seu cadastro. Funciona, mas deixa o site mais pesado.');
+      }
+
+      onChange(preparada.dataUrl);
     } catch {
       setErro('Não foi possível ler esta imagem. Tente um arquivo JPG, PNG ou WebP.');
     } finally {
@@ -119,7 +148,7 @@ export const ImageField: React.FC<ImageFieldProps> = ({
         )}
       </div>
 
-      {erro && <p className="text-[11px] text-rose-700">{erro}</p>}
+      {erro && <p className="text-[11px] text-amber-700 leading-relaxed">{erro}</p>}
     </div>
   );
 };

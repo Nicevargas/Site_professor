@@ -42,12 +42,18 @@ export const CompanyLandingView: React.FC<CompanyLandingViewProps> = ({
       >
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
+            {/*
+              Fundo branco SÓLIDO, não bg-white/10: aqui o cabeçalho é escuro,
+              e logo transparente sobre fundo semitransparente deixa o escuro
+              passar por dentro do desenho -- a logo some. E object-contain,
+              porque cover corta a marca.
+            */}
             {company.logoUrl ? (
               <img
                 src={company.logoUrl}
                 alt=""
                 referrerPolicy="no-referrer"
-                className="w-9 h-9 rounded-lg object-cover bg-white/10"
+                className="w-9 h-9 rounded-lg object-contain bg-white p-1"
               />
             ) : (
               <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center">

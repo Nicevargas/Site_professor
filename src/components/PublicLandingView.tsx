@@ -1236,11 +1236,15 @@ export const PublicLandingView: React.FC<PublicLandingViewProps> = ({
       <footer className="bg-white border-t border-[#eceef0] py-10 mt-auto">
         <div className="max-w-7xl mx-auto px-4 md:px-10 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-slate-500">
           <div className="flex items-center gap-3 font-bold text-sm text-[#091426]">
+            {/*
+              Fundo branco porque logo transparente não tem fundo próprio: sem
+              isto ela toma a cor do que estiver atrás e some, ou fica escura.
+            */}
             {teacher.showLogo !== false && teacher.logoUrl && (
               <img
                 src={teacher.logoUrl}
                 alt="Logo"
-                className="w-6 h-6 rounded-md object-contain"
+                className="w-6 h-6 rounded-md object-contain bg-white p-0.5 border border-slate-200"
               />
             )}
             <span>{brandTitle}</span>

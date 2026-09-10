@@ -251,43 +251,105 @@ export function exportAppointmentsToCsv(appointments: Appointment[], teacherName
  * Redimensiona pelo maior lado, mantendo proporção, e nunca amplia: imagem
  * pequena continua do tamanho que é, só que recomprimida.
  */
-export function readImageResized(
+export interface ImagemPreparada {
+  /** Endereço utilizável agora: data URL do resultado */
+  dataUrl: string;
+  /** O mesmo conteúdo como arquivo, para subir ao Storage */
+  file: File;
+  /** A imagem usa transparência de verdade */
+  temTransparencia: boolean;
+}
+
+/** Alguma parte da imagem é translúcida? Amostra o canal alfa. */
+function detectarTransparencia(ctx: CanvasRenderingContext2D, w: number, h: number): boolean {
+  try {
+    const { data } = ctx.getImageData(0, 0, w, h);
+    // De 4 em 4 pixels: uma logo transparente tem MUITO pixel vazio, e varrer
+    // tudo numa imagem grande trava a aba por um instante visível
+    for (let i = 3; i < data.length; i += 16) {
+      if (data[i] < 250) return true;
+    }
+    return false;
+  } catch {
+    // Imagem de outro domínio suja o canvas e proíbe a leitura. Assumir que
+    // tem transparência é o palpite seguro: no máximo guarda em WebP.
+    return true;
+  }
+}
+
+/**
+ * Lê a imagem já reduzida ao tamanho que o site usa.
+ *
+ * Redimensiona pelo maior lado, mantendo proporção, e nunca amplia: imagem
+ * pequena continua do tamanho que é, só que recomprimida.
+ *
+ * O fundo branco antes de desenhar não é enfeite. Canvas exportado como JPEG
+ * não tem canal alfa, e o que era transparente sai PRETO -- foi assim que uma
+ * logo de fundo transparente virou um quadrado escuro. Quando a imagem usa
+ * transparência de verdade, o resultado sai em WebP e ela é preservada;
+ * quando não usa, vira JPEG, que é menor.
+ */
+export async function readImageResized(
   file: File,
   maxSide = 1200,
   quality = 0.82
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
-    reader.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error('O arquivo não parece ser uma imagem.'));
-      img.onload = () => {
-        const maior = Math.max(img.width, img.height);
-        const escala = maior > maxSide ? maxSide / maior : 1;
-        const largura = Math.round(img.width * escala);
-        const altura = Math.round(img.height * escala);
+): Promise<ImagemPreparada> {
+  const dataUrlOriginal = await readFileAsDataUrl(file);
 
-        const canvas = document.createElement('canvas');
-        canvas.width = largura;
-        canvas.height = altura;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          // Sem canvas (navegador antigo, teste sem DOM gráfico) fica o original:
-          // imagem grande é melhor que nenhuma imagem.
-          resolve(String(reader.result));
-          return;
-        }
-        ctx.drawImage(img, 0, 0, largura, altura);
-
-        // PNG só quando a transparência importa (logo); foto vira JPEG
-        const temAlfa = file.type === 'image/png' || file.type === 'image/webp';
-        resolve(canvas.toDataURL(temAlfa ? 'image/webp' : 'image/jpeg', quality));
-      };
-      img.src = String(reader.result);
-    };
-    reader.readAsDataURL(file);
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error('O arquivo não parece ser uma imagem.'));
+    el.src = dataUrlOriginal;
   });
+
+  const maior = Math.max(img.width, img.height);
+  const escala = maior > maxSide ? maxSide / maior : 1;
+  const largura = Math.max(1, Math.round(img.width * escala));
+  const altura = Math.max(1, Math.round(img.height * escala));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = largura;
+  canvas.height = altura;
+  const ctx = canvas.getContext('2d');
+
+  if (!ctx) {
+    // Sem canvas (navegador antigo, teste sem DOM gráfico) fica o original:
+    // imagem grande é melhor que nenhuma imagem.
+    return { dataUrl: dataUrlOriginal, file, temTransparencia: false };
+  }
+
+  ctx.drawImage(img, 0, 0, largura, altura);
+  const temTransparencia = detectarTransparencia(ctx, largura, altura);
+
+  if (!temTransparencia) {
+    // Sem transparência, JPEG é menor. O fundo branco é redundante aqui, mas
+    // garante que qualquer canto translúcido que a amostragem não pegou saia
+    // branco, nunca preto.
+    const comFundo = document.createElement('canvas');
+    comFundo.width = largura;
+    comFundo.height = altura;
+    const ctx2 = comFundo.getContext('2d')!;
+    ctx2.fillStyle = '#ffffff';
+    ctx2.fillRect(0, 0, largura, altura);
+    ctx2.drawImage(canvas, 0, 0);
+    const dataUrl = comFundo.toDataURL('image/jpeg', quality);
+    return { dataUrl, file: dataUrlParaArquivo(dataUrl, file.name, 'jpg'), temTransparencia };
+  }
+
+  const dataUrl = canvas.toDataURL('image/webp', quality);
+  return { dataUrl, file: dataUrlParaArquivo(dataUrl, file.name, 'webp'), temTransparencia };
+}
+
+/** Converte o data URL de volta em arquivo, para subir ao Storage. */
+function dataUrlParaArquivo(dataUrl: string, nomeOriginal: string, ext: string): File {
+  const [cabecalho, base64] = dataUrl.split(',');
+  const tipo = /:(.*?);/.exec(cabecalho)?.[1] || 'image/jpeg';
+  const bin = atob(base64 || '');
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const base = nomeOriginal.replace(/\.[^.]+$/, '') || 'imagem';
+  return new File([bytes], `${base}.${ext}`, { type: tipo });
 }
 
 /** Quantos KB um data URL ocupa, para avisar quando ficou grande demais. */

@@ -21,8 +21,10 @@ import {
   Laptop
 } from 'lucide-react';
 import { THEME_COLOR_PRESETS, PRESET_LOGO_OPTIONS, ColorThemePreset } from '../utils/themePresets';
-import { readFileAsDataUrl } from '../utils/mediaAndTextHelpers';
+import { readImageResized } from '../utils/mediaAndTextHelpers';
 import { ImageField } from './ImageField';
+import { supabaseService } from '../services/supabaseService';
+import { isSupabaseConfigured } from '../lib/supabase';
 
 interface SiteBrandingCustomizerProps {
   currentTeacher: TeacherProfile;
@@ -75,15 +77,34 @@ export const SiteBrandingCustomizer: React.FC<SiteBrandingCustomizerProps> = ({
     setAccentColor(preset.accentColor);
   };
 
-  // Handle file upload for logo
+  /**
+   * Logo escolhida do computador.
+   *
+   * Passa pelo mesmo preparo das outras imagens, que é onde mora o conserto
+   * do fundo: canvas exportado como JPEG não tem canal alfa, e o que era
+   * transparente saía PRETO -- foi assim que uma logo de fundo transparente
+   * virou um quadrado escuro. Agora o transparente é detectado e preservado
+   * em WebP; quando não há transparência, o fundo é branco, nunca preto.
+   */
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const dataUrl = await readFileAsDataUrl(file);
-      setLogoUrl(dataUrl);
-    } catch (err) {
-      alert('Erro ao carregar imagem da logo.');
+      // Logo é pequena na tela: 400px basta, e mantém o arquivo leve
+      const preparada = await readImageResized(file, 400);
+
+      if (isSupabaseConfigured && currentTeacher.id) {
+        const url = await supabaseService.uploadImage(preparada.file, currentTeacher.id, 'logo');
+        if (url) {
+          setLogoUrl(url);
+          return;
+        }
+      }
+      setLogoUrl(preparada.dataUrl);
+    } catch {
+      alert('Não foi possível ler esta imagem. Tente um arquivo PNG, JPG ou WebP.');
+    } finally {
+      e.target.value = '';
     }
   };
 
@@ -404,6 +425,8 @@ export const SiteBrandingCustomizer: React.FC<SiteBrandingCustomizerProps> = ({
                 hint="Aparece no topo do site e ao lado do seu nome. Um retrato de rosto funciona melhor."
                 value={avatarUrl}
                 onChange={setAvatarUrl}
+                teacherId={currentTeacher.id}
+                campo="foto"
                 fallbackName={currentTeacher.name}
                 maxSide={600}
                 shape="circulo"
@@ -413,6 +436,8 @@ export const SiteBrandingCustomizer: React.FC<SiteBrandingCustomizerProps> = ({
                 hint="A imagem grande à direita, na abertura do site. Use uma foto larga, da sua aula ou do espaço."
                 value={heroImageUrl}
                 onChange={setHeroImageUrl}
+                teacherId={currentTeacher.id}
+                campo="capa"
                 fallbackName={currentTeacher.name}
                 maxSide={1600}
                 shape="largo"

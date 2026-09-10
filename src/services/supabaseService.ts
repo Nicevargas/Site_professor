@@ -1534,4 +1534,40 @@ export const supabaseService = {
       return null;
     }
   },
+
+  /**
+   * Guarda a imagem no balde e devolve o endereço público.
+   *
+   * As imagens moravam dentro da linha do professor, como data URL. Isso
+   * inchava toda consulta de professores e obrigava cada visitante a baixar
+   * a foto embutida no JSON da página. Aqui o banco guarda só o endereço.
+   *
+   * O caminho é 'professores/<id>/<campo>-<carimbo>.<ext>'. A pasta com o id
+   * é o que a política do Storage confere: ninguém escreve na do outro.
+   *
+   * Nome novo a cada envio, em vez de sobrescrever: CDN guarda cópia, e
+   * reaproveitar o nome faria o professor trocar a foto e continuar vendo a
+   * antiga por horas.
+   */
+  async uploadImage(file: File, teacherId: string, campo: string): Promise<string | null> {
+    if (!supabase || !teacherId) return null;
+    try {
+      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const caminho = `professores/${teacherId}/${campo}-${Date.now()}.${ext || 'jpg'}`;
+
+      const { error } = await supabase.storage
+        .from('imagens')
+        .upload(caminho, file, { cacheControl: '31536000', upsert: false });
+
+      if (error) {
+        reportSyncError('imagem', error);
+        return null;
+      }
+
+      return supabase.storage.from('imagens').getPublicUrl(caminho).data.publicUrl || null;
+    } catch (err) {
+      reportSyncError('imagem', err);
+      return null;
+    }
+  },
 };
