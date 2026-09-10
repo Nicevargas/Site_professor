@@ -174,3 +174,26 @@ describe('onde cada endereço é servido', () => {
     })).toBe('https://app.plataformaeducar.net/e/academia-x');
   });
 });
+
+describe('o nome da plataforma não vira vitrine de ninguém', () => {
+  it('aquagenda.<dominio> não é subdomínio de professor', () => {
+    // Existe um professor com slug 'aquagenda' no banco. Sem reservar, este
+    // host abriria a vitrine dele em vez de servir a plataforma
+    const ref = resolveTenant(
+      { hostname: 'aquagenda.plataformaeducar.net', pathname: '/', hash: '' },
+      'plataformaeducar.net'
+    );
+    expect(ref.mode).toBe('none');
+  });
+
+  it('e o caminho funciona nele: era para isso que o host existe', () => {
+    const ref = resolveTenant(
+      { hostname: 'aquagenda.plataformaeducar.net', pathname: '/p/eunice-vargas', hash: '' },
+      'plataformaeducar.net'
+    );
+    // Subdomínio vence caminho; se 'aquagenda' contasse como subdomínio,
+    // este endereço mostraria o professor errado
+    expect(ref.mode).toBe('path');
+    expect(ref.slug).toBe('eunice-vargas');
+  });
+});

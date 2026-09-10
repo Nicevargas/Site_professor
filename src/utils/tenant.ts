@@ -32,6 +32,11 @@ export const APP_HOST = (
 /** Subdomínios da plataforma que nunca são professores. */
 const RESERVED_SUBDOMAINS = new Set([
   'www', 'app', 'api', 'admin', 'painel', 'auth', 'cdn', 'static', 'assets', 'mail', 'blog', 'docs',
+  // O nome da plataforma: é candidato natural a APP_HOST, e ali o endereço
+  // por caminho precisa funcionar. Sem reservar, o host seria lido como
+  // subdomínio de um professor de slug 'aquagenda' -- e subdomínio vence
+  // caminho, então /p/<outro> abriria a vitrine errada.
+  'aquagenda',
 ]);
 
 /** Hospedagens de desenvolvimento e prévia não representam domínio de professor. */

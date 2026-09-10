@@ -31,6 +31,7 @@ const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET') ?? '';
  */
 const RESERVADOS = new Set([
   'www', 'app', 'api', 'admin', 'painel', 'auth', 'cdn', 'static', 'assets', 'mail', 'blog', 'docs',
+  'aquagenda',
   'localhost', 'ftp', 'cpanel', 'webdisk', 'webmail', 'autoconfig', 'autodiscover',
   'whm', 'cpcontacts', 'cpcalendars', 'titan1', 'teste',
 ]);
