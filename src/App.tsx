@@ -83,6 +83,7 @@ import { SyncErrorToast } from './components/SyncErrorToast';
 import { MyAddressView } from './components/MyAddressView';
 import { resolveTenant, slugify, buildPublicUrl, slugFromRoute, PLATFORM_HOST } from './utils/tenant';
 import { PERFIL_EM_BRANCO, perfilVazio } from './utils/perfilEmBranco';
+import { podeVerOutroProfessor, professorDoUsuario } from './utils/professorDoUsuario';
 import { PlatformLandingView } from './components/PlatformLandingView';
 import { aplicarSeo, estruturaAcademia, estruturaPlataforma, estruturaProfessor } from './utils/seo';
 import { getPlan, planAllows } from './utils/plans';
@@ -657,14 +658,28 @@ function AppInner() {
 
         if (dbTeachers) setTeachers(dbTeachers);
         if (dbTeachers && dbTeachers.length > 0) {
-          const currentExists = dbTeachers.find((t: TeacherProfile) => t.id === currentTeacher.id);
-          const activeTeacher = currentExists || dbTeachers[0];
-          setCurrentTeacher(activeTeacher);
+          /**
+           * O professor de quem está logado -- nunca "o primeiro da lista".
+           *
+           * Cair no dbTeachers[0] fazia o professor abrir "Meu site" e ver a
+           * marca de um colega; ao salvar, o banco recusava por permissão, e
+           * o erro era a única pista de que a tela mostrava outra pessoa.
+           *
+           * Sem vínculo, só quem administra pode olhar outro perfil. Para os
+           * demais fica em branco: a tela vazia diz a verdade.
+           */
+          const meu = professorDoUsuario(currentUser, dbTeachers);
+          const activeTeacher =
+            meu || (podeVerOutroProfessor(currentUser) || !currentUser ? dbTeachers[0] : null);
 
-          // Segredos de integração (n8n) vivem em integrations_config; só o dono consegue ler
-          const integrations = await supabaseService.getIntegrationsConfig(activeTeacher.id);
-          if (integrations) {
-            setCurrentTeacher((prev) => ({ ...prev, ...integrations }));
+          if (activeTeacher) {
+            setCurrentTeacher(activeTeacher);
+
+            // Segredos de integração (n8n) vivem em integrations_config; só o dono consegue ler
+            const integrations = await supabaseService.getIntegrationsConfig(activeTeacher.id);
+            if (integrations) {
+              setCurrentTeacher((prev) => ({ ...prev, ...integrations }));
+            }
           }
         }
 
@@ -751,15 +766,23 @@ function AppInner() {
     localStorage.setItem('agenda_prof_current_user', JSON.stringify(user));
 
     if (user.role === 'professor') {
-      // Só o próprio professor alimenta o perfil público com os dados do seu login
+      /**
+       * A base é o professor DELE, não o que estava na tela.
+       *
+       * Espalhar o currentTeacher aqui copiava bio, cores, logo e slug de
+       * quem estivesse carregado no momento -- outro professor, no caso
+       * comum -- e só trocava o id. O login saía com a identidade de um
+       * colega colada por cima.
+       */
+      const base = professorDoUsuario(user, teachers) || PERFIL_EM_BRANCO;
       const updatedProfile: TeacherProfile = {
-        ...currentTeacher,
+        ...base,
         ...(teacherData || {}),
-        id: user.id || currentTeacher.id,
-        name: teacherData?.name || user.name || currentTeacher.name,
-        email: teacherData?.email || user.email || currentTeacher.email,
-        specialty: teacherData?.specialty || currentTeacher.specialty,
-        whatsapp: teacherData?.whatsapp || currentTeacher.whatsapp,
+        id: base.id || user.id,
+        name: teacherData?.name || base.name || user.name || '',
+        email: teacherData?.email || base.email || user.email || '',
+        specialty: teacherData?.specialty || base.specialty,
+        whatsapp: teacherData?.whatsapp || base.whatsapp,
       };
       setCurrentTeacher(updatedProfile);
       localStorage.setItem(`agenda_prof_teacher_${updatedProfile.id}`, JSON.stringify(updatedProfile));
@@ -880,10 +903,9 @@ function AppInner() {
     setCurrentUser(authUser);
     localStorage.setItem('agenda_prof_current_user', JSON.stringify(authUser));
 
-    if (user.teacherId) {
-      const matchingTeacher = teachers.find((t) => t.id === user.teacherId);
-      if (matchingTeacher) setCurrentTeacher(matchingTeacher);
-    }
+    // Mesma regra do login: o professor do perfil assumido, não o da tela
+    const assumido = professorDoUsuario(authUser, teachers);
+    if (assumido) setCurrentTeacher(assumido);
 
     setCurrentView(getDefaultView(user.role));
   };
