@@ -804,15 +804,31 @@ function AppInner() {
        * comum -- e só trocava o id. O login saía com a identidade de um
        * colega colada por cima.
        */
-      const base = professorDoUsuario(user, teachers) || PERFIL_EM_BRANCO;
+      /**
+       * A lista de professores pode não ter chegado ainda.
+       *
+       * O login é síncrono; a carga do banco não. Quando alguém entra antes
+       * de a lista chegar, professorDoUsuario não acha nada e o perfil nascia
+       * do molde em branco -- sem slug, sem domínio. A carga do banco corrige
+       * o que está na tela, mas se a pessoa salvasse qualquer coisa antes
+       * disso, o endereço dela ia para o banco como null.
+       *
+       * Sem base conhecida, o perfil fica só com o que o login sabe, e os
+       * campos de endereço saem como undefined -- que saveTeacher trata como
+       * "não encoste", e não como "apague".
+       */
+      const base = professorDoUsuario(user, teachers);
       const updatedProfile: TeacherProfile = {
-        ...base,
+        ...(base || PERFIL_EM_BRANCO),
         ...(teacherData || {}),
-        id: base.id || user.id,
-        name: teacherData?.name || base.name || user.name || '',
-        email: teacherData?.email || base.email || user.email || '',
-        specialty: teacherData?.specialty || base.specialty,
-        whatsapp: teacherData?.whatsapp || base.whatsapp,
+        id: base?.id || user.id,
+        name: teacherData?.name || base?.name || user.name || '',
+        email: teacherData?.email || base?.email || user.email || '',
+        specialty: teacherData?.specialty || base?.specialty || '',
+        whatsapp: teacherData?.whatsapp || base?.whatsapp || '',
+        // Endereço só vem de quem o conhece: o professor achado no banco
+        slug: base?.slug,
+        customDomain: base?.customDomain,
       };
       setCurrentTeacher(updatedProfile);
       localStorage.setItem(`agenda_prof_teacher_${updatedProfile.id}`, JSON.stringify(updatedProfile));

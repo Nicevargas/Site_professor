@@ -137,10 +137,26 @@ export const supabaseService = {
         vacation_mode: teacher.vacationMode || { enabled: false },
         // O plano só é aceito de admin; o gatilho no banco recusa o resto
         plan: teacher.plan || 'start',
-        slug: teacher.slug || null,
-        custom_domain: teacher.customDomain || null,
         custom_domain_status: teacher.customDomainStatus || 'nenhum',
         updated_at: new Date().toISOString(),
+
+        /**
+         * Endereço: campo ausente NÃO é campo apagado.
+         *
+         * Isto era `slug: teacher.slug || null`, então qualquer gravação do
+         * perfil -- salvar cores, trocar a foto -- escrevia null quando o
+         * objeto em memória tinha perdido o slug. E ele se perdia fácil:
+         * basta o login acontecer antes de a lista de professores chegar do
+         * banco. O professor salvava a logo e o endereço público dele sumia,
+         * em silêncio. Foi o que apagou o slug do Renato Simon.
+         *
+         * undefined significa "não sei, não encoste". String vazia é
+         * apagamento de verdade, feito na tela "Meu endereço".
+         */
+        ...(teacher.slug !== undefined ? { slug: teacher.slug || null } : {}),
+        ...(teacher.customDomain !== undefined
+          ? { custom_domain: teacher.customDomain || null }
+          : {}),
       });
       if (!syncResult(error, 'perfil do professor')) return false;
 
