@@ -44,21 +44,32 @@ export function subscribeSyncErrors(handler: (detail: SyncErrorDetail) => void):
   return () => window.removeEventListener(SYNC_ERROR_EVENT, listener);
 }
 
-/** Traduz mensagens técnicas frequentes do Supabase para algo acionável. */
+/**
+ * O motivo da falha, em palavras que qualquer pessoa entende.
+ *
+ * Antes as mensagens falavam a língua de quem mantém o sistema: "rode as
+ * migrações da pasta supabase/migrations", "confira se o seu login está
+ * vinculado ao professor em Usuários". Um aluno marcando aula leu isso no
+ * celular. Ninguém fora da equipe técnica sabe o que fazer com essas frases,
+ * e boa parte da equipe também não.
+ *
+ * Cada explicação diz o que aconteceu e o que a pessoa pode fazer. O texto
+ * cru do banco nunca aparece: ele é o que ninguém entende.
+ */
 export function explainSyncReason(reason?: string): string {
-  if (!reason) return 'Sem detalhes do erro.';
+  if (!reason) return 'Tente de novo em alguns instantes.';
   const r = reason.toLowerCase();
   if (r.includes('row-level security') || r.includes('violates row-level') || r.includes('permission denied')) {
-    return 'O banco recusou a gravação por permissão. Confira se o seu login está vinculado ao professor em "Usuários".';
+    return 'Você não tem permissão para salvar isto. Se não deveria ser assim, fale com o responsável pela conta.';
   }
   if (r.includes('does not exist') || r.includes('column')) {
-    return 'O banco está desatualizado: rode as migrações da pasta supabase/migrations.';
+    return 'O sistema precisa de uma atualização para guardar isto. Avise o suporte.';
   }
   if (r.includes('jwt') || r.includes('expired') || r.includes('not authenticated')) {
-    return 'Sua sessão expirou. Saia e entre novamente.';
+    return 'Sua sessão terminou. Saia e entre de novo.';
   }
   if (r.includes('failed to fetch') || r.includes('network') || r.includes('timeout')) {
-    return 'Sem conexão com o servidor. Verifique a internet e tente de novo.';
+    return 'Sem conexão com a internet no momento. Confira e tente de novo.';
   }
-  return reason;
+  return 'Aconteceu um erro inesperado. Tente de novo em alguns instantes.';
 }

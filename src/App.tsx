@@ -1375,8 +1375,53 @@ function AppInner() {
     setCurrentView('public-booking');
   };
 
-  const handleBookingCompleted = (newApt: Appointment) => {
-    handleSaveNewAppointment(newApt);
+  /**
+   * Reserva vinda da tela de agendamento.
+   *
+   * A equipe continua no fluxo de sempre. Visitante e aluno passam por um
+   * caminho próprio, que ESPERA o banco responder e devolve se deu certo --
+   * antes a tela dizia "Agendamento Confirmado!" sem esperar nada. A reserva
+   * falhava por baixo, o aluno ia embora achando que tinha aula, e o
+   * professor nunca ficava sabendo.
+   */
+  const handleBookingCompleted = async (newApt: Appointment): Promise<boolean> => {
+    const ehEquipe = !!currentUser && currentUser.role !== 'aluno';
+    if (ehEquipe) {
+      handleSaveNewAppointment(newApt);
+      return true;
+    }
+
+    const scopedApt: Appointment = {
+      ...newApt,
+      teacherId: currentTeacher.id,
+      studentId: newApt.studentId || currentUser?.studentId,
+    };
+
+    // Aluno logado já tem ficha; visitante ganha uma com o que informou
+    const novoAluno: Student | null = currentUser?.studentId
+      ? null
+      : {
+          id: `std-${Date.now()}`,
+          teacherId: currentTeacher.id,
+          name: scopedApt.studentName,
+          email: scopedApt.studentEmail || '',
+          phone: scopedApt.studentPhone || '',
+          avatar: DEFAULT_STUDENT_AVATAR,
+          joinedDate: formatMonthYearPtBR(new Date()),
+          totalClasses: 1,
+          status: 'Ativo',
+          notes: scopedApt.notes,
+          lastClass: scopedApt.date,
+        };
+
+    const { ok } = await supabaseService.createPublicBooking(scopedApt, novoAluno, currentTeacher.id);
+    if (!ok) return false;
+
+    // Só depois de gravado: horário ocupado na tela e aviso ao professor
+    setAllAppointments((prev) => [scopedApt, ...prev]);
+    dispatchAppointmentWebhook(scopedApt, currentTeacher, 'created');
+    if (novoAluno) dispatchFormWebhook('student.created', currentTeacher, novoAluno);
+    return true;
   };
 
   // Filtered lists if global search is used

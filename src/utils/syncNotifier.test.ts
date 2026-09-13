@@ -36,10 +36,26 @@ describe('aviso de falha de sincronização', () => {
 
   it('traduz as causas mais comuns para uma ação', () => {
     expect(explainSyncReason('new row violates row-level security policy')).toMatch(/permiss/i);
-    expect(explainSyncReason('column "active" does not exist')).toMatch(/migra/i);
+    expect(explainSyncReason('column "active" does not exist')).toMatch(/atualiza/i);
     expect(explainSyncReason('JWT expired')).toMatch(/sess/i);
     expect(explainSyncReason('TypeError: Failed to fetch')).toMatch(/conex/i);
-    expect(explainSyncReason('algo inesperado')).toBe('algo inesperado');
-    expect(explainSyncReason(undefined)).toMatch(/sem detalhes/i);
+    expect(explainSyncReason(undefined)).toMatch(/tente de novo/i);
+  });
+
+  it('nunca repassa o texto cru do banco nem usa jargão técnico', () => {
+    // Um aluno leu "rode as migrações da pasta supabase/migrations" no
+    // celular ao marcar aula. Nenhuma explicação pode soar assim.
+    const causas = [
+      'new row violates row-level security policy',
+      'column "client_since" does not exist',
+      'JWT expired',
+      'TypeError: Failed to fetch',
+      'duplicate key value violates unique constraint',
+      undefined,
+    ];
+    for (const causa of causas) {
+      const texto = explainSyncReason(causa);
+      expect(texto).not.toMatch(/migra|supabase|row-level|constraint|duplicate|jwt|login está vinculado|banco/i);
+    }
   });
 });

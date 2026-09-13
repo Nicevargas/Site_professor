@@ -153,4 +153,27 @@ describe('agendamento pelo site público', () => {
     expect(apt.studentEmail).toBeUndefined();
     expect(apt.clientSince).not.toContain('2024');
   });
+
+  it('reserva que não foi gravada NÃO mostra "Agendamento Confirmado"', async () => {
+    // Antes a tela confirmava sem esperar o resultado: o aluno ia embora
+    // achando que tinha aula, e o professor nunca recebia nada
+    const { onBookingComplete } = renderWizard();
+    onBookingComplete.mockResolvedValue(false);
+    fireEvent.click(slotButton('10:30')!);
+    fillAndSubmit();
+
+    expect(await screen.findByText(/não conseguimos confirmar sua aula/i)).toBeInTheDocument();
+    expect(screen.queryByText(/agendamento confirmado/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/ainda não está reservado/i)).toBeInTheDocument();
+  });
+
+  it('"Tentar de novo" volta ao formulário sem perder o que foi digitado', async () => {
+    const { onBookingComplete } = renderWizard();
+    onBookingComplete.mockResolvedValue(false);
+    fireEvent.click(slotButton('10:30')!);
+    fillAndSubmit('Dora Lins');
+
+    fireEvent.click(await screen.findByRole('button', { name: /tentar de novo/i }));
+    expect(screen.getByDisplayValue('Dora Lins')).toBeInTheDocument();
+  });
 });

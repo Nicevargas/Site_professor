@@ -20,9 +20,11 @@ import {
   Sparkles,
   MessageSquare,
   Check,
-  CalendarPlus
+  CalendarPlus,
+  AlertTriangle
 } from 'lucide-react';
 import { generateGoogleCalendarUrl } from '../utils/calendarAndWhatsapp';
+import { linkWhatsapp } from '../utils/whatsappLink';
 
 interface PublicBookingWizardProps {
   teacher: TeacherProfile;
@@ -30,7 +32,11 @@ interface PublicBookingWizardProps {
   preSelectedServiceId?: string;
   /** Agenda do professor: horários já ocupados não são oferecidos ao visitante */
   existingAppointments?: Appointment[];
-  onBookingComplete: (newApt: Appointment) => void;
+  /**
+   * Grava a reserva. Devolver false (ou falhar) mantém o aluno na tela com o
+   * aviso de que não deu certo -- confirmar sem saber o resultado era mentir.
+   */
+  onBookingComplete: (newApt: Appointment) => boolean | void | Promise<boolean | void>;
   /** Turma lotada: em vez de sumir com o horário, o visitante entra na fila */
   onJoinWaitlist?: (entry: {
     serviceId: string;
@@ -73,6 +79,8 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
   const [isSuccess, setIsSuccess] = useState(false);
   const [slotTakenError, setSlotTakenError] = useState<string | null>(null);
   const [createdAppointment, setCreatedAppointment] = useState<Appointment | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  const [falhaAoReservar, setFalhaAoReservar] = useState(false);
   const [joinedWaitlist, setJoinedWaitlist] = useState(false);
 
   const selectedService = services.find((s) => s.id === selectedServiceId) || services[0];
@@ -125,7 +133,7 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
     : null;
   const isActiveSlotFull = Boolean(activeSlotState?.isFull);
 
-  const handleConfirmBooking = (e: React.FormEvent) => {
+  const handleConfirmBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!studentName.trim() || !studentPhone.trim() || !activeTimeSlot || !activeDate) return;
 
@@ -194,7 +202,24 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
       capacity: check.availability.capacity,
     };
 
-    onBookingComplete(newApt);
+    if (enviando) return;
+    setEnviando(true);
+    setFalhaAoReservar(false);
+
+    // Confirmação só depois de o banco responder
+    let deuCerto = true;
+    try {
+      deuCerto = (await onBookingComplete(newApt)) !== false;
+    } catch {
+      deuCerto = false;
+    }
+    setEnviando(false);
+
+    if (!deuCerto) {
+      setFalhaAoReservar(true);
+      return;
+    }
+
     setCreatedAppointment(newApt);
     setIsSuccess(true);
 
@@ -208,6 +233,15 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
       // Confetti fallback
     }
   };
+
+  // Quando a reserva falha, o aluno ainda tem um caminho: falar com o professor
+  const zapReserva = linkWhatsapp(
+    teacher.whatsapp,
+    `Olá, ${teacher.name}! Tentei agendar ${selectedService?.name || 'uma aula'} pelo site`
+      + (activeDate ? ` para ${activeDate.split('-').reverse().join('/')}` : '')
+      + (activeTimeSlot ? ` às ${activeTimeSlot}` : '')
+      + ', mas não consegui confirmar. Pode me ajudar?'
+  );
 
   const getStepTitle = () => {
     if (step === 1) return 'Serviço';
@@ -319,6 +353,41 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
             >
               Voltar para o site
             </button>
+          </div>
+        ) : falhaAoReservar ? (
+          /*
+            A reserva não foi gravada. Antes esta tela mostrava "Agendamento
+            Confirmado!" mesmo assim: o aluno ia embora achando que tinha aula,
+            e o professor nunca ficava sabendo.
+          */
+          <div className="bg-white rounded-2xl p-6 md:p-8 shadow-elevated border border-[#eceef0] text-center">
+            <div className="w-16 h-16 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-9 h-9" />
+            </div>
+            <h2 className="text-2xl font-bold text-[#091426] mb-2">Não conseguimos confirmar sua aula</h2>
+            <p className="text-sm text-[#45474c] mb-6">
+              Seu horário <b>ainda não está reservado</b>. Tente de novo em alguns instantes
+              {zapReserva ? ', ou fale direto com o professor.' : '.'}
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => setFalhaAoReservar(false)}
+                className="w-full py-3 rounded-xl bg-[#00687a] hover:bg-[#004e5c] text-white font-bold text-sm"
+              >
+                Tentar de novo
+              </button>
+              {zapReserva && (
+                <a
+                  href={zapReserva}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3 rounded-xl border border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-bold text-sm"
+                >
+                  Falar com {teacher.name} no WhatsApp
+                </a>
+              )}
+            </div>
           </div>
         ) : isSuccess && createdAppointment ? (
           /* Confirmation Success Screen */

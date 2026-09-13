@@ -2,6 +2,64 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { syncResult, reportSyncError } from '../utils/syncNotifier';
 import { TeacherProfile, ServiceItem, Appointment, Student, Reminder, PaymentInvoice, TestimonialItem, CurriculumItem, PhotoItem, FaqItem, SystemUser, Company, WaitlistEntry } from '../types';
 
+/**
+ * A linha de agendamento como o banco a guarda.
+ *
+ * Fica fora do serviço porque dois caminhos gravam agendamento: a equipe,
+ * que edita e reagenda (upsert), e o visitante do site, que só cria
+ * (insert). Montar a linha em dois lugares garantiria que um dia os dois
+ * discordassem -- como `client_since`, coluna que o app enviava e o banco
+ * nunca teve, e que derrubava todo agendamento feito pelo site.
+ */
+function linhaDoAgendamento(apt: Appointment, teacherId?: string) {
+  return {
+    id: apt.id,
+    teacher_id: teacherId || apt.teacherId || null,
+    student_id: apt.studentId || null,
+    student_name: apt.studentName,
+    student_initials: apt.studentInitials || null,
+    student_phone: apt.studentPhone || null,
+    student_email: apt.studentEmail || null,
+    service_id: apt.serviceId || null,
+    service_name: apt.serviceName,
+    date: apt.date,
+    day_of_week: apt.dayOfWeek || 1,
+    start_time: apt.startTime,
+    end_time: apt.endTime,
+    duration_minutes: apt.durationMinutes || 60,
+    modality: apt.modality || 'Online (Google Meet)',
+    status: apt.status || 'Confirmado',
+    notes: apt.notes || '',
+    price: apt.price || 150,
+    cancelled_at: apt.cancelledAt || null,
+    cancellation_reason: apt.cancellationReason || null,
+    capacity: apt.capacity ? Math.max(1, Number(apt.capacity)) : null,
+    attendance: apt.attendance || null,
+    attendance_note: apt.attendanceNote || null,
+    attendance_marked_at: apt.attendanceMarkedAt || null,
+  };
+}
+
+/** A linha de aluno como o banco a guarda. */
+function linhaDoAluno(student: Student, teacherId?: string) {
+  return {
+    id: student.id,
+    // Sem professor não há aluno: antes caía em 'prof-roberto', um id de
+    // demonstração que não existe no banco
+    teacher_id: teacherId || student.teacherId || null,
+    name: student.name,
+    email: student.email || '',
+    phone: student.phone || '',
+    avatar: student.avatar || '',
+    joined_date: student.joinedDate || new Date().toISOString().split('T')[0],
+    total_classes: student.totalClasses || 0,
+    last_class: student.lastClass || '',
+    status: student.status || 'Ativo',
+    notes: student.notes || '',
+    level: student.level || null,
+  };
+}
+
 export const supabaseService = {
   /**
    * Fetch all teachers or return null if not available
@@ -295,39 +353,60 @@ export const supabaseService = {
   async saveAppointment(apt: Appointment, teacherId?: string): Promise<boolean> {
     if (!isSupabaseConfigured || !supabase) return false;
     try {
-      const { error } = await supabase.from('appointments').upsert({
-        id: apt.id,
-        teacher_id: teacherId || apt.teacherId || null,
-        student_id: apt.studentId || null,
-        student_name: apt.studentName,
-        student_initials: apt.studentInitials || null,
-        student_phone: apt.studentPhone || null,
-        student_email: apt.studentEmail || null,
-        service_id: apt.serviceId || null,
-        service_name: apt.serviceName,
-        date: apt.date,
-        day_of_week: apt.dayOfWeek || 1,
-        start_time: apt.startTime,
-        end_time: apt.endTime,
-        duration_minutes: apt.durationMinutes || 60,
-        modality: apt.modality || 'Online (Google Meet)',
-        status: apt.status || 'Confirmado',
-        notes: apt.notes || '',
-        price: apt.price || 150,
-        client_since: apt.clientSince || null,
-        cancelled_at: apt.cancelledAt || null,
-        cancellation_reason: apt.cancellationReason || null,
-        capacity: apt.capacity ? Math.max(1, Number(apt.capacity)) : null,
-        attendance: apt.attendance || null,
-        attendance_note: apt.attendanceNote || null,
-        attendance_marked_at: apt.attendanceMarkedAt || null,
-      });
+      const { error } = await supabase.from('appointments').upsert(linhaDoAgendamento(apt, teacherId));
       return syncResult(error, 'agendamento');
     } catch (err) {
       console.warn('Erro ao salvar agendamento no Supabase:', err);
       reportSyncError('agendamento', err);
       return false;
     }
+  },
+
+  /**
+   * Reserva feita por quem não é da equipe: visitante do site ou aluno.
+   *
+   * Usa insert, não upsert. Para o Postgres, upsert exige também permissão
+   * de LEITURA na tabela -- e o visitante anônimo só pode inserir. Com
+   * upsert, toda reserva pelo site era recusada, mesmo sendo nova.
+   *
+   * Não dispara o aviso global de erro. Quem reserva é um aluno, e aquele
+   * aviso fala com a equipe. Quem decide o que dizer ao aluno é a tela da
+   * reserva, com o resultado daqui.
+   *
+   * O aluno é gravado depois e sem bloquear: a aula marcada é o que importa
+   * para quem está reservando; a ficha no cadastro é organização do
+   * professor.
+   */
+  async createPublicBooking(
+    apt: Appointment,
+    student: Student | null,
+    teacherId: string
+  ): Promise<{ ok: boolean; reason?: string }> {
+    // Sem banco, o estado local é a verdade: não há o que falhar
+    if (!isSupabaseConfigured || !supabase) return { ok: true };
+
+    try {
+      const { error } = await supabase.from('appointments').insert(linhaDoAgendamento(apt, teacherId));
+      if (error) {
+        console.warn('Reserva pelo site recusada:', error.message);
+        return { ok: false, reason: error.message };
+      }
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      console.warn('Reserva pelo site falhou:', reason);
+      return { ok: false, reason };
+    }
+
+    if (student) {
+      try {
+        const { error } = await supabase.from('students').insert(linhaDoAluno(student, teacherId));
+        if (error) console.warn('Aula reservada, mas a ficha do aluno não foi criada:', error.message);
+      } catch (err) {
+        console.warn('Aula reservada, mas a ficha do aluno não foi criada:', err);
+      }
+    }
+
+    return { ok: true };
   },
 
   /**
@@ -378,20 +457,7 @@ export const supabaseService = {
   async saveStudent(student: Student, teacherId?: string): Promise<boolean> {
     if (!isSupabaseConfigured || !supabase) return false;
     try {
-      const { error } = await supabase.from('students').upsert({
-        id: student.id,
-        teacher_id: teacherId || 'prof-roberto',
-        name: student.name,
-        email: student.email || '',
-        phone: student.phone || '',
-        avatar: student.avatar || '',
-        joined_date: student.joinedDate || new Date().toISOString().split('T')[0],
-        total_classes: student.totalClasses || 0,
-        last_class: student.lastClass || '',
-        status: student.status || 'Ativo',
-        notes: student.notes || '',
-        level: student.level || null,
-      });
+      const { error } = await supabase.from('students').upsert(linhaDoAluno(student, teacherId));
       return syncResult(error, 'aluno');
     } catch (err) {
       console.warn('Erro ao salvar aluno no Supabase:', err);

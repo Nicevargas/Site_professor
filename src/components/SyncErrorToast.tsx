@@ -43,10 +43,10 @@ export const SyncErrorToast: React.FC = () => {
             <AlertTriangle className="w-5 h-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold">Não foi possível salvar: {err.entity}</p>
+            <p className="text-sm font-bold">Não conseguimos salvar: {err.entity}</p>
             <p className="text-xs mt-0.5 text-rose-800">{explainSyncReason(err.reason)}</p>
             <p className="text-[11px] mt-1 text-rose-700/80">
-              A alteração ficou apenas neste navegador e será perdida ao recarregar a página.
+              O que você fez ainda não foi guardado.
             </p>
             <button
               type="button"
@@ -54,7 +54,7 @@ export const SyncErrorToast: React.FC = () => {
               className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-800 hover:underline"
             >
               <RefreshCw className="w-3 h-3" />
-              Recarregar e tentar de novo
+              Recarregar a página
             </button>
           </div>
           <button
