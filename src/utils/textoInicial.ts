@@ -72,7 +72,7 @@ const GERAL: Area = { id: 'geral', rotulo: 'Aulas particulares', nome: 'aulas pa
 export const TOTAL_VARIACOES = 3;
 
 const semAcento = (t: string) =>
-  t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 const ativos = (servicos: ServicoParaTexto[]) => servicos.filter((s) => s.active !== false);
 
