@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { TeacherProfile, VacationModeConfig, ThemePresetId } from '../types';
+import { TeacherProfile, VacationModeConfig, ThemePresetId, ServiceItem } from '../types';
+import {
+  ehSugestao, sugerirApresentacao, sugerirEspecialidade, TOTAL_VARIACOES,
+} from '../utils/textoInicial';
 import { 
   User, 
   Save, 
@@ -36,16 +39,46 @@ import { formatVacationDateBR } from '../utils/vacationHelpers';
 interface SettingsViewProps {
   currentTeacher: TeacherProfile;
   onUpdateTeacher: (updated: TeacherProfile) => void;
+  /** As aulas cadastradas: é delas que sai o texto de exemplo */
+  services?: ServiceItem[];
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   currentTeacher,
   onUpdateTeacher,
+  services = [],
 }) => {
   const [name, setName] = useState(currentTeacher.name);
   const [role, setRole] = useState(currentTeacher.role);
   const [specialty, setSpecialty] = useState(currentTeacher.specialty);
   const [bio, setBio] = useState(currentTeacher.bio);
+
+  /**
+   * Texto de exemplo para quem não sabe o que escrever.
+   *
+   * Só aparece com o campo vazio, ou enquanto o texto ainda é uma sugestão
+   * intacta. Depois que a pessoa mexe, nenhum botão troca o que ela escreveu.
+   * Nada vai para o site antes de "Salvar".
+   */
+  const dadosParaTexto = { servicos: services };
+  const [variacaoEspecialidade, setVariacaoEspecialidade] = useState(0);
+  const [variacaoBio, setVariacaoBio] = useState(0);
+
+  const podeSugerirEspecialidade =
+    !(specialty || '').trim() || ehSugestao(specialty, dadosParaTexto, 'especialidade');
+  const podeSugerirBio = !(bio || '').trim() || ehSugestao(bio, dadosParaTexto, 'apresentacao');
+
+  const sugerirOutraEspecialidade = () => {
+    const proxima = (specialty || '').trim() ? (variacaoEspecialidade + 1) % TOTAL_VARIACOES : variacaoEspecialidade;
+    setVariacaoEspecialidade(proxima);
+    setSpecialty(sugerirEspecialidade(dadosParaTexto, proxima));
+  };
+
+  const sugerirOutraBio = () => {
+    const proxima = (bio || '').trim() ? (variacaoBio + 1) % TOTAL_VARIACOES : variacaoBio;
+    setVariacaoBio(proxima);
+    setBio(sugerirApresentacao(dadosParaTexto, proxima));
+  };
   const [whatsapp, setWhatsapp] = useState(currentTeacher.whatsapp);
   const [email, setEmail] = useState(currentTeacher.email);
   const [avatarUrl, setAvatarUrl] = useState(currentTeacher.avatarUrl);
@@ -300,8 +333,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 type="text"
                 value={specialty}
                 onChange={(e) => setSpecialty(e.target.value)}
+                placeholder="Ex.: Natação · Presencial e online"
                 className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-[#00687a]"
               />
+              {podeSugerirEspecialidade && (
+                <button
+                  type="button"
+                  onClick={sugerirOutraEspecialidade}
+                  className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-[#00687a] hover:underline"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  {(specialty || '').trim() ? 'Outra sugestão' : 'Não sabe o que escrever? Use um exemplo'}
+                </button>
+              )}
             </div>
 
             <div>
@@ -311,9 +355,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <textarea
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
-                rows={3}
+                rows={4}
+                placeholder="Conte em poucas linhas o que você ensina e como são as suas aulas."
                 className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-[#00687a]"
               />
+              {podeSugerirBio && (
+                <div className="mt-1.5 space-y-1">
+                  <button
+                    type="button"
+                    onClick={sugerirOutraBio}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#00687a] hover:underline"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    {(bio || '').trim() ? 'Outra sugestão' : 'Não sabe o que escrever? Use um exemplo'}
+                  </button>
+                  {(bio || '').trim() && (
+                    <p className="text-[11px] text-slate-500">
+                      É só um ponto de partida, feito a partir das suas aulas. Ajuste com o seu
+                      jeito de falar antes de salvar.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>

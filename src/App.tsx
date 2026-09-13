@@ -1918,6 +1918,7 @@ function AppInner() {
           {currentView === 'configuracoes' && currentUser.role !== 'aluno' && (
             <SettingsView
               currentTeacher={currentTeacher}
+              services={services}
               onUpdateTeacher={(updated) => {
                 setCurrentTeacher(updated);
                 setTeachers((prev) =>
