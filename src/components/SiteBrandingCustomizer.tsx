@@ -23,6 +23,7 @@ import {
 import { THEME_COLOR_PRESETS, PRESET_LOGO_OPTIONS, ColorThemePreset } from '../utils/themePresets';
 import { readImageResized } from '../utils/mediaAndTextHelpers';
 import { ImageField } from './ImageField';
+import { camposAlterados } from '../utils/camposAlterados';
 import { supabaseService } from '../services/supabaseService';
 import { isSupabaseConfigured } from '../lib/supabase';
 
@@ -65,6 +66,21 @@ export const SiteBrandingCustomizer: React.FC<SiteBrandingCustomizerProps> = ({
   // nas iniciais, e trocá-las exigia mexer no banco.
   const [avatarUrl, setAvatarUrl] = useState<string>(currentTeacher.avatarUrl || '');
   const [heroImageUrl, setHeroImageUrl] = useState<string>(currentTeacher.heroImageUrl || '');
+
+  // O formulário como vai para o banco, e a cópia de quando a tela abriu:
+  // o salvar manda só o que mudou (ver utils/camposAlterados)
+  const formulario = (): Partial<TeacherProfile> => ({
+    themePreset: selectedPreset as any,
+    primaryColor,
+    secondaryColor,
+    accentColor,
+    brandName: brandName.trim() || currentTeacher.name,
+    logoUrl: logoUrl.trim(),
+    showLogo,
+    avatarUrl: avatarUrl.trim(),
+    heroImageUrl: heroImageUrl.trim(),
+  });
+  const [inicial, setInicial] = useState(formulario);
 
   const [isSaved, setIsSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<'colors' | 'logo' | 'preview'>('colors');
@@ -110,19 +126,13 @@ export const SiteBrandingCustomizer: React.FC<SiteBrandingCustomizerProps> = ({
 
   // Save changes
   const handleSave = () => {
-    const updated: TeacherProfile = {
-      ...currentTeacher,
-      themePreset: selectedPreset as any,
-      primaryColor,
-      secondaryColor,
-      accentColor,
-      brandName: brandName.trim() || currentTeacher.name,
-      logoUrl: logoUrl.trim(),
-      showLogo,
-      avatarUrl: avatarUrl.trim(),
-      heroImageUrl: heroImageUrl.trim(),
-    };
-    onUpdateTeacher(updated);
+    const atual = formulario();
+    const alterados = camposAlterados(inicial, atual);
+    // Campo que ninguém tocou não é regravado; nada mudou, nada é gravado
+    if (Object.keys(alterados).length > 0) {
+      onUpdateTeacher({ ...currentTeacher, ...alterados });
+      setInicial(atual);
+    }
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
   };

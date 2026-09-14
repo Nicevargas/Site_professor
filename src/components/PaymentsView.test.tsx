@@ -156,4 +156,46 @@ describe('financeiro', () => {
     expect(saved.id).toBe('prof-roberto');
     expect(saved.whatsapp).toBe('5511999999999');
   });
+
+  it('professor sem Pix não ganha chave, recebedor nem banco inventados', () => {
+    // Antes a tela abria com o e-mail como chave, o nome como recebedor e
+    // "Nubank / Inter" como banco, e salvar gravava tudo como escolha dele
+    const semPix: TeacherProfile = {
+      ...teacher,
+      pixKey: undefined,
+      pixReceiverName: undefined,
+      pixBankName: undefined,
+    };
+    const onUpdateTeacher = vi.fn();
+    render(
+      <PaymentsView
+        invoices={invoices}
+        students={students}
+        services={services}
+        currentTeacher={semPix}
+        onUpdateInvoices={vi.fn()}
+        onUpdateTeacher={onUpdateTeacher}
+      />
+    );
+    fireEvent.click(screen.getByTitle(/configurar chave pix/i));
+
+    const chave = screen.getByPlaceholderText(/seu-email@exemplo\.com ou 11999998888/i) as HTMLInputElement;
+    const recebedor = screen.getByPlaceholderText(/roberto almeida - treinamento/i) as HTMLInputElement;
+    const banco = screen.getByPlaceholderText(/nubank \/ banco inter/i) as HTMLInputElement;
+    expect(chave.value).toBe('');
+    expect(recebedor.value).toBe('');
+    expect(banco.value).toBe('');
+
+    // Chave e recebedor são obrigatórios; o banco fica em branco de propósito
+    fireEvent.change(chave, { target: { value: '11988887777' } });
+    fireEvent.change(recebedor, { target: { value: 'Roberto Almeida' } });
+    fireEvent.click(screen.getByRole('button', { name: /salvar configurações/i }));
+
+    expect(onUpdateTeacher).toHaveBeenCalledTimes(1);
+    const saved: TeacherProfile = onUpdateTeacher.mock.calls[0][0];
+    expect(saved.pixKey).toBe('11988887777');
+    expect(saved.pixReceiverName).toBe('Roberto Almeida');
+    expect(saved.pixBankName).toBeUndefined();
+    expect(saved.email).toBe('roberto@teste.com');
+  });
 });

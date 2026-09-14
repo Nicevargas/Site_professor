@@ -1,3 +1,4 @@
+import { camposAlterados } from '../utils/camposAlterados';
 import React, { useState, useMemo } from 'react';
 import { 
   PaymentInvoice, 
@@ -1289,22 +1290,33 @@ const PixSettingsModal: React.FC<PixSettingsModalProps> = ({
   onClose,
   onSave,
 }) => {
-  const [pixKey, setPixKey] = useState(currentTeacher.pixKey || currentTeacher.email || '');
+  /**
+   * Os campos começam com o que está no banco, e só com isso.
+   *
+   * Antes, campo vazio vinha preenchido: o e-mail virava chave Pix, o nome
+   * virava recebedor, e o banco era "Nubank / Inter" para todo mundo. Salvar
+   * a tela, mesmo sem mexer, gravava esses valores como se o professor os
+   * tivesse escolhido -- e o aluno recebia uma cobrança com banco errado.
+   */
+  const [pixKey, setPixKey] = useState(currentTeacher.pixKey || '');
   const [pixKeyType, setPixKeyType] = useState(currentTeacher.pixKeyType || 'email');
-  const [pixReceiverName, setPixReceiverName] = useState(currentTeacher.pixReceiverName || currentTeacher.name);
-  const [pixBankName, setPixBankName] = useState(currentTeacher.pixBankName || 'Nubank / Inter');
+  const [pixReceiverName, setPixReceiverName] = useState(currentTeacher.pixReceiverName || '');
+  const [pixBankName, setPixBankName] = useState(currentTeacher.pixBankName || '');
   const [defaultPaymentGateway, setDefaultPaymentGateway] = useState(currentTeacher.defaultPaymentGateway || 'pix');
+
+  const formularioPix = (): Partial<TeacherProfile> => ({
+    pixKey,
+    pixKeyType: pixKeyType as any,
+    pixReceiverName,
+    pixBankName,
+    defaultPaymentGateway,
+  });
+  // A cópia de quando a tela abriu: o salvar manda só o que mudou
+  const [inicialPix] = useState(formularioPix);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({
-      ...currentTeacher,
-      pixKey,
-      pixKeyType: pixKeyType as any,
-      pixReceiverName,
-      pixBankName,
-      defaultPaymentGateway,
-    });
+    onSave({ ...currentTeacher, ...camposAlterados(inicialPix, formularioPix()) });
   };
 
   return (

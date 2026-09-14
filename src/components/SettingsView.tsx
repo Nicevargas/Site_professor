@@ -3,6 +3,7 @@ import { TeacherProfile, VacationModeConfig, ThemePresetId, ServiceItem } from '
 import {
   ehSugestao, sugerirApresentacao, sugerirEspecialidade, TOTAL_VARIACOES,
 } from '../utils/textoInicial';
+import { camposAlterados } from '../utils/camposAlterados';
 import { 
   User, 
   Save, 
@@ -86,7 +87,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   
   // Visual Branding, Colors & Logo
   const [brandName, setBrandName] = useState(currentTeacher.brandName || currentTeacher.name);
-  const [logoUrl, setLogoUrl] = useState(currentTeacher.logoUrl || DEFAULT_LOGOS[0].url);
+  // Sem logo é sem logo: antes vinha a padrão, e salvar a gravava em quem nunca escolheu uma
+  const [logoUrl, setLogoUrl] = useState(currentTeacher.logoUrl || '');
   const [showLogo, setShowLogo] = useState(currentTeacher.showLogo ?? true);
   const [primaryColor, setPrimaryColor] = useState(currentTeacher.primaryColor || '#00687a');
   const [secondaryColor, setSecondaryColor] = useState(currentTeacher.secondaryColor || '#57dffe');
@@ -128,6 +130,45 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [googleCalendarSync, setGoogleCalendarSync] = useState(true);
 
+  /**
+   * O formulário como vai para o banco.
+   *
+   * A cópia de quando a tela abriu fica guardada, e o salvar manda só o que
+   * mudou em relação a ela. Campo que ninguém tocou não é regravado -- era
+   * assim que valores vazios ou padrão iam por cima do dado real.
+   */
+  const formulario = (): Partial<TeacherProfile> => ({
+    name,
+    role,
+    specialty,
+    bio,
+    whatsapp,
+    email,
+    avatarUrl,
+    heroImageUrl,
+    brandName,
+    logoUrl,
+    showLogo,
+    primaryColor,
+    secondaryColor,
+    accentColor,
+    themePreset,
+    n8nWebhookUrl,
+    n8nAuthToken,
+    whatsappAutoReminder8h,
+    vacationMode: {
+      enabled: vacationEnabled,
+      startDate: vacationStartDate || undefined,
+      endDate: vacationEndDate || undefined,
+      returnDate: vacationReturnDate || undefined,
+      title: vacationTitle.trim() || 'Recesso Pedagógico / Férias',
+      message: vacationMessage.trim() || 'Estou em período de recesso. Agendamentos temporariamente pausados.',
+      allowWaitlistOrContact: vacationAllowWaitlist,
+      customButtonText: vacationCustomButtonText.trim() || 'Entrar na Lista de Espera',
+    },
+  });
+  const [inicial, setInicial] = useState(formulario);
+
   const handleApplyPreset = (preset: typeof THEME_PRESETS[0]) => {
     setThemePreset(preset.id);
     setPrimaryColor(preset.primaryColor);
@@ -149,37 +190,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    onUpdateTeacher({
-      ...currentTeacher,
-      name,
-      role,
-      specialty,
-      bio,
-      whatsapp,
-      email,
-      avatarUrl,
-      heroImageUrl,
-      brandName,
-      logoUrl,
-      showLogo,
-      primaryColor,
-      secondaryColor,
-      accentColor,
-      themePreset,
-      n8nWebhookUrl,
-      n8nAuthToken,
-      whatsappAutoReminder8h,
-      vacationMode: {
-        enabled: vacationEnabled,
-        startDate: vacationStartDate || undefined,
-        endDate: vacationEndDate || undefined,
-        returnDate: vacationReturnDate || undefined,
-        title: vacationTitle.trim() || 'Recesso Pedagógico / Férias',
-        message: vacationMessage.trim() || 'Estou em período de recesso. Agendamentos temporariamente pausados.',
-        allowWaitlistOrContact: vacationAllowWaitlist,
-        customButtonText: vacationCustomButtonText.trim() || 'Entrar na Lista de Espera',
-      }
-    });
+    const atual = formulario();
+    const alterados = camposAlterados(inicial, atual);
+    // Nada mudou: não há o que gravar
+    if (Object.keys(alterados).length > 0) {
+      onUpdateTeacher({ ...currentTeacher, ...alterados });
+      // A próxima comparação parte do que acabou de ser salvo
+      setInicial(atual);
+    }
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
   };

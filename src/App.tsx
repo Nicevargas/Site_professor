@@ -1376,6 +1376,37 @@ function AppInner() {
   };
 
   /**
+   * Telas que editam o perfil só abrem com o perfil de verdade na mão.
+   *
+   * Elas copiam o perfil no instante em que abrem. Abertas antes de o banco
+   * responder -- recarregar a página já dentro de "Meu Perfil", internet
+   * lenta --, copiavam um perfil vazio, e o "Salvar" gravava esse vazio por
+   * cima do dado real. Enquanto o perfil não chega, a tela espera.
+   *
+   * O `key` com o id do professor faz a tela recomeçar do zero quando o
+   * perfil muda, em vez de guardar a cópia de outra pessoa.
+   */
+  const perfilPronto = cargaInicial !== 'carregando' && !perfilVazio(currentTeacher);
+  const avisoPerfil = (
+    <div className="max-w-md mx-auto my-16 text-center" role="status">
+      {cargaInicial === 'carregando' ? (
+        <>
+          <div className="w-8 h-8 mx-auto mb-3 rounded-full border-2 border-slate-200 border-t-[#00687a] animate-spin" />
+          <p className="text-sm text-[#45474c]">Carregando seu perfil…</p>
+        </>
+      ) : cargaInicial === 'falhou' ? (
+        <p className="text-sm text-[#45474c]">
+          Não foi possível carregar seu perfil. Recarregue a página para tentar de novo.
+        </p>
+      ) : (
+        <p className="text-sm text-[#45474c]">
+          Seu login ainda não está ligado a um perfil de professor. Fale com o responsável pela conta.
+        </p>
+      )}
+    </div>
+  );
+
+  /**
    * Reserva vinda da tela de agendamento.
    *
    * A equipe continua no fluxo de sempre. Visitante e aluno passam por um
@@ -1781,8 +1812,10 @@ function AppInner() {
             />
           )}
 
-          {currentView === 'pagamentos' && (
+          {currentView === 'pagamentos' && !perfilPronto && avisoPerfil}
+          {currentView === 'pagamentos' && perfilPronto && (
             <PaymentsView
+              key={currentTeacher.id}
               invoices={invoices}
               students={students}
               services={services}
@@ -1853,8 +1886,10 @@ function AppInner() {
             />
           )}
 
-          {currentView === 'site-admin' && (
+          {currentView === 'site-admin' && !perfilPronto && avisoPerfil}
+          {currentView === 'site-admin' && perfilPronto && (
             <SiteAdminView
+              key={currentTeacher.id}
               currentTeacher={currentTeacher}
               testimonials={teacherTestimonials}
               curriculum={teacherCurriculum}
@@ -1882,8 +1917,10 @@ function AppInner() {
 
           {currentView === 'planos' && <PricingPlansView />}
 
-          {currentView === 'meu-endereco' && (
+          {currentView === 'meu-endereco' && !perfilPronto && avisoPerfil}
+          {currentView === 'meu-endereco' && perfilPronto && (
             <MyAddressView
+              key={currentTeacher.id}
               currentTeacher={currentTeacher}
               userRole={currentUser.role}
               takenSlugs={teachers.filter((t) => t.id !== currentTeacher.id).map((t) => t.slug || slugify(t.name))}
@@ -1915,8 +1952,10 @@ function AppInner() {
             />
           )}
 
-          {currentView === 'configuracoes' && currentUser.role !== 'aluno' && (
+          {currentView === 'configuracoes' && currentUser.role !== 'aluno' && !perfilPronto && avisoPerfil}
+          {currentView === 'configuracoes' && currentUser.role !== 'aluno' && perfilPronto && (
             <SettingsView
+              key={currentTeacher.id}
               currentTeacher={currentTeacher}
               services={services}
               onUpdateTeacher={(updated) => {
