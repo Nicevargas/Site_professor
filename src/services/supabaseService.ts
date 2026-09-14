@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { traduzirErroDeAcesso } from '../utils/erroDeAcesso';
 import { syncResult, reportSyncError, PROFESSOR_DESCONHECIDO } from '../utils/syncNotifier';
 import { TeacherProfile, ServiceItem, Appointment, Student, Reminder, PaymentInvoice, TestimonialItem, CurriculumItem, PhotoItem, FaqItem, SystemUser, Company, WaitlistEntry } from '../types';
 
@@ -1556,17 +1557,11 @@ export const supabaseService = {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        let translatedError = error.message;
-        if (error.message.includes('Invalid login credentials')) {
-          translatedError = 'E-mail ou senha incorretos.';
-        } else if (error.message.includes('Email not confirmed')) {
-          translatedError = 'E-mail ainda não confirmado. Verifique sua caixa de entrada.';
-        }
-        return { data: null, error: translatedError };
+        return { data: null, error: traduzirErroDeAcesso(error.message) };
       }
       return { data, error: null };
     } catch (err: any) {
-      return { data: null, error: err.message || 'Falha ao autenticar usuário.' };
+      return { data: null, error: traduzirErroDeAcesso(err?.message) };
     }
   },
 
@@ -1597,17 +1592,11 @@ export const supabaseService = {
         },
       });
       if (error) {
-        let translatedError = error.message;
-        if (error.message.includes('already registered')) {
-          translatedError = 'Este e-mail já está cadastrado. Tente entrar.';
-        } else if (error.message.includes('Password should be at least')) {
-          translatedError = 'A senha deve ter no mínimo 6 caracteres.';
-        }
-        return { data: null, error: translatedError };
+        return { data: null, error: traduzirErroDeAcesso(error.message) };
       }
       return { data, error: null };
     } catch (err: any) {
-      return { data: null, error: err.message || 'Falha ao cadastrar usuário.' };
+      return { data: null, error: traduzirErroDeAcesso(err?.message) };
     }
   },
 
@@ -1623,11 +1612,29 @@ export const supabaseService = {
         redirectTo: window.location.origin,
       });
       if (error) {
-        return { error: error.message };
+        return { error: traduzirErroDeAcesso(error.message) };
       }
       return { error: null };
     } catch (err: any) {
-      return { error: err.message || 'Erro ao enviar e-mail de recuperação.' };
+      return { error: traduzirErroDeAcesso(err?.message) };
+    }
+  },
+
+  /**
+   * Grava a senha nova de quem chegou pelo link de redefinição.
+   *
+   * O link do e-mail abre uma sessão só para isso: a senha é trocada nela, e
+   * só depois de dar certo a pessoa entra no sistema.
+   */
+  async atualizarSenha(senha: string): Promise<{ error: string | null }> {
+    if (!isSupabaseConfigured || !supabase) {
+      return { error: 'Supabase não configurado. Use o modo de teste.' };
+    }
+    try {
+      const { error } = await supabase.auth.updateUser({ password: senha });
+      return { error: error ? traduzirErroDeAcesso(error.message) : null };
+    } catch (err: any) {
+      return { error: traduzirErroDeAcesso(err?.message) };
     }
   },
 

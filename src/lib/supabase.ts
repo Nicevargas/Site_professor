@@ -1,4 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+// Lê o link do e-mail (redefinição de senha) antes de o Supabase apagar o endereço
+import '../utils/linkDeAcesso';
 
 const supabaseUrl = ((import.meta as any).env?.VITE_SUPABASE_URL as string) || '';
 const supabaseAnonKey = ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY as string) || '';

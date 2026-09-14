@@ -22,6 +22,7 @@ import { supabaseService } from '../services/supabaseService';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { AuthUser, TeacherProfile, UserRole } from '../types';
 import { sanitizeSelfDeclaredRole } from '../utils/permissions';
+import { SENHA_MINIMA } from '../utils/erroDeAcesso';
 
 /** Hash SHA-256 (hex) para o cadastro local de demonstração: senha nunca fica em texto puro no navegador. */
 async function hashPassword(value: string): Promise<string> {
@@ -35,6 +36,8 @@ async function hashPassword(value: string): Promise<string> {
 interface AuthViewProps {
   currentTeacher: TeacherProfile;
   onLoginSuccess: (user: AuthUser, teacherData?: Partial<TeacherProfile>) => void;
+  /** Aviso para mostrar ao abrir (ex.: link do e-mail vencido) */
+  aviso?: string | null;
 }
 
 interface LocalRegisteredUser {
@@ -50,6 +53,7 @@ interface LocalRegisteredUser {
 export const AuthView: React.FC<AuthViewProps> = ({
   currentTeacher,
   onLoginSuccess,
+  aviso,
 }) => {
   const [tab, setTab] = useState<'login' | 'signup' | 'forgot'>('login');
   
@@ -65,7 +69,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
   
   // UI states
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(aviso ?? null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const primaryColor = currentTeacher.primaryColor || '#00687a';
@@ -229,8 +233,8 @@ export const AuthView: React.FC<AuthViewProps> = ({
       return;
     }
 
-    if (password.length < 6) {
-      setErrorMessage('A senha de segurança deve conter no mínimo 6 caracteres.');
+    if (password.length < SENHA_MINIMA) {
+      setErrorMessage(`A senha precisa ter pelo menos ${SENHA_MINIMA} caracteres.`);
       return;
     }
 
@@ -322,7 +326,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
     if (error) {
       setErrorMessage(error);
     } else {
-      setSuccessMessage('Um link seguro para redefinição de senha foi enviado para o seu e-mail.');
+      setSuccessMessage('Se este e-mail tiver cadastro, enviamos um link para você criar uma senha nova. Ele vale por 30 minutos. Não achou? Confira a caixa de spam.');
     }
   };
 
@@ -550,14 +554,14 @@ export const AuthView: React.FC<AuthViewProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Senha (Mín. 6 dígitos) *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Senha (mín. {SENHA_MINIMA} caracteres) *</label>
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  minLength={6}
+                  minLength={SENHA_MINIMA}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none"
                 />
               </div>
@@ -570,7 +574,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  minLength={6}
+                  minLength={SENHA_MINIMA}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none"
                 />
               </div>

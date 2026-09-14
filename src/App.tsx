@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   Appointment, 
   ServiceItem, 
@@ -85,6 +85,9 @@ import { resolveTenant, slugify, buildPublicUrl, slugFromRoute, PLATFORM_HOST } 
 import { PERFIL_EM_BRANCO, perfilVazio } from './utils/perfilEmBranco';
 import { podeVerOutroProfessor, professorDoUsuario } from './utils/professorDoUsuario';
 import { CHAVE_USUARIO, sessaoEncerrada, usuarioGuardado } from './utils/sessao';
+import { LINK_DE_ACESSO } from './utils/linkDeAcesso';
+import { traduzirErroDeAcesso } from './utils/erroDeAcesso';
+import { NovaSenhaView } from './components/NovaSenhaView';
 import { PlatformLandingView } from './components/PlatformLandingView';
 import { AdminMetricsView } from './components/AdminMetricsView';
 import { aplicarSeo, estruturaAcademia, estruturaPlataforma, estruturaProfessor } from './utils/seo';
@@ -752,64 +755,135 @@ function AppInner() {
    *
    * O papel (admin, professor, aluno) vem sempre do banco. Quem continua logado
    * até clicar em Sair continua: a sessão do Supabase já fica guardada.
+   *
+   * Quem chega pelo link de "Esqueci minha senha" também recebe uma sessão,
+   * mas ela serve só para criar a senha nova. Antes, essa sessão abria o
+   * painel direto e a pessoa entrava sem senha nova. Agora ela fica na tela
+   * "Crie sua nova senha" até gravar; se desistir, a sessão é encerrada. O
+   * ref existe porque os avisos do Supabase chegam dentro do efeito, que não
+   * enxerga o estado novo.
    */
+  const recuperandoSenha = useRef(isSupabaseConfigured && LINK_DE_ACESSO.recuperacao);
+  const [trocandoSenha, setTrocandoSenha] = useState(isSupabaseConfigured && LINK_DE_ACESSO.recuperacao);
+  const [avisoDeAcesso, setAvisoDeAcesso] = useState<string | null>(LINK_DE_ACESSO.erro);
+
+  // Link do e-mail vencido ou já usado: abre Entrar, com o aviso
+  useEffect(() => {
+    if (LINK_DE_ACESSO.erro) setCurrentView('auth');
+  }, []);
+
+  const encerrarAcesso = useCallback(() => {
+    setCurrentUser(null);
+    try {
+      localStorage.removeItem(CHAVE_USUARIO);
+    } catch {
+      // navegador sem armazenamento: não há cópia para apagar
+    }
+  }, []);
+
+  const aplicarSessao = useCallback(async (user: {
+    id: string;
+    email?: string;
+    user_metadata?: Record<string, any>;
+  }): Promise<AuthUser | null> => {
+    const email = user.email || '';
+    const dbUser = await supabaseService.findUserByEmail(email);
+    // O aviso de redefinição pode ter chegado enquanto o banco respondia
+    if (recuperandoSenha.current) return null;
+    const role = (dbUser?.role as UserRole) || sanitizeSelfDeclaredRole(user.user_metadata?.role);
+    const authUser: AuthUser = {
+      id: dbUser?.id || user.id,
+      email,
+      // Sem nome no banco, fica sem nome -- nunca o do professor que estiver na tela
+      name: dbUser?.name || user.user_metadata?.full_name || '',
+      role,
+      avatarUrl: dbUser?.avatar_url || '',
+      teacherId: dbUser?.teacher_id,
+      studentId: dbUser?.student_id,
+      isDemo: false,
+    };
+    setCurrentUser(authUser);
+    try {
+      localStorage.setItem(CHAVE_USUARIO, JSON.stringify(authUser));
+    } catch {
+      // sem armazenamento, o login vale só nesta aba
+    }
+    return authUser;
+  }, []);
+
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
 
-    const encerrarAcesso = () => {
-      setCurrentUser(null);
-      try {
-        localStorage.removeItem(CHAVE_USUARIO);
-      } catch {
-        // navegador sem armazenamento: não há cópia para apagar
-      }
-    };
-
-    const aplicarSessao = async (user: {
-      id: string;
-      email?: string;
-      user_metadata?: Record<string, any>;
-    }) => {
-      const email = user.email || '';
-      const dbUser = await supabaseService.findUserByEmail(email);
-      const role = (dbUser?.role as UserRole) || sanitizeSelfDeclaredRole(user.user_metadata?.role);
-      const authUser: AuthUser = {
-        id: dbUser?.id || user.id,
-        email,
-        // Sem nome no banco, fica sem nome -- nunca o do professor que estiver na tela
-        name: dbUser?.name || user.user_metadata?.full_name || '',
-        role,
-        avatarUrl: dbUser?.avatar_url || '',
-        teacherId: dbUser?.teacher_id,
-        studentId: dbUser?.student_id,
-        isDemo: false,
-      };
-      setCurrentUser(authUser);
-      try {
-        localStorage.setItem(CHAVE_USUARIO, JSON.stringify(authUser));
-      } catch {
-        // sem armazenamento, o login vale só nesta aba
-      }
+    const sairDaRecuperacao = () => {
+      recuperandoSenha.current = false;
+      setTrocandoSenha(false);
     };
 
     supabase.auth
       .getSession()
       .then(async ({ data: { session } }) => {
-        if (sessaoEncerrada(session)) encerrarAcesso();
-        else await aplicarSessao(session!.user);
+        if (sessaoEncerrada(session)) {
+          if (recuperandoSenha.current) {
+            // O endereço trazia a sessão do link, mas o servidor não a aceitou
+            sairDaRecuperacao();
+            setAvisoDeAcesso(traduzirErroDeAcesso('otp_expired'));
+            setCurrentView('auth');
+          }
+          encerrarAcesso();
+        } else if (!recuperandoSenha.current) {
+          await aplicarSessao(session!.user);
+        }
       })
       .catch(() => encerrarAcesso())
       .finally(() => setSessaoVerificada(true));
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (sessaoEncerrada(session)) encerrarAcesso();
-      else await aplicarSessao(session!.user);
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        recuperandoSenha.current = true;
+        setTrocandoSenha(true);
+        encerrarAcesso();
+        return;
+      }
+      if (sessaoEncerrada(session)) {
+        sairDaRecuperacao();
+        encerrarAcesso();
+        return;
+      }
+      // A sessão do link só serve para criar a senha nova, não abre o painel
+      if (recuperandoSenha.current) return;
+      await aplicarSessao(session!.user);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [aplicarSessao, encerrarAcesso]);
+
+  const salvarSenhaNova = async (senha: string) => (await supabaseService.atualizarSenha(senha)).error;
+
+  // Senha nova gravada: agora sim a sessão vale como login
+  const concluirTrocaDeSenha = async () => {
+    recuperandoSenha.current = false;
+    setTrocandoSenha(false);
+    setAvisoDeAcesso(null);
+    const resposta = supabase ? await supabase.auth.getSession() : null;
+    const sessao = resposta?.data.session;
+    if (sessaoEncerrada(sessao)) {
+      setCurrentView('auth');
+      return;
+    }
+    const usuario = await aplicarSessao(sessao!.user);
+    if (usuario) setCurrentView(getDefaultView(usuario.role));
+  };
+
+  // Desistiu de criar a senha: a sessão do link não fica aberta
+  const cancelarTrocaDeSenha = async () => {
+    recuperandoSenha.current = false;
+    setTrocandoSenha(false);
+    await supabaseService.signOut();
+    encerrarAcesso();
+    setCurrentView('auth');
+  };
 
   /**
    * O professor da tela segue quem está logado.
@@ -1528,6 +1602,27 @@ function AppInner() {
    * Só para visitante: quem está logado veio usar o sistema, e trocar a tela
    * dele por um erro de endereço seria tirá-lo do próprio painel.
    */
+  // Chegou pelo link de redefinição: nada abre antes de a senha nova ser criada
+  if (trocandoSenha) {
+    if (!sessaoVerificada) {
+      return (
+        <div className="min-h-screen bg-[#f7f9fb] flex items-center justify-center" role="status">
+          <div className="text-center">
+            <div className="w-8 h-8 mx-auto mb-3 rounded-full border-2 border-slate-200 border-t-[#00687a] animate-spin" />
+            <p className="text-sm text-[#45474c]">Conferindo o link do e-mail…</p>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <NovaSenhaView
+        onSalvar={salvarSenhaNova}
+        onConcluido={concluirTrocaDeSenha}
+        onCancelar={cancelarTrocaDeSenha}
+      />
+    );
+  }
+
   /**
    * A vitrine não abre com o perfil em branco.
    *
@@ -1583,6 +1678,7 @@ function AppInner() {
       <AuthView
         currentTeacher={currentTeacher}
         onLoginSuccess={handleLoginSuccess}
+        aviso={avisoDeAcesso}
       />
     );
   }
@@ -1696,6 +1792,7 @@ function AppInner() {
       <AuthView
         currentTeacher={currentTeacher}
         onLoginSuccess={handleLoginSuccess}
+        aviso={avisoDeAcesso}
       />
     );
   }
