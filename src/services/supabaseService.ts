@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { syncResult, reportSyncError } from '../utils/syncNotifier';
+import { syncResult, reportSyncError, PROFESSOR_DESCONHECIDO } from '../utils/syncNotifier';
 import { TeacherProfile, ServiceItem, Appointment, Student, Reminder, PaymentInvoice, TestimonialItem, CurriculumItem, PhotoItem, FaqItem, SystemUser, Company, WaitlistEntry } from '../types';
 
 /**
@@ -58,6 +58,23 @@ function linhaDoAluno(student: Student, teacherId?: string) {
     notes: student.notes || '',
     level: student.level || null,
   };
+}
+
+/**
+ * O professor dono do registro -- ou nenhum.
+ *
+ * As gravações de serviço, lembrete, cobrança e vídeo usavam 'prof-roberto'
+ * quando não sabiam de quem era o registro: o id de um professor de
+ * demonstração que não existe no banco. O banco recusava, com razão, e o
+ * aviso falava em permissão -- quando o problema real era o app não saber
+ * quem está logado. Sem dono conhecido, não se grava.
+ */
+function donoDoRegistro(...candidatos: (string | null | undefined)[]): string | null {
+  for (const candidato of candidatos) {
+    const id = (candidato || '').trim();
+    if (id) return id;
+  }
+  return null;
 }
 
 export const supabaseService = {
@@ -270,6 +287,12 @@ export const supabaseService = {
    */
   async saveService(service: ServiceItem, teacherId?: string): Promise<boolean> {
     if (!isSupabaseConfigured || !supabase) return false;
+    // Sem saber de qual professor é, não grava: ver donoDoRegistro
+    const dono = donoDoRegistro(teacherId, service.teacherId);
+    if (!dono) {
+      reportSyncError('serviço', PROFESSOR_DESCONHECIDO);
+      return false;
+    }
     try {
       const { error } = await supabase.from('services').upsert({
         id: service.id,
@@ -282,7 +305,7 @@ export const supabaseService = {
         active: service.active ?? true,
         capacity: Math.max(1, Number(service.capacity) || 1),
         levels: service.levels && service.levels.length ? service.levels : null,
-        teacher_id: teacherId || 'prof-roberto',
+        teacher_id: dono,
       });
       return syncResult(error, 'serviço');
     } catch (err) {
@@ -493,10 +516,16 @@ export const supabaseService = {
    */
   async saveReminder(reminder: Reminder, teacherId?: string): Promise<boolean> {
     if (!isSupabaseConfigured || !supabase) return false;
+    // Sem saber de qual professor é, não grava: ver donoDoRegistro
+    const dono = donoDoRegistro(teacherId);
+    if (!dono) {
+      reportSyncError('lembrete', PROFESSOR_DESCONHECIDO);
+      return false;
+    }
     try {
       const { error } = await supabase.from('reminders').upsert({
         id: reminder.id,
-        teacher_id: teacherId || 'prof-roberto',
+        teacher_id: dono,
         title: reminder.title,
         due_date: reminder.dueDate || new Date().toISOString().split('T')[0],
         completed: Boolean(reminder.completed),
@@ -550,10 +579,16 @@ export const supabaseService = {
    */
   async saveInvoice(invoice: PaymentInvoice, teacherId?: string): Promise<boolean> {
     if (!isSupabaseConfigured || !supabase) return false;
+    // Sem saber de qual professor é, não grava: ver donoDoRegistro
+    const dono = donoDoRegistro(teacherId, invoice.teacherId);
+    if (!dono) {
+      reportSyncError('cobrança', PROFESSOR_DESCONHECIDO);
+      return false;
+    }
     try {
       const { error } = await supabase.from('payments').upsert({
         id: invoice.id,
-        teacher_id: teacherId || invoice.teacherId || 'prof-roberto',
+        teacher_id: dono,
         student_id: invoice.studentId || null,
         student_name: invoice.studentName,
         student_phone: invoice.studentPhone || '',
@@ -665,10 +700,16 @@ export const supabaseService = {
    */
   async saveVideo(video: any, teacherId?: string): Promise<boolean> {
     if (!isSupabaseConfigured || !supabase) return false;
+    // Sem saber de qual professor é, não grava: ver donoDoRegistro
+    const dono = donoDoRegistro(teacherId, video.teacherId);
+    if (!dono) {
+      reportSyncError('vídeo', PROFESSOR_DESCONHECIDO);
+      return false;
+    }
     try {
       const { error } = await supabase.from('videos').upsert({
         id: video.id,
-        teacher_id: teacherId || video.teacherId || 'prof-roberto',
+        teacher_id: dono,
         title: video.title,
         media_type: video.mediaType || 'institucional',
         category: video.category || 'Geral',

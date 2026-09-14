@@ -6,6 +6,13 @@
 
 export const SYNC_ERROR_EVENT = 'aquagenda:sync-error';
 
+/**
+ * Motivo de uma gravação que nem chegou ao banco: o app não sabia de qual
+ * professor era o registro. Tem mensagem própria porque o aviso de permissão
+ * mandaria a pessoa procurar um problema de acesso que ela não tem.
+ */
+export const PROFESSOR_DESCONHECIDO = 'professor-desconhecido';
+
 export interface SyncErrorDetail {
   /** O que não foi salvo, em linguagem do usuário (ex.: "depoimento", "agendamento") */
   entity: string;
@@ -58,6 +65,9 @@ export function subscribeSyncErrors(handler: (detail: SyncErrorDetail) => void):
  */
 export function explainSyncReason(reason?: string): string {
   if (!reason) return 'Tente de novo em alguns instantes.';
+  if (reason === PROFESSOR_DESCONHECIDO) {
+    return 'Não conseguimos identificar seu perfil de professor. Saia e entre de novo; se continuar, fale com o responsável pela conta.';
+  }
   const r = reason.toLowerCase();
   if (r.includes('row-level security') || r.includes('violates row-level') || r.includes('permission denied')) {
     return 'Você não tem permissão para salvar isto. Se não deveria ser assim, fale com o responsável pela conta.';

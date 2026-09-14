@@ -1752,8 +1752,10 @@ function AppInner() {
             />
           )}
 
-          {currentView === 'agenda' && (
+          {currentView === 'agenda' && !perfilPronto && avisoPerfil}
+          {currentView === 'agenda' && perfilPronto && (
             <AgendaView
+              key={currentTeacher.id}
               appointments={filteredAppointmentsForView}
               services={services}
               currentTeacher={currentTeacher}
@@ -1785,8 +1787,10 @@ function AppInner() {
             />
           )}
 
-          {currentView === 'servicos' && (
+          {currentView === 'servicos' && !perfilPronto && avisoPerfil}
+          {currentView === 'servicos' && perfilPronto && (
             <ServicesView
+              key={currentTeacher.id}
               services={filteredServicesForView}
               onOpenNewServiceModal={() => {
                 setEditingService(null);
@@ -1802,8 +1806,10 @@ function AppInner() {
             />
           )}
 
-          {currentView === 'alunos' && (
+          {currentView === 'alunos' && !perfilPronto && avisoPerfil}
+          {currentView === 'alunos' && perfilPronto && (
             <StudentsView
+              key={currentTeacher.id}
               students={students}
               onAddStudent={handleAddStudent}
               quota={accountQuota}
