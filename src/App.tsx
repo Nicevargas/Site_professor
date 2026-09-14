@@ -84,6 +84,7 @@ import { MyAddressView } from './components/MyAddressView';
 import { resolveTenant, slugify, buildPublicUrl, slugFromRoute, PLATFORM_HOST } from './utils/tenant';
 import { PERFIL_EM_BRANCO, perfilVazio } from './utils/perfilEmBranco';
 import { podeVerOutroProfessor, professorDoUsuario } from './utils/professorDoUsuario';
+import { CHAVE_USUARIO, sessaoEncerrada, usuarioGuardado } from './utils/sessao';
 import { PlatformLandingView } from './components/PlatformLandingView';
 import { AdminMetricsView } from './components/AdminMetricsView';
 import { aplicarSeo, estruturaAcademia, estruturaPlataforma, estruturaProfessor } from './utils/seo';
@@ -96,17 +97,16 @@ function AppInner() {
   const { isInteractiveTourOpen, setIsInteractiveTourOpen, isTutorialHubOpen, setIsTutorialHubOpen } = useAccessibility();
 
   // Authentication & session state (defaults to null if not logged in)
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
-    try {
-      const saved = localStorage.getItem('agenda_prof_current_user');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch {
-      // ignore
-    }
-    return null;
-  });
+  /**
+   * Com o banco ligado, ninguém começa logado: só o servidor diz quem está
+   * dentro (ver utils/sessao). Antes a cópia do navegador abria o painel sem
+   * login válido -- e era editável.
+   */
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() =>
+    usuarioGuardado(typeof window !== 'undefined' ? window.localStorage : null, isSupabaseConfigured)
+  );
+  // Enquanto o servidor não responde, painel nenhum aparece
+  const [sessaoVerificada, setSessaoVerificada] = useState(!isSupabaseConfigured);
 
   // Navigation & View state - defaults to public-landing for visitors, dashboard/portal for logged in
   const [currentView, setCurrentView] = useState<ViewMode>(() => {
@@ -742,54 +742,101 @@ function AppInner() {
     loadData();
   }, []);
 
-  // Listen to Supabase Auth State
+  /**
+   * O login vale o que o servidor disser.
+   *
+   * Ao abrir, confere a sessão antes de mostrar qualquer painel; sem sessão
+   * válida, apaga a cópia do navegador. Se a sessão acabar ou a pessoa sair em
+   * outra aba, o painel fecha. Antes, sessão ausente não fazia nada -- e o
+   * painel seguia aberto com o usuário que ficou guardado.
+   *
+   * O papel (admin, professor, aluno) vem sempre do banco. Quem continua logado
+   * até clicar em Sair continua: a sessão do Supabase já fica guardada.
+   */
   useEffect(() => {
-    if (isSupabaseConfigured && supabase) {
-      supabase.auth.getSession().then(async ({ data: { session } }) => {
-        if (session?.user) {
-          const email = session.user.email || '';
-          const dbUser = await supabaseService.findUserByEmail(email);
-          const role = (dbUser?.role as UserRole) || sanitizeSelfDeclaredRole(session.user.user_metadata?.role);
-          const authUser: AuthUser = {
-            id: dbUser?.id || session.user.id,
-            email: email,
-            name: dbUser?.name || session.user.user_metadata?.full_name || currentTeacher.name,
-            role: role,
-            avatarUrl: dbUser?.avatar_url || currentTeacher.avatarUrl,
-            teacherId: dbUser?.teacher_id,
-            studentId: dbUser?.student_id,
-            isDemo: false,
-          };
-          setCurrentUser(authUser);
-          localStorage.setItem('agenda_prof_current_user', JSON.stringify(authUser));
-        }
-      });
+    if (!isSupabaseConfigured || !supabase) return;
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-        if (session?.user) {
-          const email = session.user.email || '';
-          const dbUser = await supabaseService.findUserByEmail(email);
-          const role = (dbUser?.role as UserRole) || sanitizeSelfDeclaredRole(session.user.user_metadata?.role);
-          const authUser: AuthUser = {
-            id: dbUser?.id || session.user.id,
-            email: email,
-            name: dbUser?.name || session.user.user_metadata?.full_name || currentTeacher.name,
-            role: role,
-            avatarUrl: dbUser?.avatar_url || currentTeacher.avatarUrl,
-            teacherId: dbUser?.teacher_id,
-            studentId: dbUser?.student_id,
-            isDemo: false,
-          };
-          setCurrentUser(authUser);
-          localStorage.setItem('agenda_prof_current_user', JSON.stringify(authUser));
-        }
-      });
+    const encerrarAcesso = () => {
+      setCurrentUser(null);
+      try {
+        localStorage.removeItem(CHAVE_USUARIO);
+      } catch {
+        // navegador sem armazenamento: não há cópia para apagar
+      }
+    };
 
-      return () => {
-        subscription.unsubscribe();
+    const aplicarSessao = async (user: {
+      id: string;
+      email?: string;
+      user_metadata?: Record<string, any>;
+    }) => {
+      const email = user.email || '';
+      const dbUser = await supabaseService.findUserByEmail(email);
+      const role = (dbUser?.role as UserRole) || sanitizeSelfDeclaredRole(user.user_metadata?.role);
+      const authUser: AuthUser = {
+        id: dbUser?.id || user.id,
+        email,
+        // Sem nome no banco, fica sem nome -- nunca o do professor que estiver na tela
+        name: dbUser?.name || user.user_metadata?.full_name || '',
+        role,
+        avatarUrl: dbUser?.avatar_url || '',
+        teacherId: dbUser?.teacher_id,
+        studentId: dbUser?.student_id,
+        isDemo: false,
       };
+      setCurrentUser(authUser);
+      try {
+        localStorage.setItem(CHAVE_USUARIO, JSON.stringify(authUser));
+      } catch {
+        // sem armazenamento, o login vale só nesta aba
+      }
+    };
+
+    supabase.auth
+      .getSession()
+      .then(async ({ data: { session } }) => {
+        if (sessaoEncerrada(session)) encerrarAcesso();
+        else await aplicarSessao(session!.user);
+      })
+      .catch(() => encerrarAcesso())
+      .finally(() => setSessaoVerificada(true));
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (sessaoEncerrada(session)) encerrarAcesso();
+      else await aplicarSessao(session!.user);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  /**
+   * O professor da tela segue quem está logado.
+   *
+   * Antes o usuário vinha do navegador na hora de abrir, e a carga do banco já
+   * achava o professor certo. Agora o login só chega depois que o servidor
+   * confirma -- então, quando ele chega, o perfil da tela passa a ser o dele.
+   * Admin e gestor escolhem de quem é o perfil; professor e secretaria sem
+   * vínculo ficam com o perfil em branco, nunca com o de outra pessoa.
+   */
+  useEffect(() => {
+    if (!isSupabaseConfigured || !currentUser) return;
+    if (podeVerOutroProfessor(currentUser)) return;
+
+    const meu = professorDoUsuario(currentUser, teachers);
+    if (meu) {
+      if (meu.id !== currentTeacher.id) setCurrentTeacher(meu);
+      return;
     }
-  }, [currentTeacher]);
+    if (
+      cargaInicial === 'pronta'
+      && (currentUser.role === 'professor' || currentUser.role === 'assistente')
+      && currentTeacher.id
+    ) {
+      setCurrentTeacher(PERFIL_EM_BRANCO);
+    }
+  }, [currentUser, teachers, cargaInicial]);
 
   const handleLoginSuccess = (user: AuthUser, teacherData?: Partial<TeacherProfile>) => {
     setCurrentUser(user);
@@ -1632,6 +1679,18 @@ function AppInner() {
   }
 
   // Strict route guard: Only authenticated/registered users can access the administrative backoffice
+  // Enquanto o servidor não confirma o login, painel nenhum aparece
+  if (!sessaoVerificada) {
+    return (
+      <div className="min-h-screen bg-[#f7f9fb] flex items-center justify-center" role="status">
+        <div className="text-center">
+          <div className="w-8 h-8 mx-auto mb-3 rounded-full border-2 border-slate-200 border-t-[#00687a] animate-spin" />
+          <p className="text-sm text-[#45474c]">Verificando seu acesso…</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!currentUser) {
     return (
       <AuthView
