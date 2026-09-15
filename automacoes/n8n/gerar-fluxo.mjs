@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 /**
- * Gera publicar-novidades-whatsapp.json (o fluxo para importar no n8n) a
- * partir de novidade.mjs. Assim o código que roda no n8n é o mesmo que os
- * testes conferem. Rodar sempre que mexer em novidade.mjs:
+ * Gera os fluxos para importar no n8n a partir das regras testadas:
+ *   - publicar-novidades-whatsapp.json  (novidade.mjs)
+ *   - descobrir-id-do-grupo.json        (grupos.mjs)
+ *
+ * Rodar sempre que mexer nas regras:
  *   node automacoes/n8n/gerar-fluxo.mjs
  *
- * O arquivo gerado NÃO leva chave nem senha: a chave da Evolution fica numa
- * credencial do n8n, e os endereços no nó "Configuração", preenchidos lá.
+ * Os envios usam o nó da comunidade "Evolution API" (n8n-nodes-evolution-api)
+ * com a credencial que a Nice já tem no n8n. O JSON leva só a REFERÊNCIA a
+ * essa credencial (id e nome), nunca o endereço nem a chave da Evolution.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -14,15 +17,39 @@ import { fileURLToPath } from 'node:url';
 
 const aqui = dirname(fileURLToPath(import.meta.url));
 
-// As funções de novidade.mjs sem "export": o nó de código do n8n não usa módulos
-const funcoes = readFileSync(join(aqui, 'novidade.mjs'), 'utf8')
-  .replace(/\r\n/g, '\n')
-  .replace(/^export /gm, '')
-  .trim();
+/** Credencial "Evolution API" já cadastrada no n8n da Nice (só a referência). */
+const CREDENCIAL_EVOLUTION = { evolutionApi: { id: 'tuxjQsSXPeXTu0NS', name: 'podcast' } };
+const INSTANCIA_PADRAO = 'podcast';
+const NO_EVOLUTION = { type: 'n8n-nodes-evolution-api.evolutionApi', typeVersion: 1 };
 
-const codigo = (corpo) => `${funcoes}\n\n// ---------------- passo do fluxo ----------------\n${corpo.trim()}\n`;
+/** Funções de um arquivo de regras, sem "export": o nó de código do n8n não usa módulos. */
+function funcoesDe(arquivo) {
+  return readFileSync(join(aqui, arquivo), 'utf8').replace(/\r\n/g, '\n').replace(/^export /gm, '').trim();
+}
 
-const separarNovidades = codigo(`
+function atribuicoes(prefixo, campos) {
+  return {
+    assignments: campos.map(([name, value, type = 'string'], i) => ({
+      id: `${prefixo}-${String(100 + i).padStart(12, '0')}`,
+      name,
+      value,
+      type,
+    })),
+  };
+}
+
+function gravar(nomeArquivo, fluxo) {
+  writeFileSync(join(aqui, nomeArquivo), JSON.stringify(fluxo, null, 2) + '\n');
+  console.log(`✓ automacoes/n8n/${nomeArquivo} gerado`);
+}
+
+// ============================================================================
+// Fluxo 1: publicar novidades no grupo
+// ============================================================================
+const regrasNovidade = funcoesDe('novidade.mjs');
+const passo = (corpo) => `${regrasNovidade}\n\n// ---------------- passo do fluxo ----------------\n${corpo.trim()}\n`;
+
+const separarNovidades = passo(`
 const config = $('Configuração').first().json;
 
 // Botão "Testar com meu número": manda a novidade de teste só para você
@@ -40,7 +67,7 @@ return novidadesDoPush(aviso.body, config)
   .map((n) => ({ json: { ...n, destino: config.grupoJid, modo: 'grupo', esperaSegundos: Math.max(1, Number(config.esperaMinutos || 3) * 60) } }));
 `);
 
-const montarMensagem = codigo(`
+const montarMensagem = passo(`
 const config = $('Configuração').first().json;
 const markdown = await this.helpers.httpRequest({
   method: 'GET',
@@ -58,7 +85,7 @@ return { json: { ...$json, ...envio } };
 `);
 
 const marcarPublicada = `
-// Guarda o que já foi para o grupo: se o GitHub avisar de novo, não repete
+// Só chega aqui se o envio deu certo: o nó da Evolution para o fluxo quando falha
 const item = $('Montar mensagem').item.json;
 if (item.modo !== 'grupo') return { json: { teste: true, enviado: item.caminho } };
 const dados = $getWorkflowStaticData('global');
@@ -66,18 +93,7 @@ dados.publicadas = [...new Set([...(dados.publicadas || []), item.caminho])].sli
 return { json: { publicada: item.caminho } };
 `.trim() + '\n';
 
-const configuracao = [
-  ['evolutionUrl', 'https://evolution.seu-dominio.com.br', 'string'],
-  ['instancia', 'NOME-DA-INSTANCIA', 'string'],
-  ['grupoJid', '120363000000000000@g.us', 'string'],
-  ['numeroTeste', '5551999999999', 'string'],
-  ['arquivoTeste', 'novidades/2026-09-15-domingo-e-aula-gratuita.md', 'string'],
-  ['repositorio', 'Nicevargas/Site_professor', 'string'],
-  ['branch', 'main', 'string'],
-  ['esperaMinutos', 3, 'number'],
-];
-
-const fluxo = {
+gravar('publicar-novidades-whatsapp.json', {
   name: 'Aquagenda: publicar novidades no grupo do WhatsApp',
   nodes: [
     {
@@ -100,14 +116,15 @@ const fluxo = {
     {
       parameters: {
         mode: 'manual',
-        assignments: {
-          assignments: configuracao.map(([name, value, type], i) => ({
-            id: `5a1d0a3e-0003-4a6e-9c1b-${String(100 + i).padStart(12, '0')}`,
-            name,
-            value,
-            type,
-          })),
-        },
+        assignments: atribuicoes('5a1d0a3e-0003-4a6e-9c1b', [
+          ['instancia', INSTANCIA_PADRAO],
+          ['grupoJid', '120363000000000000@g.us'],
+          ['numeroTeste', '5551999999999'],
+          ['arquivoTeste', 'novidades/2026-09-15-domingo-e-aula-gratuita.md'],
+          ['repositorio', 'Nicevargas/Site_professor'],
+          ['branch', 'main'],
+          ['esperaMinutos', 3, 'number'],
+        ]),
         includeOtherFields: false,
         options: {},
       },
@@ -143,21 +160,21 @@ const fluxo = {
       position: [960, 100],
     },
     {
+      // Só os campos que o nó mostra em "Enviar Imagem"; tipo e nome do arquivo ficam no padrão do nó
       parameters: {
-        method: 'POST',
-        url: "={{ $('Configuração').first().json.evolutionUrl.replace(/\\/+$/, '') }}/message/{{ $json.rota }}/{{ $('Configuração').first().json.instancia }}",
-        authentication: 'genericCredentialType',
-        genericAuthType: 'httpHeaderAuth',
-        sendBody: true,
-        specifyBody: 'json',
-        jsonBody: '={{ JSON.stringify($json.corpoEnvio) }}',
-        options: {},
+        resource: 'messages-api',
+        operation: 'send-image',
+        instanceName: "={{ $('Configuração').first().json.instancia }}",
+        remoteJid: '={{ $json.remoteJid }}',
+        media: '={{ $json.media }}',
+        caption: '={{ $json.caption }}',
+        options_message: {},
       },
       id: '5a1d0a3e-0007-4a6e-9c1b-000000000007',
       name: 'Enviar pelo WhatsApp',
-      type: 'n8n-nodes-base.httpRequest',
-      typeVersion: 4.2,
+      ...NO_EVOLUTION,
       position: [1200, 100],
+      credentials: CREDENCIAL_EVOLUTION,
       retryOnFail: true,
       maxTries: 3,
       waitBetweenTries: 5000,
@@ -182,20 +199,12 @@ const fluxo = {
   },
   settings: { executionOrder: 'v1' },
   pinData: {},
-};
-
-writeFileSync(join(aqui, 'publicar-novidades-whatsapp.json'), JSON.stringify(fluxo, null, 2) + '\n');
-console.log('✓ automacoes/n8n/publicar-novidades-whatsapp.json gerado');
+});
 
 // ============================================================================
 // Fluxo 2: descobrir o ID do grupo (para preencher grupoJid)
 // ============================================================================
-const funcoesGrupos = readFileSync(join(aqui, 'grupos.mjs'), 'utf8')
-  .replace(/\r\n/g, '\n')
-  .replace(/^export /gm, '')
-  .trim();
-
-const nomeEId = `${funcoesGrupos}
+const nomeEId = `${funcoesDe('grupos.mjs')}
 
 // ---------------- passo do fluxo ----------------
 const config = $('Configuração').first().json;
@@ -212,7 +221,7 @@ if (!lista.length) {
 return lista.map((g) => ({ json: g }));
 `;
 
-const fluxoGrupos = {
+gravar('descobrir-id-do-grupo.json', {
   name: 'Aquagenda: descobrir ID do grupo do WhatsApp',
   nodes: [
     {
@@ -226,18 +235,10 @@ const fluxoGrupos = {
     {
       parameters: {
         mode: 'manual',
-        assignments: {
-          assignments: [
-            ['evolutionUrl', 'https://evolution.seu-dominio.com.br'],
-            ['instancia', 'NOME-DA-INSTANCIA'],
-            ['buscarNome', ''],
-          ].map(([name, value], i) => ({
-            id: `6b2e1b4f-0002-4b7f-8d2c-${String(100 + i).padStart(12, '0')}`,
-            name,
-            value,
-            type: 'string',
-          })),
-        },
+        assignments: atribuicoes('6b2e1b4f-0002-4b7f-8d2c', [
+          ['instancia', INSTANCIA_PADRAO],
+          ['buscarNome', ''],
+        ]),
         includeOtherFields: false,
         options: {},
       },
@@ -249,19 +250,17 @@ const fluxoGrupos = {
     },
     {
       parameters: {
-        method: 'GET',
-        url: "={{ $('Configuração').first().json.evolutionUrl.replace(/\\/+$/, '') }}/group/fetchAllGroups/{{ $('Configuração').first().json.instancia }}",
-        authentication: 'genericCredentialType',
-        genericAuthType: 'httpHeaderAuth',
-        sendQuery: true,
-        queryParameters: { parameters: [{ name: 'getParticipants', value: 'false' }] },
-        options: {},
+        resource: 'groups-api',
+        operation: 'fetch-groups',
+        instanceName: "={{ $('Configuração').first().json.instancia }}",
+        searchMethod: 'fetchAll',
+        getParticipants: false,
       },
       id: '6b2e1b4f-0003-4b7f-8d2c-000000000003',
       name: 'Buscar grupos na Evolution',
-      type: 'n8n-nodes-base.httpRequest',
-      typeVersion: 4.2,
+      ...NO_EVOLUTION,
       position: [480, 0],
+      credentials: CREDENCIAL_EVOLUTION,
     },
     {
       parameters: { jsCode: nomeEId },
@@ -279,7 +278,4 @@ const fluxoGrupos = {
   },
   settings: { executionOrder: 'v1' },
   pinData: {},
-};
-
-writeFileSync(join(aqui, 'descobrir-id-do-grupo.json'), JSON.stringify(fluxoGrupos, null, 2) + '\n');
-console.log('✓ automacoes/n8n/descobrir-id-do-grupo.json gerado');
+});

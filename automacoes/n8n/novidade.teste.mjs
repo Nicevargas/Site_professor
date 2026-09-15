@@ -1,6 +1,6 @@
 /**
  * Testes da automação de novidades. Rodar com:
- *   node --test automacoes/n8n/novidade.teste.mjs
+ *   node --test automacoes/n8n/
  *
  * O nome é ".teste.mjs" (e não ".test.") de propósito: estes testes usam o
  * executor do próprio Node, e o vitest do site não deve tentar rodá-los.
@@ -58,7 +58,7 @@ test('outra branch, outro repositório ou ping do GitHub não publicam nada', ()
   assert.deepEqual(novidadesDoPush({ zen: 'Keep it logically awesome.', hook_id: 1 }, config), []);
 });
 
-test('lê texto e imagem das três novidades reais do projeto', () => {
+test('lê texto e imagem das novidades reais do projeto', () => {
   const arquivos = readdirSync(join(raiz, 'novidades')).filter((f) => /^\d{4}-\d{2}-\d{2}-.+\.md$/.test(f));
   assert.ok(arquivos.length >= 3, 'esperava ao menos 3 novidades');
   for (const arquivo of arquivos) {
@@ -82,32 +82,24 @@ test('novidade sem a seção de texto é recusada', () => {
   assert.throws(() => extrairMensagem('# Só título', 'novidades/2026-09-20-x.md'), /Texto para o WhatsApp/);
 });
 
-test('com imagem, pede sendMedia com o texto na legenda', () => {
+test('monta os campos do nó "Enviar Imagem" com o texto na legenda', () => {
   const envio = montarEnvio({
     destino: '120363000000000000@g.us',
     texto: '🆕 *Oi*',
     imagemUrl: urlBruta('Nicevargas/Site_professor', 'abc123', 'novidades/imagens/2026-09-20-x.png'),
     arquivoImagem: 'novidades/imagens/2026-09-20-x.png',
   });
-  assert.equal(envio.rota, 'sendMedia');
-  assert.deepEqual(envio.corpoEnvio, {
-    number: '120363000000000000@g.us',
-    mediatype: 'image',
-    mimetype: 'image/png',
-    caption: '🆕 *Oi*',
-    media: 'https://raw.githubusercontent.com/Nicevargas/Site_professor/abc123/novidades/imagens/2026-09-20-x.png',
-    fileName: '2026-09-20-x.png',
-  });
+  assert.equal(envio.remoteJid, '120363000000000000@g.us');
+  assert.equal(envio.caption, '🆕 *Oi*');
+  assert.equal(envio.media, 'https://raw.githubusercontent.com/Nicevargas/Site_professor/abc123/novidades/imagens/2026-09-20-x.png');
 });
 
-test('sem imagem, pede sendText', () => {
-  assert.deepEqual(montarEnvio({ destino: '5551999999999', texto: 'oi', imagemUrl: null }), {
-    rota: 'sendText',
-    corpoEnvio: { number: '5551999999999', text: 'oi' },
-  });
+test('novidade sem imagem para com aviso, em vez de mandar pela metade', () => {
+  assert.throws(() => montarEnvio({ destino: '5551999999999', texto: 'oi', imagemUrl: null }), /precisa de imagem/);
+  assert.throws(() => montarEnvio({ destino: '', texto: 'oi', imagemUrl: 'https://x/y.png' }), /destino/);
 });
 
-test('o fluxo do n8n está em dia com este código e os nós de código são JavaScript válido', () => {
+test('o fluxo de publicar está em dia, usa o nó da Evolution e não leva chave', () => {
   const caminhoFluxo = join(aqui, 'publicar-novidades-whatsapp.json');
   // No Windows o Git pode trocar o fim de linha ao baixar: isso não é desatualização
   const lerSemFimDeLinha = () => readFileSync(caminhoFluxo, 'utf8').replace(/\r\n/g, '\n');
@@ -121,6 +113,17 @@ test('o fluxo do n8n está em dia com este código e os nós de código são Jav
   for (const no of fluxo.nodes.filter((n) => n.type === 'n8n-nodes-base.code')) {
     assert.doesNotThrow(() => new AsyncFunction('$', '$json', '$getWorkflowStaticData', no.parameters.jsCode), `nó "${no.name}" com erro de sintaxe`);
   }
-  // Nenhuma chave ou segredo dentro do arquivo
-  assert.ok(!/apikey"\s*:\s*"[A-Za-z0-9]{16,}/i.test(depois), 'o JSON não pode ter chave de API');
+
+  const envio = fluxo.nodes.find((n) => n.name === 'Enviar pelo WhatsApp');
+  assert.equal(envio.type, 'n8n-nodes-evolution-api.evolutionApi');
+  assert.equal(envio.parameters.resource, 'messages-api');
+  assert.equal(envio.parameters.operation, 'send-image');
+  // Só campos que o nó mostra em "Enviar Imagem" (os outros o n8n descarta)
+  assert.deepEqual(Object.keys(envio.parameters).sort(), ['caption', 'instanceName', 'media', 'operation', 'options_message', 'remoteJid', 'resource']);
+
+  // Credencial só como referência (id e nome), nunca endereço ou chave
+  for (const no of fluxo.nodes.filter((n) => n.credentials)) {
+    assert.deepEqual(Object.keys(no.credentials.evolutionApi).sort(), ['id', 'name'], `nó "${no.name}" leva mais que a referência da credencial`);
+  }
+  assert.ok(!/apikey|server-url/i.test(depois), 'o JSON não pode ter chave nem endereço da Evolution');
 });

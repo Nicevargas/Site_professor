@@ -20,6 +20,8 @@ function semAcento(texto) {
  */
 export function listarGrupos(respostas, busca) {
   const grupos = (Array.isArray(respostas) ? respostas : [respostas])
+    // O nó da Evolution no n8n entrega { success: true, data: [grupos] }
+    .flatMap((r) => (r && !Array.isArray(r) && Array.isArray(r.data) ? r.data : [r]))
     .flatMap((r) => (Array.isArray(r) ? r : [r]))
     .filter((g) => g && typeof g.id === 'string' && g.id.endsWith('@g.us'));
 

@@ -77,23 +77,22 @@ export function mimetypeDaImagem(caminho) {
 }
 
 /**
- * Pedido para a Evolution API: imagem com o texto de legenda, ou só texto.
- * Campos conferidos no código da Evolution (SendMediaDto / SendTextDto).
+ * Campos do nó da Evolution API no n8n (n8n-nodes-evolution-api), operação
+ * "Enviar Imagem": a imagem vai com o texto de legenda, numa mensagem só.
+ *
+ * Toda novidade precisa de imagem (é o modelo de novidades/README.md). Sem
+ * ela, para com aviso claro em vez de mandar algo pela metade para o grupo.
  */
 export function montarEnvio({ destino, texto, imagemUrl, arquivoImagem }) {
   if (!destino) throw new Error('falta o destino (ID do grupo ou número de teste)');
-  if (imagemUrl) {
-    return {
-      rota: 'sendMedia',
-      corpoEnvio: {
-        number: String(destino),
-        mediatype: 'image',
-        mimetype: mimetypeDaImagem(arquivoImagem || imagemUrl),
-        caption: texto,
-        media: imagemUrl,
-        fileName: String(arquivoImagem || imagemUrl).split('/').pop(),
-      },
-    };
+  if (!imagemUrl) {
+    throw new Error('a novidade precisa de imagem: a seção "## Imagem" não aponta para nenhum arquivo em imagens/');
   }
-  return { rota: 'sendText', corpoEnvio: { number: String(destino), text: texto } };
+  return {
+    remoteJid: String(destino),
+    media: imagemUrl,
+    mimetype: mimetypeDaImagem(arquivoImagem || imagemUrl),
+    caption: texto,
+    fileName: String(arquivoImagem || imagemUrl).split('/').pop(),
+  };
 }

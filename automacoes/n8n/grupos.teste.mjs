@@ -1,6 +1,6 @@
 /**
  * Testes do fluxo "descobrir o ID do grupo". Rodar com:
- *   node --test automacoes/n8n/grupos.teste.mjs
+ *   node --test automacoes/n8n/
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,7 +13,7 @@ import { listarGrupos } from './grupos.mjs';
 const aqui = dirname(fileURLToPath(import.meta.url));
 
 // Formato devolvido pela Evolution API em /group/fetchAllGroups
-const resposta = [
+const grupos = [
   { id: '120363111111111111@g.us', subject: 'Professores Aquágenda', size: 42, announce: true, isCommunity: false },
   { id: '120363222222222222@g.us', subject: 'Família', size: 8, announce: false, isCommunity: false },
   { id: '120363333333333333@g.us', subject: 'Avisos da Academia', size: 120, announce: false, isCommunity: true },
@@ -21,13 +21,18 @@ const resposta = [
 ];
 
 test('lista todos os grupos em ordem de nome, com o ID pronto para copiar', () => {
-  const lista = listarGrupos(resposta, '');
+  const lista = listarGrupos(grupos, '');
   assert.deepEqual(lista.map((g) => g.grupo), ['Avisos da Academia', 'Família', 'Professores Aquágenda']);
   assert.ok(lista.every((g) => g.id.endsWith('@g.us')), 'só grupos, nunca conversa comum');
 });
 
+test('entende a resposta do nó da Evolution no n8n ({ success, data })', () => {
+  const doNo = [{ success: true, data: grupos }];
+  assert.equal(listarGrupos(doNo, '').length, 3);
+});
+
 test('busca pelo nome ignora maiúscula e acento', () => {
-  assert.deepEqual(listarGrupos(resposta, 'AQUAGENDA'), [
+  assert.deepEqual(listarGrupos(grupos, 'AQUAGENDA'), [
     {
       grupo: 'Professores Aquágenda',
       id: '120363111111111111@g.us',
@@ -36,20 +41,20 @@ test('busca pelo nome ignora maiúscula e acento', () => {
       comunidade: 'não',
     },
   ]);
-  assert.equal(listarGrupos(resposta, 'familia')[0].id, '120363222222222222@g.us');
+  assert.equal(listarGrupos(grupos, 'familia')[0].id, '120363222222222222@g.us');
 });
 
-test('aceita a resposta item a item, como o n8n entrega', () => {
-  assert.equal(listarGrupos(resposta.map((g) => g), null).length, 3);
-  assert.equal(listarGrupos([[...resposta]], undefined).length, 3);
+test('aceita a resposta como lista direta ou item a item', () => {
+  assert.equal(listarGrupos(grupos.map((g) => g), null).length, 3);
+  assert.equal(listarGrupos([[...grupos]], undefined).length, 3);
 });
 
 test('nenhum grupo com o nome buscado devolve lista vazia', () => {
-  assert.deepEqual(listarGrupos(resposta, 'não existe'), []);
-  assert.deepEqual(listarGrupos([], ''), []);
+  assert.deepEqual(listarGrupos(grupos, 'não existe'), []);
+  assert.deepEqual(listarGrupos([{ success: true, data: [] }], ''), []);
 });
 
-test('o fluxo do n8n está em dia e o nó de código é JavaScript válido', () => {
+test('o fluxo de grupos está em dia e usa o nó da Evolution para buscar todos', () => {
   const caminho = join(aqui, 'descobrir-id-do-grupo.json');
   const ler = () => readFileSync(caminho, 'utf8').replace(/\r\n/g, '\n');
   const antes = ler();
@@ -62,8 +67,13 @@ test('o fluxo do n8n está em dia e o nó de código é JavaScript válido', () 
   for (const no of fluxo.nodes.filter((n) => n.type === 'n8n-nodes-base.code')) {
     assert.doesNotThrow(() => new AsyncFunction('$', '$input', no.parameters.jsCode), `nó "${no.name}" com erro de sintaxe`);
   }
-  const http = fluxo.nodes.find((n) => n.type === 'n8n-nodes-base.httpRequest');
-  assert.match(http.parameters.url, /\/group\/fetchAllGroups\//);
-  assert.deepEqual(http.parameters.queryParameters.parameters, [{ name: 'getParticipants', value: 'false' }]);
-  assert.ok(!/"credentials"/.test(depois), 'o JSON não pode levar credencial');
+
+  const busca = fluxo.nodes.find((n) => n.name === 'Buscar grupos na Evolution');
+  assert.equal(busca.type, 'n8n-nodes-evolution-api.evolutionApi');
+  assert.deepEqual(
+    { resource: busca.parameters.resource, operation: busca.parameters.operation, searchMethod: busca.parameters.searchMethod, getParticipants: busca.parameters.getParticipants },
+    { resource: 'groups-api', operation: 'fetch-groups', searchMethod: 'fetchAll', getParticipants: false }
+  );
+  assert.deepEqual(Object.keys(busca.credentials.evolutionApi).sort(), ['id', 'name']);
+  assert.ok(!/apikey|server-url/i.test(depois), 'o JSON não pode ter chave nem endereço da Evolution');
 });
