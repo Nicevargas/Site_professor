@@ -98,6 +98,11 @@ export function formatWeekRange(week: CalendarDay[]): string {
 }
 const MONTHS_SHORT_PT_BR = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
+/** "Seg, 07 Set": o rótulo curto de um dia, usado no agendamento público. */
+export function rotuloCurtoDoDia(d: Date): string {
+  return `${WEEKDAYS_PT_BR[d.getDay()]}, ${String(d.getDate()).padStart(2, '0')} ${MONTHS_SHORT_PT_BR[d.getMonth()]}`;
+}
+
 /**
  * Próximos dias úteis a partir de amanhã, no formato usado pelo agendamento público.
  * Ex.: { date: '2026-09-07', label: 'Seg, 07 Set', dayOfWeek: 1 }
@@ -111,7 +116,7 @@ export function nextBusinessDays(count: number, from: Date = new Date()): { date
     if (dayOfWeek === 0 || dayOfWeek === 6) continue; // pula fim de semana
     days.push({
       date: toLocalDateKey(cursor),
-      label: `${WEEKDAYS_PT_BR[dayOfWeek]}, ${String(cursor.getDate()).padStart(2, '0')} ${MONTHS_SHORT_PT_BR[cursor.getMonth()]}`,
+      label: rotuloCurtoDoDia(cursor),
       dayOfWeek,
     });
   }

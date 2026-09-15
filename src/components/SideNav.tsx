@@ -3,7 +3,7 @@ import { ViewMode, TeacherProfile, AuthUser, UserRole, SiteAdminTab } from '../t
 import { useAccessibility } from '../context/AccessibilityContext';
 import { SITE_ADMIN_SECTIONS } from '../utils/routes';
 import { AquagendaIcon } from './AquagendaLogo';
-import { LayoutDashboard, Calendar as CalendarIcon, Layers, Users, Settings, CreditCard, ExternalLink, Zap, Globe, DollarSign, ShieldCheck, GraduationCap, Headphones, UserCheck, BookmarkCheck, Video, HelpCircle, PlayCircle, X, Pin, PinOff, PanelLeftClose, PanelLeftOpen, Menu, Smartphone, Link2, Building2, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Calendar as CalendarIcon, Layers, Users, Settings, CreditCard, ExternalLink, Zap, Globe, DollarSign, ShieldCheck, GraduationCap, Headphones, UserCheck, BookmarkCheck, Video, HelpCircle, PlayCircle, X, Pin, PinOff, PanelLeftClose, PanelLeftOpen, Menu, Smartphone, Link2, Building2, BarChart3, Clock } from 'lucide-react';
 
 export type SidebarMode = 'drawer' | 'pinned' | 'compact';
 
@@ -50,6 +50,7 @@ export const SideNav: React.FC<SideNavProps> = ({
           { id: 'dashboard' as ViewMode, label: 'Dashboard Geral', icon: LayoutDashboard },
           { id: 'admin-metricas' as ViewMode, label: 'Painel da Plataforma', icon: BarChart3 },
           { id: 'agenda' as ViewMode, label: 'Agenda Global', icon: CalendarIcon },
+          { id: 'horarios' as ViewMode, label: 'Horários de Aula', icon: Clock },
           { id: 'servicos' as ViewMode, label: 'Serviços', icon: Layers },
           { id: 'alunos' as ViewMode, label: 'Alunos & CRM', icon: Users },
           { id: 'pagamentos' as ViewMode, label: 'Financeiro & Pix', icon: DollarSign, badge: overdueCount > 0 ? `${overdueCount}` : undefined },
@@ -66,6 +67,7 @@ export const SideNav: React.FC<SideNavProps> = ({
         return [
           { id: 'dashboard' as ViewMode, label: 'Dashboard', icon: LayoutDashboard },
           { id: 'agenda' as ViewMode, label: 'Minha Agenda', icon: CalendarIcon },
+          { id: 'horarios' as ViewMode, label: 'Horários de Aula', icon: Clock },
           { id: 'servicos' as ViewMode, label: 'Meus Serviços', icon: Layers },
           { id: 'alunos' as ViewMode, label: 'Meus Alunos', icon: Users },
           { id: 'pagamentos' as ViewMode, label: 'Meu Financeiro', icon: DollarSign, badge: overdueCount > 0 ? `${overdueCount}` : undefined },

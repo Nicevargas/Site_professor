@@ -1,7 +1,8 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { traduzirErroDeAcesso } from '../utils/erroDeAcesso';
 import { syncResult, reportSyncError, PROFESSOR_DESCONHECIDO } from '../utils/syncNotifier';
-import { TeacherProfile, ServiceItem, Appointment, Student, Reminder, PaymentInvoice, TestimonialItem, CurriculumItem, PhotoItem, FaqItem, SystemUser, Company, WaitlistEntry } from '../types';
+import { TeacherProfile, ServiceItem, Appointment, Student, Reminder, PaymentInvoice, TestimonialItem, CurriculumItem, PhotoItem, FaqItem, SystemUser, Company, WaitlistEntry, GradeSemanal } from '../types';
+import { normalizarGrade } from '../utils/gradeSemanal';
 
 /**
  * A linha de agendamento como o banco a guarda.
@@ -119,6 +120,8 @@ export const supabaseService = {
         defaultPaymentGateway: t.default_payment_gateway || undefined,
         whatsappAutoReminder8h: t.whatsapp_auto_reminder_8h ?? true,
         vacationMode: t.vacation_mode && typeof t.vacation_mode === 'object' ? t.vacation_mode : undefined,
+        // NULL = nunca configurou: fica undefined e o site usa a grade padrão
+        horariosAula: t.class_schedule && typeof t.class_schedule === 'object' ? normalizarGrade(t.class_schedule) : undefined,
         // Assinatura e endereço público
         plan: t.plan || 'start',
         slug: t.slug || undefined,
@@ -252,6 +255,41 @@ export const supabaseService = {
     } catch (err) {
       console.warn('Erro ao salvar professor no Supabase:', err);
       reportSyncError('perfil do professor', err);
+      return false;
+    }
+  },
+
+  /**
+   * Grava só os horários de aula do professor.
+   *
+   * saveTeacher reescreve a linha inteira e completa campo vazio com valor
+   * padrão (cor, tema, forma de pagamento). Para uma tela que só mexe nos
+   * horários, isso seria trocar dados do professor sem ele pedir. Aqui vai
+   * uma coluna e nada mais.
+   *
+   * O banco não avisa quando a regra de acesso ignora um update: responde
+   * sucesso com zero linhas. Por isso pede o id de volta e confere.
+   */
+  async saveClassSchedule(teacherId: string | undefined, grade: GradeSemanal): Promise<boolean> {
+    if (!isSupabaseConfigured || !supabase) return false;
+    if (!teacherId || !teacherId.trim()) {
+      reportSyncError('horários de aula', PROFESSOR_DESCONHECIDO);
+      return false;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('teachers')
+        .update({ class_schedule: grade })
+        .eq('id', teacherId)
+        .select('id');
+      if (error) return syncResult(error, 'horários de aula');
+      if (!data || data.length === 0) {
+        reportSyncError('horários de aula', 'permission denied for table teachers');
+        return false;
+      }
+      return true;
+    } catch (err) {
+      reportSyncError('horários de aula', err);
       return false;
     }
   },

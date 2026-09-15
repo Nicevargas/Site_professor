@@ -81,6 +81,7 @@ import { hashFromView, viewFromHash, VIEW_TITLES } from './utils/routes';
 import { formatMonthYearPtBR, toLocalDateKey } from './utils/dates';
 import { SyncErrorToast } from './components/SyncErrorToast';
 import { MyAddressView } from './components/MyAddressView';
+import { MeusHorariosView } from './components/MeusHorariosView';
 import { resolveTenant, slugify, buildPublicUrl, slugFromRoute, PLATFORM_HOST } from './utils/tenant';
 import { PERFIL_EM_BRANCO, perfilVazio } from './utils/perfilEmBranco';
 import { podeVerOutroProfessor, professorDoUsuario } from './utils/professorDoUsuario';
@@ -2078,6 +2079,26 @@ function AppInner() {
           )}
 
           {currentView === 'planos' && <PricingPlansView />}
+
+          {currentView === 'horarios' && !perfilPronto && avisoPerfil}
+          {currentView === 'horarios' && perfilPronto && (
+            <MeusHorariosView
+              key={currentTeacher.id}
+              currentTeacher={currentTeacher}
+              onSalvar={async (grade) => {
+                // Sem banco (demonstração) a grade vale só nesta tela
+                const professorId = currentTeacher.id;
+                const ok = isSupabaseConfigured
+                  ? await supabaseService.saveClassSchedule(professorId, grade)
+                  : true;
+                if (ok) {
+                  setCurrentTeacher((prev) => (prev.id === professorId ? { ...prev, horariosAula: grade } : prev));
+                  setTeachers((prev) => prev.map((tp) => (tp.id === professorId ? { ...tp, horariosAula: grade } : tp)));
+                }
+                return ok;
+              }}
+            />
+          )}
 
           {currentView === 'meu-endereco' && !perfilPronto && avisoPerfil}
           {currentView === 'meu-endereco' && perfilPronto && (

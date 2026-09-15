@@ -2,7 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { SafeImage } from './SafeImage';
 import { TeacherProfile, ServiceItem, Appointment } from '../types';
 import confetti from 'canvas-confetti';
-import { nextBusinessDays, formatMonthYearPtBR } from '../utils/dates';
+import { formatMonthYearPtBR } from '../utils/dates';
+import { gradeEfetiva, horariosDoDia, periodoDoHorario, proximosDiasComAula } from '../utils/gradeSemanal';
 import { addMinutes, checkBooking } from '../utils/schedule';
 import { availability } from '../utils/classes';
 import { 
@@ -85,19 +86,19 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
 
   const selectedService = services.find((s) => s.id === selectedServiceId) || services[0];
 
-  // Próximos cinco dias úteis a partir de amanhã
-  const availableDays = useMemo(() => nextBusinessDays(5), []);
-
-  const allTimeSlots = [
-    { time: '09:00', period: 'Manhã' },
-    { time: '10:30', period: 'Manhã' },
-    { time: '14:00', period: 'Tarde' },
-    { time: '15:30', period: 'Tarde' },
-    { time: '17:00', period: 'Tarde' },
-  ];
+  /**
+   * Dias e horários vêm da grade do professor ("Horários de aula").
+   * Quem nunca configurou continua com a grade de antes: segunda a sexta,
+   * 09:00, 10:30, 14:00, 15:30 e 17:00.
+   */
+  const grade = useMemo(() => gradeEfetiva(teacher.horariosAula), [teacher.horariosAula]);
+  const availableDays = useMemo(() => proximosDiasComAula(grade, 5), [grade]);
 
   // Primeiro dia da lista quando ainda não há escolha
   const activeDate = selectedDate || availableDays[0]?.date || '';
+  const diaAtivo = availableDays.find((d) => d.date === activeDate)?.dayOfWeek ?? -1;
+
+  const allTimeSlots = horariosDoDia(grade, diaAtivo).map((time) => ({ time, period: periodoDoHorario(time) }));
 
   /**
    * Um horário só some da lista quando bate com outra aula ou com um bloqueio.
@@ -121,7 +122,7 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
       })
       .filter((ts) => !ts.blocked);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeDate, existingAppointments, selectedService?.id, selectedService?.durationMinutes, selectedService?.capacity]);
+  }, [activeDate, diaAtivo, grade, existingAppointments, selectedService?.id, selectedService?.durationMinutes, selectedService?.capacity]);
 
   const activeTimeSlot =
     selectedTimeSlot && availableTimeSlots.some((ts) => ts.time === selectedTimeSlot)
@@ -547,6 +548,11 @@ export const PublicBookingWizard: React.FC<PublicBookingWizardProps> = ({
                   <label className="block text-xs font-bold text-[#191c1e] mb-2 uppercase tracking-wider">
                     Dias Disponíveis
                   </label>
+                  {availableDays.length === 0 && (
+                    <p className="p-4 rounded-xl bg-slate-50 border border-dashed border-slate-300 text-xs text-slate-600">
+                      O professor ainda não abriu horários para agendar pelo site. Fale com ele no WhatsApp.
+                    </p>
+                  )}
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                     {availableDays.map((d) => (
                       <button

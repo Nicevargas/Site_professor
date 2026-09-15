@@ -5,6 +5,8 @@ export type ViewMode =
   | 'admin-metricas'
   | 'dashboard'
   | 'agenda'
+  /** Horários de aula por dia da semana, usados no agendamento do site */
+  | 'horarios'
   | 'servicos'
   | 'alunos'
   | 'pagamentos'
@@ -340,6 +342,15 @@ export type ThemePresetId =
   | 'ocean' | 'emerald' | 'indigo' | 'purple'
   | 'sunset' | 'slate' | 'rose' | 'amber' | 'custom';
 
+/** 0 = domingo ... 6 = sábado, como Date.getDay() */
+export type DiaDaSemana = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+/**
+ * Horários de início de aula por dia: { 1: ['07:00', '18:00'] }.
+ * Dia ausente = sem aula nesse dia. Ver utils/gradeSemanal.
+ */
+export type GradeSemanal = Partial<Record<DiaDaSemana, string[]>>;
+
 export interface TeacherProfile {
   id: string;
   name: string;
@@ -391,6 +402,11 @@ export interface TeacherProfile {
   siteSections?: string[];
   /** Nomes trocados pelo professor: { servicos: 'Modalidades' }. Só os alterados. */
   siteSectionLabels?: Record<string, string>;
+  /**
+   * Horários que o aluno vê para agendar pelo site. Ausente = nunca
+   * configurou, e o site usa a grade padrão (GRADE_PADRAO).
+   */
+  horariosAula?: GradeSemanal;
 }
 
 export interface PricingPlan {
