@@ -109,9 +109,11 @@ test('sem imagem, pede sendText', () => {
 
 test('o fluxo do n8n está em dia com este código e os nós de código são JavaScript válido', () => {
   const caminhoFluxo = join(aqui, 'publicar-novidades-whatsapp.json');
-  const antes = readFileSync(caminhoFluxo, 'utf8');
+  // No Windows o Git pode trocar o fim de linha ao baixar: isso não é desatualização
+  const lerSemFimDeLinha = () => readFileSync(caminhoFluxo, 'utf8').replace(/\r\n/g, '\n');
+  const antes = lerSemFimDeLinha();
   execFileSync(process.execPath, [join(aqui, 'gerar-fluxo.mjs')]);
-  const depois = readFileSync(caminhoFluxo, 'utf8');
+  const depois = lerSemFimDeLinha();
   assert.equal(depois, antes, 'o JSON estava desatualizado: rode node automacoes/n8n/gerar-fluxo.mjs e faça commit');
 
   const fluxo = JSON.parse(depois);
