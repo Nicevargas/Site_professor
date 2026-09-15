@@ -1,0 +1,262 @@
+{
+  "name": "Aquagenda: publicar novidades no grupo do WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "aquagenda-novidades-TROQUE-ESTE-FINAL",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "5a1d0a3e-0001-4a6e-9c1b-000000000001",
+      "name": "GitHub avisa",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "5a1d0a3e-0001-4a6e-9c1b-0000000000aa"
+    },
+    {
+      "parameters": {},
+      "id": "5a1d0a3e-0002-4a6e-9c1b-000000000002",
+      "name": "Testar com meu número",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5a1d0a3e-0003-4a6e-9c1b-000000000100",
+              "name": "evolutionUrl",
+              "value": "https://evolution.seu-dominio.com.br",
+              "type": "string"
+            },
+            {
+              "id": "5a1d0a3e-0003-4a6e-9c1b-000000000101",
+              "name": "instancia",
+              "value": "NOME-DA-INSTANCIA",
+              "type": "string"
+            },
+            {
+              "id": "5a1d0a3e-0003-4a6e-9c1b-000000000102",
+              "name": "grupoJid",
+              "value": "120363000000000000@g.us",
+              "type": "string"
+            },
+            {
+              "id": "5a1d0a3e-0003-4a6e-9c1b-000000000103",
+              "name": "numeroTeste",
+              "value": "5551999999999",
+              "type": "string"
+            },
+            {
+              "id": "5a1d0a3e-0003-4a6e-9c1b-000000000104",
+              "name": "arquivoTeste",
+              "value": "novidades/2026-09-15-domingo-e-aula-gratuita.md",
+              "type": "string"
+            },
+            {
+              "id": "5a1d0a3e-0003-4a6e-9c1b-000000000105",
+              "name": "repositorio",
+              "value": "Nicevargas/Site_professor",
+              "type": "string"
+            },
+            {
+              "id": "5a1d0a3e-0003-4a6e-9c1b-000000000106",
+              "name": "branch",
+              "value": "main",
+              "type": "string"
+            },
+            {
+              "id": "5a1d0a3e-0003-4a6e-9c1b-000000000107",
+              "name": "esperaMinutos",
+              "value": 3,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "5a1d0a3e-0003-4a6e-9c1b-000000000003",
+      "name": "Configuração",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Regras da automação \"novidade no GitHub → grupo de WhatsApp\".\n *\n * Este arquivo é a fonte da verdade: gerar-fluxo.mjs copia estas funções para\n * dentro dos nós de código do n8n, e novidade.teste.mjs testa exatamente o\n * mesmo código. Nada de import aqui: o n8n roda o texto puro das funções.\n */\n\n/** Só conteúdo de novidade: novidades/AAAA-MM-DD-assunto.md (o README não entra). */\nconst ARQUIVO_NOVIDADE = /^novidades\\/\\d{4}-\\d{2}-\\d{2}-[a-z0-9-]+\\.md$/;\n\n/** Legenda de imagem no WhatsApp corta perto de 1024 caracteres. */\nconst LIMITE_LEGENDA = 1000;\n\n/**\n * Novidades NOVAS de um push do GitHub, na ordem do nome (data).\n *\n * Só conta arquivo ADICIONADO: editar uma novidade antiga não publica de\n * novo. Push em outra branch ou de outro repositório não publica nada.\n */\nfunction novidadesDoPush(corpo, config) {\n  if (!corpo || !config) return [];\n  if (corpo.ref !== `refs/heads/${config.branch}`) return [];\n  if (!corpo.repository || corpo.repository.full_name !== config.repositorio) return [];\n\n  const adicionados = new Set();\n  const removidos = new Set();\n  for (const commit of corpo.commits || []) {\n    for (const caminho of commit.added || []) {\n      if (ARQUIVO_NOVIDADE.test(caminho)) adicionados.add(caminho);\n    }\n    for (const caminho of commit.removed || []) removidos.add(caminho);\n  }\n  return [...adicionados]\n    .filter((caminho) => !removidos.has(caminho))\n    .sort()\n    .map((caminho) => ({ caminho, commit: corpo.after }));\n}\n\n/** Endereço público do arquivo no GitHub, travado no commit (não muda depois). */\nfunction urlBruta(repositorio, commit, caminho) {\n  const partes = String(caminho).split('/').map(encodeURIComponent).join('/');\n  return `https://raw.githubusercontent.com/${repositorio}/${commit}/${partes}`;\n}\n\n/** Conteúdo de uma seção \"## Título\" do markdown, até a próxima seção. */\nfunction secaoDoMarkdown(markdown, titulo) {\n  const linhas = String(markdown).replace(/\\r\\n/g, '\\n').split('\\n');\n  const inicio = linhas.findIndex((l) => l.startsWith('## ') && l.slice(3).trim().startsWith(titulo));\n  if (inicio < 0) return '';\n  const fimRelativo = linhas.slice(inicio + 1).findIndex((l) => l.startsWith('## '));\n  const fim = fimRelativo < 0 ? linhas.length : inicio + 1 + fimRelativo;\n  return linhas.slice(inicio + 1, fim).join('\\n').trim();\n}\n\n/**\n * Texto e imagem de uma novidade, no modelo de novidades/README.md.\n * A imagem vem como caminho no repositório (novidades/imagens/x.png).\n */\nfunction extrairMensagem(markdown, caminho) {\n  const texto = secaoDoMarkdown(markdown, 'Texto para o WhatsApp');\n  if (!texto) throw new Error(`${caminho}: não achei a seção \"## Texto para o WhatsApp\"`);\n  if (texto.length > LIMITE_LEGENDA) {\n    throw new Error(`${caminho}: o texto tem ${texto.length} caracteres; o limite para ir junto da imagem é ${LIMITE_LEGENDA}`);\n  }\n  const secaoImagem = secaoDoMarkdown(markdown, 'Imagem');\n  const achado = secaoImagem.match(/(imagens\\/[^\\s:]+\\.(?:png|jpe?g|webp))/i);\n  const pasta = caminho.slice(0, caminho.lastIndexOf('/'));\n  return { texto, imagem: achado ? `${pasta}/${achado[1]}` : null };\n}\n\nfunction mimetypeDaImagem(caminho) {\n  const extensao = String(caminho).split('.').pop().toLowerCase();\n  if (extensao === 'jpg' || extensao === 'jpeg') return 'image/jpeg';\n  if (extensao === 'webp') return 'image/webp';\n  return 'image/png';\n}\n\n/**\n * Pedido para a Evolution API: imagem com o texto de legenda, ou só texto.\n * Campos conferidos no código da Evolution (SendMediaDto / SendTextDto).\n */\nfunction montarEnvio({ destino, texto, imagemUrl, arquivoImagem }) {\n  if (!destino) throw new Error('falta o destino (ID do grupo ou número de teste)');\n  if (imagemUrl) {\n    return {\n      rota: 'sendMedia',\n      corpoEnvio: {\n        number: String(destino),\n        mediatype: 'image',\n        mimetype: mimetypeDaImagem(arquivoImagem || imagemUrl),\n        caption: texto,\n        media: imagemUrl,\n        fileName: String(arquivoImagem || imagemUrl).split('/').pop(),\n      },\n    };\n  }\n  return { rota: 'sendText', corpoEnvio: { number: String(destino), text: texto } };\n}\n\n// ---------------- passo do fluxo ----------------\nconst config = $('Configuração').first().json;\n\n// Botão \"Testar com meu número\": manda a novidade de teste só para você\nif (!$('GitHub avisa').isExecuted) {\n  return [{ json: { caminho: config.arquivoTeste, commit: config.branch, destino: String(config.numeroTeste), modo: 'teste', esperaSegundos: 1 } }];\n}\n\nconst aviso = $('GitHub avisa').first().json;\nconst evento = (aviso.headers || {})['x-github-event'];\nif (evento !== 'push') return [];\n\nconst jaPublicadas = $getWorkflowStaticData('global').publicadas || [];\nreturn novidadesDoPush(aviso.body, config)\n  .filter((n) => !jaPublicadas.includes(n.caminho))\n  .map((n) => ({ json: { ...n, destino: config.grupoJid, modo: 'grupo', esperaSegundos: Math.max(1, Number(config.esperaMinutos || 3) * 60) } }));\n"
+      },
+      "id": "5a1d0a3e-0004-4a6e-9c1b-000000000004",
+      "name": "Separar novidades",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "amount": "={{ $json.esperaSegundos }}",
+        "unit": "seconds"
+      },
+      "id": "5a1d0a3e-0005-4a6e-9c1b-000000000005",
+      "name": "Esperar o site publicar",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        100
+      ],
+      "webhookId": "5a1d0a3e-0005-4a6e-9c1b-0000000000bb"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "/**\n * Regras da automação \"novidade no GitHub → grupo de WhatsApp\".\n *\n * Este arquivo é a fonte da verdade: gerar-fluxo.mjs copia estas funções para\n * dentro dos nós de código do n8n, e novidade.teste.mjs testa exatamente o\n * mesmo código. Nada de import aqui: o n8n roda o texto puro das funções.\n */\n\n/** Só conteúdo de novidade: novidades/AAAA-MM-DD-assunto.md (o README não entra). */\nconst ARQUIVO_NOVIDADE = /^novidades\\/\\d{4}-\\d{2}-\\d{2}-[a-z0-9-]+\\.md$/;\n\n/** Legenda de imagem no WhatsApp corta perto de 1024 caracteres. */\nconst LIMITE_LEGENDA = 1000;\n\n/**\n * Novidades NOVAS de um push do GitHub, na ordem do nome (data).\n *\n * Só conta arquivo ADICIONADO: editar uma novidade antiga não publica de\n * novo. Push em outra branch ou de outro repositório não publica nada.\n */\nfunction novidadesDoPush(corpo, config) {\n  if (!corpo || !config) return [];\n  if (corpo.ref !== `refs/heads/${config.branch}`) return [];\n  if (!corpo.repository || corpo.repository.full_name !== config.repositorio) return [];\n\n  const adicionados = new Set();\n  const removidos = new Set();\n  for (const commit of corpo.commits || []) {\n    for (const caminho of commit.added || []) {\n      if (ARQUIVO_NOVIDADE.test(caminho)) adicionados.add(caminho);\n    }\n    for (const caminho of commit.removed || []) removidos.add(caminho);\n  }\n  return [...adicionados]\n    .filter((caminho) => !removidos.has(caminho))\n    .sort()\n    .map((caminho) => ({ caminho, commit: corpo.after }));\n}\n\n/** Endereço público do arquivo no GitHub, travado no commit (não muda depois). */\nfunction urlBruta(repositorio, commit, caminho) {\n  const partes = String(caminho).split('/').map(encodeURIComponent).join('/');\n  return `https://raw.githubusercontent.com/${repositorio}/${commit}/${partes}`;\n}\n\n/** Conteúdo de uma seção \"## Título\" do markdown, até a próxima seção. */\nfunction secaoDoMarkdown(markdown, titulo) {\n  const linhas = String(markdown).replace(/\\r\\n/g, '\\n').split('\\n');\n  const inicio = linhas.findIndex((l) => l.startsWith('## ') && l.slice(3).trim().startsWith(titulo));\n  if (inicio < 0) return '';\n  const fimRelativo = linhas.slice(inicio + 1).findIndex((l) => l.startsWith('## '));\n  const fim = fimRelativo < 0 ? linhas.length : inicio + 1 + fimRelativo;\n  return linhas.slice(inicio + 1, fim).join('\\n').trim();\n}\n\n/**\n * Texto e imagem de uma novidade, no modelo de novidades/README.md.\n * A imagem vem como caminho no repositório (novidades/imagens/x.png).\n */\nfunction extrairMensagem(markdown, caminho) {\n  const texto = secaoDoMarkdown(markdown, 'Texto para o WhatsApp');\n  if (!texto) throw new Error(`${caminho}: não achei a seção \"## Texto para o WhatsApp\"`);\n  if (texto.length > LIMITE_LEGENDA) {\n    throw new Error(`${caminho}: o texto tem ${texto.length} caracteres; o limite para ir junto da imagem é ${LIMITE_LEGENDA}`);\n  }\n  const secaoImagem = secaoDoMarkdown(markdown, 'Imagem');\n  const achado = secaoImagem.match(/(imagens\\/[^\\s:]+\\.(?:png|jpe?g|webp))/i);\n  const pasta = caminho.slice(0, caminho.lastIndexOf('/'));\n  return { texto, imagem: achado ? `${pasta}/${achado[1]}` : null };\n}\n\nfunction mimetypeDaImagem(caminho) {\n  const extensao = String(caminho).split('.').pop().toLowerCase();\n  if (extensao === 'jpg' || extensao === 'jpeg') return 'image/jpeg';\n  if (extensao === 'webp') return 'image/webp';\n  return 'image/png';\n}\n\n/**\n * Pedido para a Evolution API: imagem com o texto de legenda, ou só texto.\n * Campos conferidos no código da Evolution (SendMediaDto / SendTextDto).\n */\nfunction montarEnvio({ destino, texto, imagemUrl, arquivoImagem }) {\n  if (!destino) throw new Error('falta o destino (ID do grupo ou número de teste)');\n  if (imagemUrl) {\n    return {\n      rota: 'sendMedia',\n      corpoEnvio: {\n        number: String(destino),\n        mediatype: 'image',\n        mimetype: mimetypeDaImagem(arquivoImagem || imagemUrl),\n        caption: texto,\n        media: imagemUrl,\n        fileName: String(arquivoImagem || imagemUrl).split('/').pop(),\n      },\n    };\n  }\n  return { rota: 'sendText', corpoEnvio: { number: String(destino), text: texto } };\n}\n\n// ---------------- passo do fluxo ----------------\nconst config = $('Configuração').first().json;\nconst markdown = await this.helpers.httpRequest({\n  method: 'GET',\n  url: urlBruta(config.repositorio, $json.commit, $json.caminho),\n  json: false,\n});\nconst { texto, imagem } = extrairMensagem(String(markdown), $json.caminho);\nconst envio = montarEnvio({\n  destino: $json.destino,\n  texto,\n  imagemUrl: imagem ? urlBruta(config.repositorio, $json.commit, imagem) : null,\n  arquivoImagem: imagem,\n});\nreturn { json: { ...$json, ...envio } };\n"
+      },
+      "id": "5a1d0a3e-0006-4a6e-9c1b-000000000006",
+      "name": "Montar mensagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Configuração').first().json.evolutionUrl.replace(/\\/+$/, '') }}/message/{{ $json.rota }}/{{ $('Configuração').first().json.instancia }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.corpoEnvio) }}",
+        "options": {}
+      },
+      "id": "5a1d0a3e-0007-4a6e-9c1b-000000000007",
+      "name": "Enviar pelo WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        100
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Guarda o que já foi para o grupo: se o GitHub avisar de novo, não repete\nconst item = $('Montar mensagem').item.json;\nif (item.modo !== 'grupo') return { json: { teste: true, enviado: item.caminho } };\nconst dados = $getWorkflowStaticData('global');\ndados.publicadas = [...new Set([...(dados.publicadas || []), item.caminho])].slice(-500);\nreturn { json: { publicada: item.caminho } };\n"
+      },
+      "id": "5a1d0a3e-0008-4a6e-9c1b-000000000008",
+      "name": "Marcar como publicada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "GitHub avisa": {
+      "main": [
+        [
+          {
+            "node": "Configuração",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Testar com meu número": {
+      "main": [
+        [
+          {
+            "node": "Configuração",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuração": {
+      "main": [
+        [
+          {
+            "node": "Separar novidades",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Separar novidades": {
+      "main": [
+        [
+          {
+            "node": "Esperar o site publicar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esperar o site publicar": {
+      "main": [
+        [
+          {
+            "node": "Montar mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar mensagem": {
+      "main": [
+        [
+          {
+            "node": "Enviar pelo WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar pelo WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Marcar como publicada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

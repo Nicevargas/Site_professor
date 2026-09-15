@@ -8,6 +8,12 @@ Toda alteração publicada que o professor percebe (tela nova, mudança no jeito
 2. `novidades/imagens/AAAA-MM-DD-assunto.png`: print feito com `node scripts/print-novidade.mjs` (só modo demonstração, sem dado real).
 3. Na resposta final, colar o texto para a Nice copiar.
 
-Nunca enviar nada pelo WhatsApp: quem envia é a Nice. Alteração que o professor não vê não gera post.
+**A publicação no grupo é automática**: quando um `novidades/AAAA-MM-DD-assunto.md` novo chega no `main`, o n8n publica sozinho, sem aprovação (ver `automacoes/n8n/README.md`). Por isso:
+- revise texto e print antes do commit, porque não tem volta depois do push;
+- texto com até 1000 caracteres, para caber na legenda da imagem;
+- nunca crie arquivo de novidade de teste ou rascunho no `main`;
+- nunca envie mensagem por outra via.
+
+Alteração que o professor não vê não gera post.
 
 Escrever sempre em português simples, com o nome dos botões exatamente como aparecem na tela.

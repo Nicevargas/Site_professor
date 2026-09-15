@@ -5,7 +5,9 @@ Cada alteração publicada que o professor percebe no Aquagenda ganha um conteú
 - **Para quem:** professores que já usam o Aquagenda.
 - **O que tem:** texto pronto para colar + print da tela.
 - **Quando:** no mesmo commit da alteração.
-- **Quem envia:** a Nice copia e cola no grupo. Nada é enviado automaticamente.
+- **Quem envia:** o n8n, **automaticamente**, quando o arquivo novo chega no `main` (ver `automacoes/n8n/README.md`).
+
+> ⚠️ Publica **direto no grupo, sem aprovação**. Revise o texto e o print **antes do commit**. O texto tem limite de 1000 caracteres, para caber como legenda da imagem.
 
 Alteração que o professor não vê não ganha post: testes, código interno ou ajuste técnico sem mudança de uso.
 
