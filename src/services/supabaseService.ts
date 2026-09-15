@@ -3,6 +3,7 @@ import { traduzirErroDeAcesso } from '../utils/erroDeAcesso';
 import { syncResult, reportSyncError, PROFESSOR_DESCONHECIDO } from '../utils/syncNotifier';
 import { TeacherProfile, ServiceItem, Appointment, Student, Reminder, PaymentInvoice, TestimonialItem, CurriculumItem, PhotoItem, FaqItem, SystemUser, Company, WaitlistEntry, GradeSemanal } from '../types';
 import { normalizarGrade } from '../utils/gradeSemanal';
+import { diaDaSemanaDaAula, valorDaAula } from '../utils/valoresDaAula';
 
 /**
  * A linha de agendamento como o banco a guarda.
@@ -25,14 +26,16 @@ function linhaDoAgendamento(apt: Appointment, teacherId?: string) {
     service_id: apt.serviceId || null,
     service_name: apt.serviceName,
     date: apt.date,
-    day_of_week: apt.dayOfWeek || 1,
+    // 0 = domingo é válido; ver utils/valoresDaAula
+    day_of_week: diaDaSemanaDaAula(apt.date, apt.dayOfWeek),
     start_time: apt.startTime,
     end_time: apt.endTime,
     duration_minutes: apt.durationMinutes || 60,
     modality: apt.modality || 'Online (Google Meet)',
     status: apt.status || 'Confirmado',
     notes: apt.notes || '',
-    price: apt.price || 150,
+    // R$ 0 é aula gratuita, não vira o preço padrão
+    price: valorDaAula(apt.price),
     cancelled_at: apt.cancelledAt || null,
     cancellation_reason: apt.cancellationReason || null,
     capacity: apt.capacity ? Math.max(1, Number(apt.capacity)) : null,
@@ -386,14 +389,14 @@ export const supabaseService = {
         serviceId: a.service_id,
         serviceName: a.service_name,
         date: a.date,
-        dayOfWeek: Number(a.day_of_week || 1),
+        dayOfWeek: diaDaSemanaDaAula(a.date, a.day_of_week),
         startTime: a.start_time,
         endTime: a.end_time,
         durationMinutes: Number(a.duration_minutes || 60),
         modality: a.modality,
         status: a.status || 'Confirmado',
         notes: a.notes || '',
-        price: Number(a.price || 150),
+        price: valorDaAula(a.price),
         clientSince: a.client_since || undefined,
         cancelledAt: a.cancelled_at || undefined,
         cancellationReason: a.cancellation_reason || undefined,
@@ -1544,14 +1547,14 @@ export const supabaseService = {
           service_id: a.serviceId || null,
           service_name: a.serviceName,
           date: a.date,
-          day_of_week: a.dayOfWeek || 1,
+          day_of_week: diaDaSemanaDaAula(a.date, a.dayOfWeek),
           start_time: a.startTime,
           end_time: a.endTime,
           duration_minutes: a.durationMinutes || 60,
           modality: a.modality || 'Online (Google Meet)',
           status: a.status || 'Confirmado',
           notes: a.notes || '',
-          price: a.price || 150,
+          price: valorDaAula(a.price),
         });
       }
 
