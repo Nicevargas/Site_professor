@@ -24,38 +24,61 @@ As 3 novidades que já estavam no projeto antes da automação **não saem sozin
 
 ## Arquivos
 
-- `publicar-novidades-whatsapp.json`: o fluxo para importar no n8n (não tem chave nenhuma).
-- `novidade.mjs`: as regras (quais arquivos, como ler o texto, o que mandar para a Evolution).
-- `gerar-fluxo.mjs`: monta o JSON a partir de `novidade.mjs`. Rodar sempre que mexer nas regras.
-- `novidade.teste.mjs`: testes, que rodam com `node --test automacoes/n8n/novidade.teste.mjs`.
+- `descobrir-id-do-grupo.json`: fluxo que lista seus grupos com nome e ID (passo 1).
+- `publicar-novidades-whatsapp.json`: o fluxo que publica as novidades.
+- `novidade.mjs` e `grupos.mjs`: as regras de cada fluxo.
+- `gerar-fluxo.mjs`: monta os dois JSON a partir das regras. Rodar sempre que mexer nelas.
+- `novidade.teste.mjs` e `grupos.teste.mjs`: testes, que rodam com `node --test automacoes/n8n/`.
+
+Nenhum JSON leva chave ou senha. A chave da Evolution fica numa credencial do n8n.
 
 ---
 
 ## Como ligar (uma vez só)
 
-### 1. Evolution API: pegar o ID do grupo
+### 1. Descobrir o ID do grupo (fluxo `descobrir-id-do-grupo.json`)
 
-A instância da Evolution precisa estar conectada ao WhatsApp que participa do grupo, como administrador ou com permissão de enviar mensagem.
+A instância da Evolution precisa estar conectada ao WhatsApp que **participa do grupo**.
 
-Para listar os grupos, troque os três valores em MAIÚSCULAS:
+1. No n8n: **Workflows → Add workflow → ⋯ (três pontinhos) → Import from File** → escolha `descobrir-id-do-grupo.json`.
+2. Abra o nó **Buscar grupos na Evolution** → em *Credential for Header Auth* clique em **Create new credential**:
+   - **Name:** `apikey`
+   - **Value:** a chave da sua Evolution API
+
+   Salve. Essa mesma credencial serve depois para o fluxo de publicar.
+3. Abra o nó **Configuração** e preencha:
+   - `evolutionUrl`: endereço da sua Evolution, ex.: `https://evolution.seudominio.com.br`
+   - `instancia`: nome da instância conectada ao WhatsApp
+   - `buscarNome` (opcional): parte do nome do grupo, ex.: `professores`. Maiúscula e acento não importam. Vazio lista todos.
+4. Clique em **Test workflow**.
+5. Clique no último nó, **Nome e ID de cada grupo**, e veja a tabela:
+
+| Coluna | O que é |
+|---|---|
+| `grupo` | nome do grupo |
+| `id` | **o que você copia**, termina em `@g.us` |
+| `participantes` | quantas pessoas |
+| `quemPodeEnviar` | se aparecer **só administradores**, o número conectado na Evolution precisa ser administrador do grupo |
+
+Esse fluxo **só lê**: não envia nada para ninguém.
+
+<details>
+<summary>Alternativa sem n8n (terminal)</summary>
 
 ```bash
 curl -H "apikey: SUA-CHAVE-DA-EVOLUTION" "https://SEU-EVOLUTION/group/fetchAllGroups/NOME-DA-INSTANCIA?getParticipants=false"
 ```
 
-Na resposta, ache o grupo pelo `subject` (nome do grupo) e copie o `id`, que termina em `@g.us`.
+Na resposta, ache o grupo pelo `subject` (nome) e copie o `id`.
+</details>
 
-### 2. n8n: importar o fluxo
+### 2. n8n: importar o fluxo de publicar
 
-No n8n: **Workflows → Add workflow → ⋯ (três pontinhos) → Import from File** → escolha `automacoes/n8n/publicar-novidades-whatsapp.json`.
+**Workflows → Add workflow → ⋯ → Import from File** → escolha `publicar-novidades-whatsapp.json`.
 
-### 3. n8n: chave da Evolution (credencial)
+### 3. n8n: chave da Evolution
 
-Abra o nó **Enviar pelo WhatsApp** → em *Credential for Header Auth* clique em **Create new credential**:
-- **Name:** `apikey`
-- **Value:** a chave da sua Evolution API
-
-Salve. A chave fica guardada só no n8n, nunca no GitHub.
+Abra o nó **Enviar pelo WhatsApp** → em *Credential for Header Auth*, **escolha a credencial `apikey` criada no passo 1**. Se ainda não criou, crie agora do mesmo jeito.
 
 ### 4. n8n: preencher a Configuração
 
@@ -63,9 +86,9 @@ Abra o nó **Configuração** e troque:
 
 | Campo | O que colocar |
 |---|---|
-| `evolutionUrl` | endereço da sua Evolution, ex.: `https://evolution.seudominio.com.br` |
-| `instancia` | nome da instância conectada ao WhatsApp |
-| `grupoJid` | o ID do grupo do passo 1 (termina em `@g.us`) |
+| `evolutionUrl` | o mesmo endereço do passo 1 |
+| `instancia` | o mesmo nome de instância do passo 1 |
+| `grupoJid` | o `id` do grupo copiado no passo 1 (termina em `@g.us`) |
 | `numeroTeste` | seu WhatsApp com DDI e DDD, só números, ex.: `5551999999999` |
 | `arquivoTeste` | a novidade usada no teste (já vem uma preenchida) |
 
@@ -97,7 +120,7 @@ Pronto: a próxima novidade que entrar no `main` vai para o grupo sozinha.
 
 ## Para desligar
 
-No n8n, desligue o botão **Active** do fluxo. Nada mais é publicado.
+No n8n, desligue o botão **Active** do fluxo de publicar. Nada mais é publicado.
 
 ## Cuidados
 

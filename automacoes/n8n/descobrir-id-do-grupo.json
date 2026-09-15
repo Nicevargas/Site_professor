@@ -1,0 +1,131 @@
+{
+  "name": "Aquagenda: descobrir ID do grupo do WhatsApp",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "6b2e1b4f-0001-4b7f-8d2c-000000000001",
+      "name": "Listar meus grupos",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6b2e1b4f-0002-4b7f-8d2c-000000000100",
+              "name": "evolutionUrl",
+              "value": "https://evolution.seu-dominio.com.br",
+              "type": "string"
+            },
+            {
+              "id": "6b2e1b4f-0002-4b7f-8d2c-000000000101",
+              "name": "instancia",
+              "value": "NOME-DA-INSTANCIA",
+              "type": "string"
+            },
+            {
+              "id": "6b2e1b4f-0002-4b7f-8d2c-000000000102",
+              "name": "buscarNome",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "6b2e1b4f-0002-4b7f-8d2c-000000000002",
+      "name": "Configuração",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Configuração').first().json.evolutionUrl.replace(/\\/+$/, '') }}/group/fetchAllGroups/{{ $('Configuração').first().json.instancia }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "getParticipants",
+              "value": "false"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6b2e1b4f-0003-4b7f-8d2c-000000000003",
+      "name": "Buscar grupos na Evolution",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Regras do fluxo \"descobrir o ID do grupo do WhatsApp\".\n *\n * Mesma ideia de novidade.mjs: gerar-fluxo.mjs copia estas funções para o nó\n * de código do n8n, e grupos.teste.mjs testa exatamente este código.\n *\n * Campos conferidos no código da Evolution API (fetchAllGroups): id, subject,\n * size, announce, isCommunity.\n */\n\n/** Para buscar \"aquagenda\" e achar \"Professores Aquágenda\". */\nfunction semAcento(texto) {\n  return String(texto || '').normalize('NFD').replace(/\\p{M}/gu, '').toLowerCase();\n}\n\n/**\n * Tabela simples dos grupos: nome, ID, participantes e quem pode enviar.\n * `busca` filtra pelo nome, sem ligar para maiúscula ou acento.\n * Aceita a resposta da Evolution como lista ou item a item (como o n8n entrega).\n */\nfunction listarGrupos(respostas, busca) {\n  const grupos = (Array.isArray(respostas) ? respostas : [respostas])\n    .flatMap((r) => (Array.isArray(r) ? r : [r]))\n    .filter((g) => g && typeof g.id === 'string' && g.id.endsWith('@g.us'));\n\n  const termo = semAcento(busca).trim();\n  return grupos\n    .filter((g) => !termo || semAcento(g.subject).includes(termo))\n    .map((g) => ({\n      grupo: g.subject || '(sem nome)',\n      id: g.id,\n      participantes: typeof g.size === 'number' ? g.size : null,\n      quemPodeEnviar: g.announce ? 'só administradores' : 'todos',\n      comunidade: g.isCommunity ? 'sim' : 'não',\n    }))\n    .sort((a, b) => a.grupo.localeCompare(b.grupo, 'pt-BR'));\n}\n\n// ---------------- passo do fluxo ----------------\nconst config = $('Configuração').first().json;\nconst lista = listarGrupos($input.all().map((i) => i.json), config.buscarNome);\nif (!lista.length) {\n  return [{\n    json: {\n      aviso: config.buscarNome\n        ? `Nenhum grupo com \"${config.buscarNome}\" no nome. Apague o buscarNome na Configuração e rode de novo.`\n        : 'Nenhum grupo encontrado. Confira se a instância está conectada ao WhatsApp que participa do grupo.',\n    },\n  }];\n}\nreturn lista.map((g) => ({ json: g }));\n"
+      },
+      "id": "6b2e1b4f-0004-4b7f-8d2c-000000000004",
+      "name": "Nome e ID de cada grupo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Listar meus grupos": {
+      "main": [
+        [
+          {
+            "node": "Configuração",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuração": {
+      "main": [
+        [
+          {
+            "node": "Buscar grupos na Evolution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar grupos na Evolution": {
+      "main": [
+        [
+          {
+            "node": "Nome e ID de cada grupo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

@@ -186,3 +186,100 @@ const fluxo = {
 
 writeFileSync(join(aqui, 'publicar-novidades-whatsapp.json'), JSON.stringify(fluxo, null, 2) + '\n');
 console.log('✓ automacoes/n8n/publicar-novidades-whatsapp.json gerado');
+
+// ============================================================================
+// Fluxo 2: descobrir o ID do grupo (para preencher grupoJid)
+// ============================================================================
+const funcoesGrupos = readFileSync(join(aqui, 'grupos.mjs'), 'utf8')
+  .replace(/\r\n/g, '\n')
+  .replace(/^export /gm, '')
+  .trim();
+
+const nomeEId = `${funcoesGrupos}
+
+// ---------------- passo do fluxo ----------------
+const config = $('Configuração').first().json;
+const lista = listarGrupos($input.all().map((i) => i.json), config.buscarNome);
+if (!lista.length) {
+  return [{
+    json: {
+      aviso: config.buscarNome
+        ? \`Nenhum grupo com "\${config.buscarNome}" no nome. Apague o buscarNome na Configuração e rode de novo.\`
+        : 'Nenhum grupo encontrado. Confira se a instância está conectada ao WhatsApp que participa do grupo.',
+    },
+  }];
+}
+return lista.map((g) => ({ json: g }));
+`;
+
+const fluxoGrupos = {
+  name: 'Aquagenda: descobrir ID do grupo do WhatsApp',
+  nodes: [
+    {
+      parameters: {},
+      id: '6b2e1b4f-0001-4b7f-8d2c-000000000001',
+      name: 'Listar meus grupos',
+      type: 'n8n-nodes-base.manualTrigger',
+      typeVersion: 1,
+      position: [0, 0],
+    },
+    {
+      parameters: {
+        mode: 'manual',
+        assignments: {
+          assignments: [
+            ['evolutionUrl', 'https://evolution.seu-dominio.com.br'],
+            ['instancia', 'NOME-DA-INSTANCIA'],
+            ['buscarNome', ''],
+          ].map(([name, value], i) => ({
+            id: `6b2e1b4f-0002-4b7f-8d2c-${String(100 + i).padStart(12, '0')}`,
+            name,
+            value,
+            type: 'string',
+          })),
+        },
+        includeOtherFields: false,
+        options: {},
+      },
+      id: '6b2e1b4f-0002-4b7f-8d2c-000000000002',
+      name: 'Configuração',
+      type: 'n8n-nodes-base.set',
+      typeVersion: 3.4,
+      position: [240, 0],
+    },
+    {
+      parameters: {
+        method: 'GET',
+        url: "={{ $('Configuração').first().json.evolutionUrl.replace(/\\/+$/, '') }}/group/fetchAllGroups/{{ $('Configuração').first().json.instancia }}",
+        authentication: 'genericCredentialType',
+        genericAuthType: 'httpHeaderAuth',
+        sendQuery: true,
+        queryParameters: { parameters: [{ name: 'getParticipants', value: 'false' }] },
+        options: {},
+      },
+      id: '6b2e1b4f-0003-4b7f-8d2c-000000000003',
+      name: 'Buscar grupos na Evolution',
+      type: 'n8n-nodes-base.httpRequest',
+      typeVersion: 4.2,
+      position: [480, 0],
+    },
+    {
+      parameters: { jsCode: nomeEId },
+      id: '6b2e1b4f-0004-4b7f-8d2c-000000000004',
+      name: 'Nome e ID de cada grupo',
+      type: 'n8n-nodes-base.code',
+      typeVersion: 2,
+      position: [720, 0],
+    },
+  ],
+  connections: {
+    'Listar meus grupos': { main: [[{ node: 'Configuração', type: 'main', index: 0 }]] },
+    Configuração: { main: [[{ node: 'Buscar grupos na Evolution', type: 'main', index: 0 }]] },
+    'Buscar grupos na Evolution': { main: [[{ node: 'Nome e ID de cada grupo', type: 'main', index: 0 }]] },
+  },
+  settings: { executionOrder: 'v1' },
+  pinData: {},
+};
+
+writeFileSync(join(aqui, 'descobrir-id-do-grupo.json'), JSON.stringify(fluxoGrupos, null, 2) + '\n');
+console.log('✓ automacoes/n8n/descobrir-id-do-grupo.json gerado');
