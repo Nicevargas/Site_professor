@@ -1,0 +1,41 @@
+name: Avisar novidade para o WhatsApp
+
+# Novidade nova no main → issue para a Nice com o link "Enviar no WhatsApp".
+# Substitui o n8n + Evolution da VPS (fora do ar em 16/09/2026): não precisa de
+# servidor nem de token extra, só do GITHUB_TOKEN que o próprio Actions dá.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "novidades/*.md"
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: novidade-whatsapp
+  cancel-in-progress: false
+
+jobs:
+  avisar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Conferir as regras do aviso
+        run: node --test automacoes/whatsapp/aviso.teste.mjs
+
+      - name: Abrir o aviso para enviar no grupo
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTES: ${{ github.event.before }}
+          RESPONSAVEL: Nicevargas
+        run: node automacoes/whatsapp/avisar.mjs

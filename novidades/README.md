@@ -5,9 +5,9 @@ Cada alteração publicada que o professor percebe no Aquagenda ganha um conteú
 - **Para quem:** professores que já usam o Aquagenda.
 - **O que tem:** texto pronto para colar + print da tela.
 - **Quando:** no mesmo commit da alteração.
-- **Quem envia:** o n8n, **automaticamente**, quando o arquivo novo chega no `main` (ver `automacoes/n8n/README.md`).
+- **Quem envia:** a Nice, com 1 toque. Quando o arquivo novo chega no `main`, o GitHub abre um aviso para ela com o botão **Enviar no WhatsApp** (ver `automacoes/whatsapp/README.md`).
 
-> ⚠️ Publica **direto no grupo, sem aprovação**. Revise o texto e o print **antes do commit**. O texto tem limite de 1000 caracteres, para caber como legenda da imagem.
+> ⚠️ O aviso sai **na hora do push**. Revise o texto e o print **antes do commit**. O texto tem limite de 1000 caracteres, para caber como legenda da imagem.
 
 Alteração que o professor não vê não ganha post: testes, código interno ou ajuste técnico sem mudança de uso.
 

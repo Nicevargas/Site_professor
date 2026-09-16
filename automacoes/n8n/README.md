@@ -1,5 +1,7 @@
 # Novidade no GitHub → grupo de WhatsApp (n8n + Evolution API)
 
+> **Desligado em 16/09/2026.** A VPS do n8n e da Evolution saiu do ar. O envio passou a ser feito pela Nice com 1 toque, sem servidor: veja `automacoes/whatsapp/README.md`. As regras de texto e imagem (`novidade.mjs`) continuam sendo usadas por lá.
+
 Quando uma novidade nova (`novidades/AAAA-MM-DD-assunto.md`) chega ao GitHub na branch `main`, este fluxo do n8n faz, sozinho:
 
 1. Espera 3 minutos, para a Vercel terminar de publicar o site.

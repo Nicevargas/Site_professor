@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Enviar novidade no WhatsApp · Aquagenda</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <!--
+    Página usada pela Nice para mandar a novidade no grupo dos professores.
+    O link vem do aviso aberto pelo GitHub (automacoes/whatsapp/). Texto e
+    imagem ficam depois do "#", então não passam pelo servidor.
+  -->
+  <style>
+    :root { color-scheme: light; --verde: #1faa59; --verde-escuro: #178a47; --texto: #1d2733; --suave: #5b6675; --borda: #e3e8ef; --fundo: #f5f7fb; }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--fundo); color: var(--texto); }
+    main { max-width: 520px; margin: 0 auto; padding: 20px 16px 40px; }
+    h1 { font-size: 1.35rem; margin: 4px 0 4px; }
+    p.ajuda { color: var(--suave); margin: 0 0 16px; line-height: 1.45; }
+    .cartao { background: #fff; border: 1px solid var(--borda); border-radius: 18px; overflow: hidden; }
+    .cartao img { display: block; width: 100%; height: auto; background: #eef1f6; min-height: 120px; }
+    .cartao pre { margin: 0; padding: 14px 16px; white-space: pre-wrap; word-wrap: break-word; font: inherit; line-height: 1.45; }
+    button { width: 100%; border: 0; border-radius: 14px; font: inherit; font-weight: 700; font-size: 1.05rem; padding: 15px 16px; cursor: pointer; }
+    #enviar { background: var(--verde); color: #fff; margin: 18px 0 10px; }
+    #enviar:active { background: var(--verde-escuro); }
+    #enviar:disabled { opacity: .6; }
+    .secundarios { display: flex; gap: 10px; flex-wrap: wrap; }
+    .secundarios button { flex: 1 1 140px; background: #fff; color: var(--texto); border: 1px solid var(--borda); font-size: .95rem; }
+    #status { min-height: 1.4em; margin: 12px 0 0; line-height: 1.45; }
+    #status.ok { color: var(--verde-escuro); }
+    #status.erro { color: #b3261e; }
+    .passos { color: var(--suave); font-size: .92rem; line-height: 1.5; padding-left: 20px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Enviar novidade no WhatsApp</h1>
+    <p class="ajuda">Confira a imagem e o texto. Depois toque em <b>Enviar no WhatsApp</b> e escolha o grupo dos professores.</p>
+
+    <div id="conteudo" class="cartao" hidden>
+      <img id="imagem" alt="Imagem da novidade">
+      <pre id="texto"></pre>
+    </div>
+
+    <button id="enviar" type="button" hidden disabled>Carregando a imagem…</button>
+    <div class="secundarios" id="secundarios" hidden>
+      <button id="copiar" type="button">Copiar texto</button>
+      <button id="baixar" type="button">Baixar imagem</button>
+    </div>
+    <p id="status" role="status" aria-live="polite"></p>
+
+    <ol class="passos" id="passos" hidden>
+      <li>Toque em <b>Enviar no WhatsApp</b>.</li>
+      <li>Escolha o <b>WhatsApp</b> e depois o grupo dos professores.</li>
+      <li>Se a legenda vier vazia, toque nela e <b>cole</b>: o texto já foi copiado.</li>
+    </ol>
+  </main>
+
+  <script>
+    (function () {
+      var ORIGEM = 'https://raw.githubusercontent.com/Nicevargas/Site_professor/';
+      var params = new URLSearchParams(location.hash.slice(1));
+      var texto = params.get('texto') || '';
+      var imagem = params.get('imagem') || '';
+      var status = document.getElementById('status');
+      var botao = document.getElementById('enviar');
+      var arquivo = null;
+
+      function aviso(mensagem, tipo) {
+        status.textContent = mensagem;
+        status.className = tipo || '';
+      }
+
+      function copiarTexto() {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          return navigator.clipboard.writeText(texto).then(function () { return true; }, function () { return false; });
+        }
+        return Promise.resolve(false);
+      }
+
+      if (!texto || imagem.indexOf(ORIGEM) !== 0 || /[?#]/.test(imagem.slice(ORIGEM.length))) {
+        aviso('Este link não tem uma novidade válida. Abra o link que veio no aviso do GitHub.', 'erro');
+        return;
+      }
+
+      document.getElementById('texto').textContent = texto;
+      document.getElementById('imagem').src = imagem;
+      document.getElementById('conteudo').hidden = false;
+      botao.hidden = false;
+      document.getElementById('secundarios').hidden = false;
+      document.getElementById('passos').hidden = false;
+
+      var nome = imagem.split('/').pop();
+      fetch(imagem)
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+        .then(function (blob) {
+          arquivo = new File([blob], nome, { type: blob.type || 'image/png' });
+          botao.disabled = false;
+          botao.textContent = 'Enviar no WhatsApp';
+        })
+        .catch(function () {
+          botao.disabled = false;
+          botao.textContent = 'Enviar só o texto no WhatsApp';
+          aviso('Não consegui baixar a imagem agora. Dá para enviar só o texto, ou tentar de novo em instantes.', 'erro');
+        });
+
+      botao.addEventListener('click', function () {
+        copiarTexto().then(function () {
+          var podeArquivo = arquivo && navigator.canShare && navigator.canShare({ files: [arquivo] });
+          if (podeArquivo) {
+            navigator.share({ files: [arquivo], text: texto }).then(function () {
+              aviso('Pronto! Se a legenda chegou vazia, cole o texto: ele já está copiado.', 'ok');
+            }, function (erro) {
+              if (erro && erro.name === 'AbortError') return;
+              abrirSoTexto();
+            });
+          } else {
+            abrirSoTexto();
+          }
+        });
+      });
+
+      function abrirSoTexto() {
+        aviso('Este navegador não envia a imagem direto. Abri o WhatsApp com o texto; use "Baixar imagem" para anexá-la.', 'erro');
+        window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank', 'noopener');
+      }
+
+      document.getElementById('copiar').addEventListener('click', function () {
+        copiarTexto().then(function (ok) {
+          aviso(ok ? 'Texto copiado.' : 'Não consegui copiar. Segure o dedo no texto para copiar.', ok ? 'ok' : 'erro');
+        });
+      });
+
+      document.getElementById('baixar').addEventListener('click', function () {
+        if (!arquivo) { window.open(imagem, '_blank', 'noopener'); return; }
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(arquivo);
+        a.download = nome;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      });
+    })();
+  </script>
+</body>
+</html>
