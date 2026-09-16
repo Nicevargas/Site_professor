@@ -12,7 +12,7 @@ import { extrairMensagem, urlBruta } from '../n8n/novidade.mjs';
 
 export { extrairMensagem, urlBruta };
 
-export const PAGINA_DE_ENVIO = 'https://aquagenda.com.br/compartilhar-novidade.html';
+export const PAGINA_DE_ENVIO = 'https://aquagenda.plataformaeducar.net/compartilhar-novidade.html';
 
 /** A página só aceita imagem deste repositório: ninguém usa o link para mostrar outra coisa. */
 export const ORIGEM_DAS_IMAGENS = 'https://raw.githubusercontent.com/Nicevargas/Site_professor/';
