@@ -307,14 +307,83 @@ async function cobrar(teacherId: string, cobranca: PedidoCobranca) {
   const dados = await resp.json();
   const link = String(dados.init_point ?? '');
 
-  // Grava o link na cobrança, se ela já estiver no banco. Se o app ainda não
-  // terminou de salvar, ele mesmo grava o link que recebe na resposta.
+  const pix = await pixDoMercadoPago(token, teacherId, cobranca, valor);
+
+  // Grava o link (e o Pix) na cobrança, se ela já estiver no banco. Se o app
+  // ainda não terminou de salvar, ele mesmo grava o que recebe na resposta.
+  const mudancas: Record<string, unknown> = { payment_link_url: link, updated_at: new Date().toISOString() };
+  if (pix.codigo) mudancas.pix_code = pix.codigo;
   await banco(
     `payments?id=eq.${encodeURIComponent(cobranca.id)}&teacher_id=eq.${encodeURIComponent(teacherId)}`,
-    { method: 'PATCH', body: JSON.stringify({ payment_link_url: link, updated_at: new Date().toISOString() }) }
+    { method: 'PATCH', body: JSON.stringify(mudancas) }
   );
 
-  return json(200, { link });
+  return json(200, { link, pixCode: pix.codigo, avisoPix: pix.aviso });
+}
+
+/** Pix vence no máximo em 30 dias no Mercado Pago, e no mínimo daqui a 1 hora. */
+function validadeDoPix(vencimento: string | undefined): string {
+  const agora = Date.now();
+  const limite = agora + 29 * 24 * 60 * 60 * 1000;
+  // Fim do dia do vencimento, no horário de Brasília
+  const fimDoDia = vencimento ? Date.parse(`${vencimento}T23:59:59-03:00`) : NaN;
+  const alvo = Number.isFinite(fimDoDia) ? fimDoDia : agora + 24 * 60 * 60 * 1000;
+  return new Date(Math.min(Math.max(alvo, agora + 60 * 60 * 1000), limite)).toISOString();
+}
+
+/**
+ * O Pix Copia e Cola da cobrança, gerado pelo Mercado Pago.
+ *
+ * Diferente do Pix feito com a chave do professor, este traz a cobrança
+ * amarrada (external_reference): quando o aluno paga, o aviso chega e a
+ * cobrança dá baixa sozinha. E o aluno não precisa abrir página nenhuma --
+ * cola o código no banco e pronto.
+ *
+ * Nunca derruba o link: se o Pix falhar, a cobrança sai só com o link e o
+ * motivo volta em `aviso`, para o professor saber o que ajustar.
+ */
+async function pixDoMercadoPago(
+  token: string,
+  teacherId: string,
+  cobranca: PedidoCobranca,
+  valor: number
+): Promise<{ codigo: string | null; aviso: string | null }> {
+  // O Mercado Pago exige e-mail de quem paga no Pix. Sem o do aluno, vai um
+  // endereço da plataforma, que só serve para o pedido passar.
+  const email = cobranca.alunoEmail && cobranca.alunoEmail.includes('@')
+    ? cobranca.alunoEmail
+    : 'pagamento@plataformaeducar.net';
+
+  const resp = await mp(token, '/v1/payments', {
+    method: 'POST',
+    headers: { 'X-Idempotency-Key': `pix-${teacherId}-${cobranca.id}-${valor}` },
+    body: JSON.stringify({
+      transaction_amount: Math.round(valor * 100) / 100,
+      description: (cobranca.descricao || 'Aula').slice(0, 250),
+      payment_method_id: 'pix',
+      external_reference: cobranca.id,
+      notification_url: `${URL_AVISO}?t=${encodeURIComponent(teacherId)}`,
+      date_of_expiration: validadeDoPix(cobranca.vencimento),
+      payer: { email, first_name: cobranca.alunoNome || undefined },
+    }),
+  });
+
+  if (resp.ok) {
+    const dados = await resp.json();
+    const codigo = dados.point_of_interaction?.transaction_data?.qr_code;
+    return { codigo: codigo ? String(codigo) : null, aviso: null };
+  }
+
+  const erro = await resp.text();
+  console.warn('Pix recusado pelo Mercado Pago:', resp.status, erro);
+  // 13253: a conta de quem recebe não tem chave Pix habilitada no Mercado Pago
+  if (/13253|key enabled|without key/i.test(erro)) {
+    return {
+      codigo: null,
+      aviso: 'Sua conta do Mercado Pago ainda não tem chave Pix. No app do Mercado Pago, abra Pix > Minhas chaves e cadastre uma. Depois clique em Gerar link de novo.',
+    };
+  }
+  return { codigo: null, aviso: 'O link foi gerado, mas o Mercado Pago não gerou o código Pix desta vez.' };
 }
 
 // --------------------------------------------------------------------

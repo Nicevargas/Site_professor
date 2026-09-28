@@ -3,6 +3,7 @@ import { pixDaCobranca } from '../utils/pix';
 import {
   mercadoPagoService,
   lerRetornoDoMercadoPago,
+  pixEhDoMercadoPago,
   StatusMercadoPago,
   STATUS_DESCONECTADO,
 } from '../services/mercadoPagoService';
@@ -82,9 +83,9 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
   // Quick Action notification
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
-  const showNotification = (msg: string) => {
+  const showNotification = (msg: string, duracaoMs = 3500) => {
     setActionNotice(msg);
-    setTimeout(() => setActionNotice(null), 3500);
+    setTimeout(() => setActionNotice(null), duracaoMs);
   };
 
   // ------------------------------------------------------------------
@@ -141,11 +142,16 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
   const handleGerarLink = async (invoice: PaymentInvoice) => {
     setGerandoLinkId(invoice.id);
     try {
-      const link = await mercadoPagoService.gerarLink(currentTeacher.id, invoice);
+      const { link, pixCode, avisoPix } = await mercadoPagoService.gerarLink(currentTeacher.id, invoice);
       onUpdateInvoices(
-        invoicesRef.current.map((inv) => (inv.id === invoice.id ? { ...inv, paymentLinkUrl: link } : inv))
+        invoicesRef.current.map((inv) =>
+          inv.id === invoice.id
+            ? { ...inv, paymentLinkUrl: link, ...(pixCode ? { pixCode } : {}) }
+            : inv
+        )
       );
-      showNotification('Link de pagamento do Mercado Pago pronto!');
+      if (avisoPix) showNotification(avisoPix, 12000);
+      else showNotification(pixCode ? 'Link e Pix Copia e Cola do Mercado Pago prontos!' : 'Link de pagamento do Mercado Pago pronto!');
     } catch (err) {
       showNotification((err as Error).message);
     } finally {
@@ -816,6 +822,16 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
                           </button>
 
                           {/* Copiar link de pagamento, ou gerar no Mercado Pago */}
+                          {inv.paymentLinkUrl && mp.conectado && !pixEhDoMercadoPago(inv.pixCode) && inv.status !== 'pago' && inv.status !== 'cancelado' && (
+                            <button
+                              onClick={() => handleGerarLink(inv)}
+                              disabled={gerandoLinkId === inv.id}
+                              className="px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 rounded-lg font-bold text-[11px] transition-colors disabled:opacity-60"
+                              title="Gerar Pix Copia e Cola do Mercado Pago, com baixa automática"
+                            >
+                              {gerandoLinkId === inv.id ? 'Gerando...' : 'Gerar Pix'}
+                            </button>
+                          )}
                           {inv.paymentLinkUrl ? (
                             <button
                               onClick={() => handleCopy(inv.paymentLinkUrl!, `link-${inv.id}`)}
@@ -1257,9 +1273,14 @@ const SharePaymentModal: React.FC<SharePaymentModalProps> = ({
 
   const isOverdue = invoice.status === 'vencido';
 
+  // O código Pix vai numa mensagem SÓ DELE (botão "Enviar código Pix"): no
+  // WhatsApp, segurar o dedo copia a mensagem inteira, e o banco só aceita
+  // o código puro. Com o código, a chave fica redundante.
+  const pixCopiaECola = invoice.pixCode || '';
   const formasDePagar = [
-    pixKey ? `🔑 *Chave PIX:* ${pixKey}` : '',
-    paymentLink ? `🔗 *Pagar com Pix, cartão ou boleto:* ${paymentLink}` : '',
+    pixCopiaECola ? '📲 *Pix Copia e Cola:* vai na próxima mensagem. É só copiar e colar no app do seu banco.' : '',
+    !pixCopiaECola && pixKey ? `🔑 *Chave PIX:* ${pixKey}` : '',
+    paymentLink ? `🔗 *Pagar com cartão ou boleto:* ${paymentLink}` : '',
   ].filter(Boolean).join('\n');
 
   // Customized WhatsApp text message
@@ -1273,11 +1294,11 @@ const SharePaymentModal: React.FC<SharePaymentModalProps> = ({
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  const handleOpenWhatsApp = () => {
+  const handleOpenWhatsApp = (texto: string = whatsappMessage) => {
     const rawPhone = (invoice.studentPhone || '').replace(/\D/g, '');
     const cleanPhone = rawPhone.length >= 10 ? (rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`) : '';
-    const encodedText = encodeURIComponent(whatsappMessage);
-    
+    const encodedText = encodeURIComponent(texto);
+
     if (cleanPhone) {
       window.open(`https://wa.me/${cleanPhone}?text=${encodedText}`, '_blank');
     } else {
@@ -1349,7 +1370,32 @@ const SharePaymentModal: React.FC<SharePaymentModalProps> = ({
 
         {/* Quick Copy Link and PIX */}
         <div className="space-y-3 pt-1 text-xs">
-          {pixKey && (<div>
+          {pixCopiaECola && (
+            <div>
+              <label className="block font-semibold text-slate-600 mb-1">
+                Pix Copia e Cola{pixEhDoMercadoPago(pixCopiaECola) ? ' (dá baixa sozinho quando o aluno pagar)' : ''}:
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={pixCopiaECola}
+                  aria-label="Código Pix Copia e Cola"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono text-slate-800 text-xs truncate"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleCopyText(pixCopiaECola, 'pix-code')}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-colors border border-slate-300 shrink-0"
+                  title="Copiar código Pix"
+                >
+                  {copiedKey === 'pix-code' ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!pixCopiaECola && pixKey && (<div>
             <label className="block font-semibold text-slate-600 mb-1">Chave PIX do Professor:</label>
             <div className="flex gap-2">
               <input
@@ -1401,7 +1447,7 @@ const SharePaymentModal: React.FC<SharePaymentModalProps> = ({
             </button>
           )}
 
-          <div className="flex gap-2 sm:ml-auto">
+          <div className="flex flex-wrap gap-2 sm:ml-auto justify-end">
             <button
               type="button"
               onClick={onClose}
@@ -1411,12 +1457,22 @@ const SharePaymentModal: React.FC<SharePaymentModalProps> = ({
             </button>
             <button
               type="button"
-              onClick={handleOpenWhatsApp}
+              onClick={() => handleOpenWhatsApp()}
               className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-sm"
             >
               <Send className="w-4 h-4" />
-              <span>Abrir no WhatsApp</span>
+              <span>{pixCopiaECola ? '1. Enviar mensagem' : 'Abrir no WhatsApp'}</span>
             </button>
+            {pixCopiaECola && (
+              <button
+                type="button"
+                onClick={() => handleOpenWhatsApp(pixCopiaECola)}
+                className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-sm"
+              >
+                <QrCode className="w-4 h-4" />
+                <span>2. Enviar código Pix</span>
+              </button>
+            )}
           </div>
         </div>
 

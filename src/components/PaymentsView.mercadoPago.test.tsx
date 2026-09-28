@@ -48,6 +48,9 @@ const pendente: PaymentInvoice = {
   amount: 100, dueDate: '2026-10-01', status: 'pendente', method: 'pix', createdAt: '2026-09-28',
 };
 
+// Formato de um Pix dinâmico do Mercado Pago (aponta para um endereço dele)
+const PIX_MP = '00020126580014br.gov.bcb.pix2536pix-qr.mercadopago.com/instore/o/v2/abc5204000053039865802BR6304ABCD';
+
 const conectado: StatusMercadoPago = {
   configurado: true, conectado: true, apelido: 'Roberto Almeida', email: 'roberto@mp.com', conectadoEm: '2026-09-28',
 };
@@ -101,7 +104,11 @@ describe('financeiro com Mercado Pago', () => {
 
   it('conectado: mostra a conta e gera o link de uma cobrança pendente', async () => {
     servico.status.mockResolvedValue(conectado);
-    servico.gerarLink.mockResolvedValue('https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=123');
+    servico.gerarLink.mockResolvedValue({
+      link: 'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=123',
+      pixCode: PIX_MP,
+      avisoPix: null,
+    });
     const { onUpdateInvoices } = renderizar();
 
     expect(await screen.findByText(/mercado pago conectado/i)).toBeInTheDocument();
@@ -112,11 +119,54 @@ describe('financeiro com Mercado Pago', () => {
     expect(servico.gerarLink).toHaveBeenCalledWith('prof-roberto', pendente);
     const lista: PaymentInvoice[] = onUpdateInvoices.mock.calls[0][0];
     expect(lista[0].paymentLinkUrl).toContain('mercadopago.com.br');
+    expect(lista[0].pixCode).toBe(PIX_MP);
+  });
+
+  it('conta sem chave Pix no Mercado Pago: gera o link e explica o que falta', async () => {
+    servico.status.mockResolvedValue(conectado);
+    servico.gerarLink.mockResolvedValue({
+      link: 'https://mp.test/link',
+      pixCode: null,
+      avisoPix: 'Sua conta do Mercado Pago ainda não tem chave Pix.',
+    });
+    const { onUpdateInvoices } = renderizar();
+    fireEvent.click(await screen.findByRole('button', { name: /gerar link/i }));
+
+    expect(await screen.findByText(/ainda não tem chave pix/i)).toBeInTheDocument();
+    const lista: PaymentInvoice[] = onUpdateInvoices.mock.calls[0][0];
+    expect(lista[0].paymentLinkUrl).toBe('https://mp.test/link');
+    expect(lista[0].pixCode).toBeUndefined();
+  });
+
+  it('cobrança com link mas sem Pix do Mercado Pago oferece Gerar Pix', async () => {
+    servico.status.mockResolvedValue(conectado);
+    renderizar([{ ...pendente, paymentLinkUrl: 'https://mp.test/link' }]);
+    expect(await screen.findByRole('button', { name: /gerar pix/i })).toBeInTheDocument();
+  });
+
+  it('WhatsApp: mensagem avisa do código, e o código Pix vai sozinho no segundo envio', async () => {
+    servico.status.mockResolvedValue(conectado);
+    const abrir = vi.spyOn(window, 'open').mockImplementation(() => null);
+    renderizar([{ ...pendente, studentPhone: '(11) 98765-4321', paymentLinkUrl: 'https://mp.test/link', pixCode: PIX_MP }]);
+    await screen.findByText(/mercado pago conectado/i);
+    expect(screen.queryByRole('button', { name: /gerar pix/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTitle(/enviar cobrança/i));
+    fireEvent.click(screen.getByRole('button', { name: /1\. enviar mensagem/i }));
+    const mensagem = decodeURIComponent(String(abrir.mock.calls[0][0]).split('text=')[1]);
+    expect(mensagem).toMatch(/vai na próxima mensagem/);
+    expect(mensagem).not.toContain(PIX_MP);
+
+    fireEvent.click(screen.getByRole('button', { name: /2\. enviar código pix/i }));
+    const url = String(abrir.mock.calls[1][0]);
+    expect(url.startsWith('https://wa.me/5511987654321?text=')).toBe(true);
+    expect(decodeURIComponent(url.split('text=')[1])).toBe(PIX_MP);
+    abrir.mockRestore();
   });
 
   it('conectado: cobrança nova já sai com o link do Mercado Pago', async () => {
     servico.status.mockResolvedValue(conectado);
-    servico.gerarLink.mockResolvedValue('https://mp.test/link');
+    servico.gerarLink.mockResolvedValue({ link: 'https://mp.test/link', pixCode: null, avisoPix: null });
     const { onUpdateInvoices, rerender } = renderizar([]);
     await screen.findByText(/mercado pago conectado/i);
 

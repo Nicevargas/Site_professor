@@ -68,9 +68,13 @@ export const mercadoPagoService = {
     await chamar({ acao: 'desconectar', teacherId });
   },
 
-  /** Link de pagamento do Mercado Pago (Pix, cartão ou boleto) para a cobrança. */
-  async gerarLink(teacherId: string, invoice: PaymentInvoice): Promise<string> {
-    const { link } = await chamar<{ link: string }>({
+  /**
+   * Link de pagamento do Mercado Pago para a cobrança e, quando a conta do
+   * professor tem chave Pix no Mercado Pago, o Pix Copia e Cola com baixa
+   * automática. `avisoPix` explica por que o Pix não veio.
+   */
+  async gerarLink(teacherId: string, invoice: PaymentInvoice): Promise<CobrancaMercadoPago> {
+    const resposta = await chamar<CobrancaMercadoPago>({
       acao: 'cobrar',
       teacherId,
       cobranca: {
@@ -82,9 +86,25 @@ export const mercadoPagoService = {
         vencimento: invoice.dueDate,
       },
     });
-    return link;
+    return { link: resposta.link, pixCode: resposta.pixCode ?? null, avisoPix: resposta.avisoPix ?? null };
   },
 };
+
+export interface CobrancaMercadoPago {
+  link: string;
+  pixCode: string | null;
+  avisoPix: string | null;
+}
+
+/**
+ * O Pix da cobrança veio do Mercado Pago (dá baixa sozinho)?
+ *
+ * O código do Mercado Pago é dinâmico e aponta para um endereço dele; o
+ * feito com a chave do professor (utils/pix) é estático e não tem esse endereço.
+ */
+export function pixEhDoMercadoPago(pixCode?: string): boolean {
+  return Boolean(pixCode && /mercadopago|mercadolibre|mercadolivre/i.test(pixCode));
+}
 
 /**
  * Lê e apaga o ?mercadopago=conectado|erro que a função põe na URL ao voltar
