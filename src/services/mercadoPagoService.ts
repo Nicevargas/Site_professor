@@ -48,7 +48,9 @@ async function chamar<T>(corpo: Record<string, unknown>): Promise<T> {
 
 export const mercadoPagoService = {
   async status(teacherId: string): Promise<StatusMercadoPago> {
-    if (!isSupabaseConfigured) return STATUS_DESCONECTADO;
+    // Na demonstração o cartão aparece, para mostrar o recurso; conectar
+    // avisa que precisa do banco (ver chamar)
+    if (!isSupabaseConfigured) return { ...STATUS_DESCONECTADO, configurado: true };
     try {
       return await chamar<StatusMercadoPago>({ acao: 'status', teacherId });
     } catch {
