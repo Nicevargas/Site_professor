@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { getFirstName } from '../utils/names';
 import { pixDaCobranca } from '../utils/pix';
+import { PixQrCode } from './PixQrCode';
 
 interface StudentPortalViewProps {
   currentUser: AuthUser | null;
@@ -498,6 +499,11 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
 
               {pixOf(selectedInvoice) ? (
                 <>
+                  <div className="flex flex-col items-center gap-1">
+                    <PixQrCode codigo={pixOf(selectedInvoice)} tamanho={200} />
+                    <p className="text-[11px] text-slate-500">Leia com a câmera do app do seu banco, na área Pix.</p>
+                  </div>
+
                   {/* Pix Copy Code Box */}
                   <div className="space-y-2 text-left">
                     <label className="text-xs font-bold text-slate-700">Código Pix Copia e Cola:</label>

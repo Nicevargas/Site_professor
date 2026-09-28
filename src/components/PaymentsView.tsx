@@ -1,5 +1,6 @@
 import { camposAlterados } from '../utils/camposAlterados';
 import { pixDaCobranca } from '../utils/pix';
+import { PixQrCode } from './PixQrCode';
 import {
   mercadoPagoService,
   lerRetornoDoMercadoPago,
@@ -817,6 +818,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
                             onClick={() => handleOpenShare(inv)}
                             className="p-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
                             title="Enviar cobrança / link no WhatsApp"
+                            aria-label={`Enviar cobrança de ${inv.studentName} no WhatsApp`}
                           >
                             <MessageSquare className="w-4 h-4" />
                           </button>
@@ -1295,7 +1297,7 @@ const SharePaymentModal: React.FC<SharePaymentModalProps> = ({
 
   // Customized WhatsApp text message
   const whatsappMessage = isOverdue
-    ? `*LEMBRETE DE PAGAMENTO PENDENTE* ⚠️\n\nOlá, ${invoice.studentName}! Tudo bem? 👋\nAqui é do atendimento do Prof. ${currentTeacher.name}.\n\nConstatamos em nosso sistema que a fatura referente a *${invoice.serviceOrPlanName}* no valor de *${formatCurrency(invoice.amount)}* venceu no dia *${formatDateBR(invoice.dueDate)}*.\n\n${formasDePagar}\n\nCaso já tenha realizado o pagamento, favor desconsiderar ou nos enviar o comprovante por aqui. Obrigado! 🙏`
+    ? `*LEMBRETE DE PAGAMENTO PENDENTE* ⚠️\n\nOlá, ${invoice.studentName}! Tudo bem? 👋\nAqui é do atendimento de ${currentTeacher.name}.\n\nConstatamos em nosso sistema que a fatura referente a *${invoice.serviceOrPlanName}* no valor de *${formatCurrency(invoice.amount)}* venceu no dia *${formatDateBR(invoice.dueDate)}*.\n\n${formasDePagar}\n\nCaso já tenha realizado o pagamento, favor desconsiderar ou nos enviar o comprovante por aqui. Obrigado! 🙏`
     : `*LINK DE PAGAMENTO - ${currentTeacher.name.toUpperCase()}* 💳\n\nOlá, ${invoice.studentName}! Tudo bem? 👋\nSegue o link para o pagamento referente a *${invoice.serviceOrPlanName}*:\n\n💰 *Valor:* ${formatCurrency(invoice.amount)}\n🗓️ *Vencimento:* ${formatDateBR(invoice.dueDate)}\n\n${formasDePagar}\n\nQualquer dúvida, estamos à disposição!`;
 
   const handleCopyText = (text: string, id: string) => {
@@ -1380,6 +1382,18 @@ const SharePaymentModal: React.FC<SharePaymentModalProps> = ({
 
         {/* Quick Copy Link and PIX */}
         <div className="space-y-3 pt-1 text-xs">
+          {pixCopiaECola && (
+            <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-2xl">
+              <p className="text-center font-bold text-slate-700 mb-2">QR Code do Pix</p>
+              <PixQrCode
+                codigo={pixCopiaECola}
+                comAcoes
+                nomeArquivo={`pix-${invoice.studentName}-${invoice.id}`.replace(/[^A-Za-z0-9-]+/g, '-')}
+                legenda={`Pix de ${formatCurrency(invoice.amount)} - ${invoice.serviceOrPlanName}. Leia o QR Code no app do seu banco.`}
+              />
+            </div>
+          )}
+
           {pixCopiaECola && (
             <div>
               <label className="block font-semibold text-slate-600 mb-1">

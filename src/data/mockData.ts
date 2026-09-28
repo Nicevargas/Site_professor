@@ -17,6 +17,11 @@ import {
   WaitlistEntry
 } from '../types';
 import { relativeDate } from '../utils/dates';
+import { gerarPixCopiaECola } from '../utils/pix';
+
+/** Pix válido da demonstração, com a chave do professor de exemplo. */
+const pixDemo = (valor: number) =>
+  gerarPixCopiaECola({ chave: 'roberto.almeida@agendaprofessor.com.br', tipo: 'email', recebedor: 'Roberto Almeida', valor });
 import { PLANS, PLAN_ORDER, PlanTier } from '../utils/plans';
 
 export const INITIAL_COMPANIES: Company[] = [
@@ -823,8 +828,7 @@ export const INITIAL_PAYMENT_INVOICES: PaymentInvoice[] = [
     dueDate: '2026-08-20',
     status: 'vencido',
     method: 'pix',
-    pixCode: '00020126580014br.gov.bcb.pix0136roberto.almeida@agendaprofessor.com.br5204000053039865405550.005802BR5922Roberto Almeida6009Sao Paulo62070503***6304ABCD',
-    paymentLinkUrl: 'https://pay.agendaprofessor.com.br/pay/inv-101',
+    pixCode: pixDemo(550),
     notes: 'Mensalidade de Agosto. 1 dia de atraso.',
     createdAt: '2026-08-10',
     installments: 'Mensalidade'
@@ -841,8 +845,7 @@ export const INITIAL_PAYMENT_INVOICES: PaymentInvoice[] = [
     dueDate: '2026-08-21',
     status: 'pendente',
     method: 'pix',
-    pixCode: '00020126580014br.gov.bcb.pix0136roberto.almeida@agendaprofessor.com.br5204000053039865405220.005802BR5922Roberto Almeida6009Sao Paulo62070503***6304EF01',
-    paymentLinkUrl: 'https://pay.agendaprofessor.com.br/pay/inv-102',
+    pixCode: pixDemo(220),
     notes: 'Vence hoje! Sessão individual agendada.',
     createdAt: '2026-08-18',
     installments: 'À vista'
@@ -859,7 +862,6 @@ export const INITIAL_PAYMENT_INVOICES: PaymentInvoice[] = [
     dueDate: '2026-08-25',
     status: 'pendente',
     method: 'cartao',
-    paymentLinkUrl: 'https://pay.agendaprofessor.com.br/pay/inv-103',
     notes: 'Parcelamento em 3x no Cartão de Crédito.',
     createdAt: '2026-08-15',
     installments: '1/3'
@@ -877,8 +879,7 @@ export const INITIAL_PAYMENT_INVOICES: PaymentInvoice[] = [
     paidAt: '2026-08-15',
     status: 'pago',
     method: 'pix',
-    pixCode: '00020126580014br.gov.bcb.pix0136roberto.almeida@agendaprofessor.com.br5204000053039865405150.005802BR5922Roberto Almeida6009Sao Paulo62070503***63049911',
-    paymentLinkUrl: 'https://pay.agendaprofessor.com.br/pay/inv-104',
+    pixCode: pixDemo(150),
     notes: 'Pago via PIX. Comprovante validado.',
     createdAt: '2026-08-12',
     installments: 'À vista'
@@ -896,7 +897,6 @@ export const INITIAL_PAYMENT_INVOICES: PaymentInvoice[] = [
     paidAt: '2026-08-14',
     status: 'pago',
     method: 'cartao',
-    paymentLinkUrl: 'https://pay.agendaprofessor.com.br/pay/inv-105',
     notes: 'Confirmado no Cartão de Crédito.',
     createdAt: '2026-08-10',
     installments: '2x'
@@ -913,7 +913,6 @@ export const INITIAL_PAYMENT_INVOICES: PaymentInvoice[] = [
     dueDate: '2026-08-10',
     status: 'vencido',
     method: 'boleto',
-    paymentLinkUrl: 'https://pay.agendaprofessor.com.br/pay/inv-106',
     notes: 'Inadimplente há 11 dias. Boleto não compensado.',
     createdAt: '2026-08-05',
     installments: 'Única'
