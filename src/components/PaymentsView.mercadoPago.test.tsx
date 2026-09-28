@@ -151,11 +151,19 @@ describe('financeiro com Mercado Pago', () => {
     await screen.findByText(/mercado pago conectado/i);
     expect(screen.queryByRole('button', { name: /gerar pix/i })).not.toBeInTheDocument();
 
+    // O copiar da linha entrega o código Pix, não o link
+    const escrever = vi.fn();
+    Object.assign(navigator, { clipboard: { writeText: escrever } });
+    fireEvent.click(screen.getByTitle('Copiar código Pix'));
+    expect(escrever).toHaveBeenCalledWith(PIX_MP);
+
     fireEvent.click(screen.getByTitle(/enviar cobrança/i));
     fireEvent.click(screen.getByRole('button', { name: /1\. enviar mensagem/i }));
     const mensagem = decodeURIComponent(String(abrir.mock.calls[0][0]).split('text=')[1]);
     expect(mensagem).toMatch(/vai na próxima mensagem/);
     expect(mensagem).not.toContain(PIX_MP);
+    // Sem o link: o aluno clicava nele e caía na página do Mercado Pago, que pede login
+    expect(mensagem).not.toContain('https://mp.test/link');
 
     fireEvent.click(screen.getByRole('button', { name: /2\. enviar código pix/i }));
     const url = String(abrir.mock.calls[1][0]);

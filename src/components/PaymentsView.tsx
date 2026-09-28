@@ -834,9 +834,16 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
                           )}
                           {inv.paymentLinkUrl ? (
                             <button
-                              onClick={() => handleCopy(inv.paymentLinkUrl!, `link-${inv.id}`)}
+                              // Com Pix do Mercado Pago, copia o código: o link abre a página
+                              // do Mercado Pago, que pede login a quem só quer pagar com Pix
+                              onClick={() =>
+                                handleCopy(
+                                  pixEhDoMercadoPago(inv.pixCode) ? inv.pixCode! : inv.paymentLinkUrl!,
+                                  `link-${inv.id}`
+                                )
+                              }
                               className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
-                              title="Copiar Link de Pagamento"
+                              title={pixEhDoMercadoPago(inv.pixCode) ? 'Copiar código Pix' : 'Copiar Link de Pagamento'}
                             >
                               {copiedId === `link-${inv.id}` ? (
                                 <Check className="w-4 h-4 text-emerald-600" />
@@ -1277,10 +1284,13 @@ const SharePaymentModal: React.FC<SharePaymentModalProps> = ({
   // WhatsApp, segurar o dedo copia a mensagem inteira, e o banco só aceita
   // o código puro. Com o código, a chave fica redundante.
   const pixCopiaECola = invoice.pixCode || '';
+  // Com código Pix, o link fica fora da mensagem: o aluno clicava nele, caía
+  // na página do Mercado Pago e ela pedia login. O link continua na janela
+  // para o professor copiar se o aluno pedir cartão.
   const formasDePagar = [
-    pixCopiaECola ? '📲 *Pix Copia e Cola:* vai na próxima mensagem. É só copiar e colar no app do seu banco.' : '',
+    pixCopiaECola ? '📲 *Pix Copia e Cola:* vai na próxima mensagem. É só copiar e colar no app do seu banco, em Pix > Pix Copia e Cola.' : '',
     !pixCopiaECola && pixKey ? `🔑 *Chave PIX:* ${pixKey}` : '',
-    paymentLink ? `🔗 *Pagar com cartão ou boleto:* ${paymentLink}` : '',
+    !pixCopiaECola && paymentLink ? `🔗 *Pagar com Pix, cartão ou boleto:* ${paymentLink}` : '',
   ].filter(Boolean).join('\n');
 
   // Customized WhatsApp text message
@@ -1415,7 +1425,9 @@ const SharePaymentModal: React.FC<SharePaymentModalProps> = ({
           </div>)}
 
           {paymentLink && (<div>
-            <label className="block font-semibold text-slate-600 mb-1">Link de Pagamento Seguro:</label>
+            <label className="block font-semibold text-slate-600 mb-1">
+              {pixCopiaECola ? 'Link para pagar com cartão (só se o aluno pedir):' : 'Link de Pagamento Seguro:'}
+            </label>
             <div className="flex gap-2">
               <input
                 type="text"
