@@ -4,10 +4,17 @@ import { PixQrCode } from './PixQrCode';
 import {
   mercadoPagoService,
   lerRetornoDoMercadoPago,
-  pixEhDoMercadoPago,
+  pixComBaixaAutomatica,
   StatusMercadoPago,
   STATUS_DESCONECTADO,
 } from '../services/mercadoPagoService';
+import {
+  asaasService,
+  StatusAsaas,
+  ASAAS_DESCONECTADO,
+  PrecisaCpf,
+  documentoValido,
+} from '../services/asaasService';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   PaymentInvoice, 
@@ -96,6 +103,21 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
   const [mpOcupado, setMpOcupado] = useState(false);
   const [gerandoLinkId, setGerandoLinkId] = useState<string | null>(null);
 
+  // Asaas: o professor cola a chave de API (não há "entrar e autorizar")
+  const [asaas, setAsaas] = useState<StatusAsaas>(ASAAS_DESCONECTADO);
+  const [isAsaasModalOpen, setIsAsaasModalOpen] = useState(false);
+  const [asaasOcupado, setAsaasOcupado] = useState(false);
+
+  /**
+   * Quem gera as cobranças. Com os dois conectados, vale a escolha salva no
+   * perfil (defaultPaymentGateway); com um só, é ele.
+   */
+  const recebedor: 'mercadopago' | 'asaas' | null =
+    mp.conectado && asaas.conectado
+      ? currentTeacher.defaultPaymentGateway === 'asaas' ? 'asaas' : 'mercadopago'
+      : mp.conectado ? 'mercadopago' : asaas.conectado ? 'asaas' : null;
+  const nomeDoRecebedor = recebedor === 'asaas' ? 'Asaas' : 'Mercado Pago';
+
   // A lista mais recente, para quem termina depois de um await: sem isto,
   // o link gerado seria gravado numa lista antiga e apagaria a cobrança nova.
   const invoicesRef = useRef(invoices);
@@ -108,6 +130,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
 
     let ativo = true;
     mercadoPagoService.status(currentTeacher.id).then((s) => ativo && setMp(s));
+    asaasService.status(currentTeacher.id).then((s) => ativo && setAsaas(s));
     onRefreshInvoices?.();
     return () => {
       ativo = false;
@@ -139,11 +162,63 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
     }
   };
 
-  /** Pede o link ao Mercado Pago e grava na cobrança. */
+  const handleConectarAsaas = async (chave: string) => {
+    setAsaasOcupado(true);
+    try {
+      const novo = await asaasService.conectar(currentTeacher.id, chave);
+      setAsaas(novo);
+      setIsAsaasModalOpen(false);
+      showNotification(
+        novo.avisoConfigurado
+          ? 'Asaas conectado! Suas cobranças já saem com Pix e dão baixa sozinhas.'
+          : 'Asaas conectado, mas o aviso de pagamento não foi criado: a baixa ficará manual. Veja a ajuda no cartão do Asaas.',
+        novo.avisoConfigurado ? 3500 : 12000
+      );
+    } catch (err) {
+      showNotification((err as Error).message, 8000);
+    } finally {
+      setAsaasOcupado(false);
+    }
+  };
+
+  const handleDesconectarAsaas = async () => {
+    if (!window.confirm('Desconectar o Asaas? As cobranças novas deixam de sair pelo Asaas, e os pagamentos deixam de dar baixa sozinhos.')) return;
+    setAsaasOcupado(true);
+    try {
+      await asaasService.desconectar(currentTeacher.id);
+      setAsaas(ASAAS_DESCONECTADO);
+      showNotification('Asaas desconectado.');
+    } catch (err) {
+      showNotification((err as Error).message);
+    } finally {
+      setAsaasOcupado(false);
+    }
+  };
+
+  /** Pede o link (e o Pix) a quem recebe e grava na cobrança. */
   const handleGerarLink = async (invoice: PaymentInvoice) => {
+    if (!recebedor) return;
     setGerandoLinkId(invoice.id);
     try {
-      const { link, pixCode, avisoPix } = await mercadoPagoService.gerarLink(currentTeacher.id, invoice);
+      let resultado;
+      if (recebedor === 'asaas') {
+        try {
+          resultado = await asaasService.gerarLink(currentTeacher.id, invoice);
+        } catch (err) {
+          if (!(err instanceof PrecisaCpf)) throw err;
+          // Só na primeira cobrança do aluno: depois o Asaas o reencontra
+          const cpf = window.prompt(`O Asaas pede o CPF (ou CNPJ) de ${invoice.studentName} para criar a cobrança. Só números:`);
+          if (!cpf) return;
+          if (!documentoValido(cpf)) {
+            showNotification('Esse CPF não é válido. Confira os números e clique em Gerar link de novo.', 6000);
+            return;
+          }
+          resultado = await asaasService.gerarLink(currentTeacher.id, invoice, cpf);
+        }
+      } else {
+        resultado = await mercadoPagoService.gerarLink(currentTeacher.id, invoice);
+      }
+      const { link, pixCode, avisoPix } = resultado;
       onUpdateInvoices(
         invoicesRef.current.map((inv) =>
           inv.id === invoice.id
@@ -152,12 +227,19 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
         )
       );
       if (avisoPix) showNotification(avisoPix, 12000);
-      else showNotification(pixCode ? 'Link e Pix Copia e Cola do Mercado Pago prontos!' : 'Link de pagamento do Mercado Pago pronto!');
+      else showNotification(pixCode ? `Link e Pix Copia e Cola do ${nomeDoRecebedor} prontos!` : `Link de pagamento do ${nomeDoRecebedor} pronto!`);
     } catch (err) {
-      showNotification((err as Error).message);
+      showNotification((err as Error).message, 8000);
     } finally {
       setGerandoLinkId(null);
     }
+  };
+
+  /** Com os dois conectados, o professor escolhe quem gera as cobranças novas. */
+  const handleEscolherRecebedor = (escolha: 'mercadopago' | 'asaas') => {
+    if (escolha === recebedor) return;
+    onUpdateTeacher({ ...currentTeacher, defaultPaymentGateway: escolha });
+    showNotification(`Cobranças novas sairão pelo ${escolha === 'asaas' ? 'Asaas' : 'Mercado Pago'}.`);
   };
 
   // Helper copy function
@@ -497,6 +579,76 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
           </section>
         )}
 
+        {/* Asaas: o professor cola a chave de API da conta dele */}
+        <section
+          aria-label="Asaas"
+          className={`rounded-2xl p-5 border flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+            asaas.conectado ? 'bg-emerald-50 border-emerald-200' : 'bg-indigo-50/60 border-indigo-200'
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${asaas.conectado ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'}`}>
+              {asaas.conectado ? <CheckCircle2 className="w-5 h-5" /> : <Receipt className="w-5 h-5" />}
+            </div>
+            {asaas.conectado ? (
+              <div>
+                <h2 className="text-sm font-bold text-[#091426]">
+                  Asaas conectado{asaas.ambiente === 'sandbox' ? ' (conta de teste)' : ''}
+                </h2>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  {asaas.nome || asaas.email ? <>Recebendo na conta de <strong>{asaas.nome || asaas.email}</strong>. </> : null}
+                  {asaas.avisoConfigurado
+                    ? <>Cobranças com Pix, boleto ou cartão, e baixa automática quando o aluno paga.</>
+                    : <>A baixa automática não foi ativada. Clique em <strong>Desconectar</strong> e conecte de novo; se continuar, confira se a chave tem permissão para webhooks.</>}
+                </p>
+              </div>
+            ) : (
+              <div>
+                <h2 className="text-sm font-bold text-[#091426]">Receba pelo Asaas</h2>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Pix, boleto e cartão, com baixa automática. Você só precisa colar a <strong>chave de API</strong> da sua conta do Asaas, uma vez.
+                </p>
+              </div>
+            )}
+          </div>
+          {asaas.conectado ? (
+            <button
+              onClick={handleDesconectarAsaas}
+              disabled={asaasOcupado}
+              className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold shrink-0 disabled:opacity-60"
+            >
+              Desconectar
+            </button>
+          ) : (
+            <button
+              onClick={() => setIsAsaasModalOpen(true)}
+              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shrink-0 flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Conectar Asaas</span>
+            </button>
+          )}
+        </section>
+
+        {/* Com os dois conectados, o professor escolhe quem gera as cobranças */}
+        {mp.conectado && asaas.conectado && (
+          <fieldset className="rounded-2xl p-4 border border-slate-200 bg-white flex flex-wrap items-center gap-4 text-xs">
+            <legend className="sr-only">Quem gera as cobranças novas</legend>
+            <span className="font-bold text-slate-700">Cobranças novas saem pelo:</span>
+            {(['mercadopago', 'asaas'] as const).map((opcao) => (
+              <label key={opcao} className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="radio"
+                  name="recebedor"
+                  checked={recebedor === opcao}
+                  onChange={() => handleEscolherRecebedor(opcao)}
+                />
+                <span>{opcao === 'asaas' ? 'Asaas' : 'Mercado Pago'}</span>
+              </label>
+            ))}
+          </fieldset>
+        )}
+
         {/* Financial KPI Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           
@@ -824,12 +976,12 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
                           </button>
 
                           {/* Copiar link de pagamento, ou gerar no Mercado Pago */}
-                          {inv.paymentLinkUrl && mp.conectado && !pixEhDoMercadoPago(inv.pixCode) && inv.status !== 'pago' && inv.status !== 'cancelado' && (
+                          {inv.paymentLinkUrl && recebedor && !pixComBaixaAutomatica(inv.pixCode) && inv.status !== 'pago' && inv.status !== 'cancelado' && (
                             <button
                               onClick={() => handleGerarLink(inv)}
                               disabled={gerandoLinkId === inv.id}
                               className="px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 rounded-lg font-bold text-[11px] transition-colors disabled:opacity-60"
-                              title="Gerar Pix Copia e Cola do Mercado Pago, com baixa automática"
+                              title={`Gerar Pix Copia e Cola do ${nomeDoRecebedor}, com baixa automática`}
                             >
                               {gerandoLinkId === inv.id ? 'Gerando...' : 'Gerar Pix'}
                             </button>
@@ -840,12 +992,12 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
                               // do Mercado Pago, que pede login a quem só quer pagar com Pix
                               onClick={() =>
                                 handleCopy(
-                                  pixEhDoMercadoPago(inv.pixCode) ? inv.pixCode! : inv.paymentLinkUrl!,
+                                  pixComBaixaAutomatica(inv.pixCode) ? inv.pixCode! : inv.paymentLinkUrl!,
                                   `link-${inv.id}`
                                 )
                               }
                               className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
-                              title={pixEhDoMercadoPago(inv.pixCode) ? 'Copiar código Pix' : 'Copiar Link de Pagamento'}
+                              title={pixComBaixaAutomatica(inv.pixCode) ? 'Copiar código Pix' : 'Copiar Link de Pagamento'}
                             >
                               {copiedId === `link-${inv.id}` ? (
                                 <Check className="w-4 h-4 text-emerald-600" />
@@ -853,12 +1005,12 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
                                 <Copy className="w-4 h-4" />
                               )}
                             </button>
-                          ) : mp.conectado && inv.status !== 'pago' && inv.status !== 'cancelado' ? (
+                          ) : recebedor && inv.status !== 'pago' && inv.status !== 'cancelado' ? (
                             <button
                               onClick={() => handleGerarLink(inv)}
                               disabled={gerandoLinkId === inv.id}
                               className="px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 rounded-lg font-bold text-[11px] transition-colors disabled:opacity-60"
-                              title="Gerar link de pagamento no Mercado Pago"
+                              title={`Gerar link de pagamento no ${nomeDoRecebedor}`}
                             >
                               {gerandoLinkId === inv.id ? 'Gerando...' : 'Gerar link'}
                             </button>
@@ -955,7 +1107,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
             onUpdateInvoices([newInvoice, ...invoices]);
             setIsNewInvoiceOpen(false);
             showNotification('Cobrança criada com sucesso!');
-            if (mp.conectado) handleGerarLink(newInvoice);
+            if (recebedor) handleGerarLink(newInvoice);
           }}
         />
       )}
@@ -976,6 +1128,15 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
         />
       )}
 
+      {/* Modal 4: Conectar Asaas (colar a chave de API) */}
+      {isAsaasModalOpen && (
+        <ConectarAsaasModal
+          ocupado={asaasOcupado}
+          onClose={() => setIsAsaasModalOpen(false)}
+          onConectar={handleConectarAsaas}
+        />
+      )}
+
       {/* Modal 3: Configurações de PIX e Recebimento */}
       {isPixSettingsOpen && (
         <PixSettingsModal
@@ -990,6 +1151,88 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
       )}
 
     </main>
+  );
+};
+
+// -------------------------------------------------------------
+// MODAL: Conectar Asaas
+// -------------------------------------------------------------
+interface ConectarAsaasModalProps {
+  ocupado: boolean;
+  onClose: () => void;
+  onConectar: (chave: string) => void;
+}
+
+const ConectarAsaasModal: React.FC<ConectarAsaasModalProps> = ({ ocupado, onClose, onConectar }) => {
+  const [chave, setChave] = useState('');
+  const pareceChave = chave.trim().startsWith('$aact_');
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+      <div role="dialog" aria-label="Conectar Asaas" className="bg-white rounded-3xl max-w-lg w-full p-6 md:p-8 shadow-2xl border border-slate-100 my-8 space-y-5 text-xs">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+              <Receipt className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-[#091426]">Conectar Asaas</h2>
+              <p className="text-xs text-slate-500">Cole a chave de API da sua conta. É só uma vez.</p>
+            </div>
+          </div>
+          <button onClick={onClose} aria-label="Fechar" className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <ol className="list-decimal pl-5 space-y-1.5 text-slate-700 leading-relaxed">
+          <li>Entre na sua conta do <strong>Asaas</strong> pelo computador.</li>
+          <li>Abra o menu <strong>Integrações</strong> e depois <strong>Chaves de API</strong>.</li>
+          <li>Clique em <strong>Gerar chave de API</strong> e copie a chave. Ela começa com <code className="font-mono">$aact_</code> e só aparece uma vez.</li>
+          <li>Cole abaixo e clique em <strong>Conectar</strong>.</li>
+        </ol>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (pareceChave) onConectar(chave);
+          }}
+          className="space-y-3"
+        >
+          <label className="block">
+            <span className="block font-bold text-slate-700 mb-1">Chave de API do Asaas</span>
+            <input
+              type="password"
+              autoComplete="off"
+              value={chave}
+              onChange={(e) => setChave(e.target.value)}
+              placeholder="$aact_..."
+              className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono text-slate-900 focus:bg-white"
+            />
+          </label>
+          {chave.trim() && !pareceChave && (
+            <p className="text-rose-600">Essa não parece uma chave do Asaas: ela começa com $aact_.</p>
+          )}
+          <p className="text-slate-500">
+            A chave fica guardada com segurança e nunca aparece de novo na tela. O Aquagenda também ativa sozinho, na sua conta do Asaas, o aviso de pagamento que faz a cobrança virar <strong>Pago</strong>.
+          </p>
+
+          <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+            <button type="button" onClick={onClose} className="px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold">
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={!pareceChave || ocupado}
+              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center gap-2 disabled:opacity-50"
+            >
+              {ocupado ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+              <span>{ocupado ? 'Conferindo...' : 'Conectar'}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 };
 
@@ -1397,7 +1640,7 @@ const SharePaymentModal: React.FC<SharePaymentModalProps> = ({
           {pixCopiaECola && (
             <div>
               <label className="block font-semibold text-slate-600 mb-1">
-                Pix Copia e Cola{pixEhDoMercadoPago(pixCopiaECola) ? ' (dá baixa sozinho quando o aluno pagar)' : ''}:
+                Pix Copia e Cola{pixComBaixaAutomatica(pixCopiaECola) ? ' (dá baixa sozinho quando o aluno pagar)' : ''}:
               </label>
               <div className="flex gap-2">
                 <input

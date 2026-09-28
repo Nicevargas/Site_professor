@@ -97,13 +97,16 @@ export interface CobrancaMercadoPago {
 }
 
 /**
- * O Pix da cobrança veio do Mercado Pago (dá baixa sozinho)?
+ * O Pix foi gerado por um recebedor conectado (Mercado Pago ou Asaas), e por
+ * isso dá baixa sozinho?
  *
- * O código do Mercado Pago é dinâmico e aponta para um endereço dele; o
- * feito com a chave do professor (utils/pix) é estático e não tem esse endereço.
+ * Os dois geram Pix DINÂMICO: dentro do código, logo depois de
+ * "br.gov.bcb.pix", vem o campo 25 com o endereço da cobrança. O Pix feito
+ * com a chave do professor (utils/pix) é estático e traz o campo 01, a chave.
+ * Olhar o formato, e não o nome do banco, vale para qualquer recebedor.
  */
-export function pixEhDoMercadoPago(pixCode?: string): boolean {
-  return Boolean(pixCode && /mercadopago|mercadolibre|mercadolivre/i.test(pixCode));
+export function pixComBaixaAutomatica(pixCode?: string): boolean {
+  return Boolean(pixCode && /br\.gov\.bcb\.pix25/i.test(pixCode));
 }
 
 /**
