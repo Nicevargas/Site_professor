@@ -986,7 +986,10 @@ const NewInvoiceModal: React.FC<NewInvoiceModalProps> = ({
   onClose,
   onSave,
 }) => {
-  const [selectedStudentId, setSelectedStudentId] = useState(students[0]?.id || '');
+  // Sem aluno cadastrado, a única opção da lista é a cobrança avulsa. Antes o
+  // estado começava vazio: a lista mostrava "Outro Aluno", mas os campos de
+  // nome não apareciam e o salvar reclamava que faltava o nome.
+  const [selectedStudentId, setSelectedStudentId] = useState(students[0]?.id || 'custom');
   const [customStudentName, setCustomStudentName] = useState('');
   const [customStudentPhone, setCustomStudentPhone] = useState('');
   const [serviceOrPlanName, setServiceOrPlanName] = useState(services[0]?.name || 'Aula Particular');

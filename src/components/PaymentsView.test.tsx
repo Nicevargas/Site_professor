@@ -201,4 +201,29 @@ describe('financeiro', () => {
     expect(saved.pixBankName).toBeUndefined();
     expect(saved.email).toBe('roberto@teste.com');
   });
+
+  it('sem aluno cadastrado, a cobrança avulsa já mostra os campos de nome e salva', () => {
+    const onUpdateInvoices = vi.fn();
+    render(
+      <PaymentsView
+        invoices={[]}
+        students={[]}
+        services={services}
+        currentTeacher={teacher}
+        onUpdateInvoices={onUpdateInvoices}
+        onUpdateTeacher={vi.fn()}
+      />
+    );
+    const alerta = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    fireEvent.click(screen.getByRole('button', { name: /nova cobrança \/ link/i }));
+    fireEvent.change(screen.getByPlaceholderText('Ex: Beatriz Lima'), { target: { value: 'Beatriz Lima' } });
+    fireEvent.change(screen.getByPlaceholderText('(11) 99999-8888'), { target: { value: '(11) 91234-5678' } });
+    fireEvent.click(screen.getByRole('button', { name: /gerar cobrança & link/i }));
+
+    expect(alerta).not.toHaveBeenCalled();
+    const criada: PaymentInvoice = onUpdateInvoices.mock.calls[0][0][0];
+    expect(criada).toMatchObject({ studentName: 'Beatriz Lima', studentPhone: '(11) 91234-5678' });
+    expect(criada.studentId).toBeUndefined();
+    alerta.mockRestore();
+  });
 });
