@@ -1,5 +1,12 @@
 import { camposAlterados } from '../utils/camposAlterados';
-import React, { useState, useMemo } from 'react';
+import { pixDaCobranca } from '../utils/pix';
+import {
+  mercadoPagoService,
+  lerRetornoDoMercadoPago,
+  StatusMercadoPago,
+  STATUS_DESCONECTADO,
+} from '../services/mercadoPagoService';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   PaymentInvoice, 
   Student, 
@@ -47,6 +54,8 @@ interface PaymentsViewProps {
   currentTeacher: TeacherProfile;
   onUpdateInvoices: (invoices: PaymentInvoice[]) => void;
   onUpdateTeacher: (teacher: TeacherProfile) => void;
+  /** Relê as cobranças do banco: o Mercado Pago pode ter dado baixa sozinho. */
+  onRefreshInvoices?: () => void;
 }
 
 export const PaymentsView: React.FC<PaymentsViewProps> = ({
@@ -56,6 +65,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
   currentTeacher,
   onUpdateInvoices,
   onUpdateTeacher,
+  onRefreshInvoices,
 }) => {
   // Filters and state
   const [activeStatusFilter, setActiveStatusFilter] = useState<'all' | PaymentStatus>('all');
@@ -75,6 +85,72 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
   const showNotification = (msg: string) => {
     setActionNotice(msg);
     setTimeout(() => setActionNotice(null), 3500);
+  };
+
+  // ------------------------------------------------------------------
+  // Mercado Pago
+  // ------------------------------------------------------------------
+  const [mp, setMp] = useState<StatusMercadoPago>(STATUS_DESCONECTADO);
+  const [mpOcupado, setMpOcupado] = useState(false);
+  const [gerandoLinkId, setGerandoLinkId] = useState<string | null>(null);
+
+  // A lista mais recente, para quem termina depois de um await: sem isto,
+  // o link gerado seria gravado numa lista antiga e apagaria a cobrança nova.
+  const invoicesRef = useRef(invoices);
+  invoicesRef.current = invoices;
+
+  useEffect(() => {
+    const retorno = lerRetornoDoMercadoPago();
+    if (retorno === 'conectado') showNotification('Mercado Pago conectado! Suas cobranças já saem com link de pagamento.');
+    if (retorno === 'erro') showNotification('Não deu para conectar o Mercado Pago. Tente de novo.');
+
+    let ativo = true;
+    mercadoPagoService.status(currentTeacher.id).then((s) => ativo && setMp(s));
+    onRefreshInvoices?.();
+    return () => {
+      ativo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTeacher.id]);
+
+  const handleConectarMercadoPago = async () => {
+    setMpOcupado(true);
+    try {
+      window.location.href = await mercadoPagoService.enderecoParaConectar(currentTeacher.id);
+    } catch (err) {
+      showNotification((err as Error).message);
+      setMpOcupado(false);
+    }
+  };
+
+  const handleDesconectarMercadoPago = async () => {
+    if (!window.confirm('Desconectar o Mercado Pago? As cobranças novas deixam de sair com link, e os pagamentos deixam de dar baixa sozinhos.')) return;
+    setMpOcupado(true);
+    try {
+      await mercadoPagoService.desconectar(currentTeacher.id);
+      setMp({ ...mp, conectado: false, apelido: null, email: null, conectadoEm: null });
+      showNotification('Mercado Pago desconectado.');
+    } catch (err) {
+      showNotification((err as Error).message);
+    } finally {
+      setMpOcupado(false);
+    }
+  };
+
+  /** Pede o link ao Mercado Pago e grava na cobrança. */
+  const handleGerarLink = async (invoice: PaymentInvoice) => {
+    setGerandoLinkId(invoice.id);
+    try {
+      const link = await mercadoPagoService.gerarLink(currentTeacher.id, invoice);
+      onUpdateInvoices(
+        invoicesRef.current.map((inv) => (inv.id === invoice.id ? { ...inv, paymentLinkUrl: link } : inv))
+      );
+      showNotification('Link de pagamento do Mercado Pago pronto!');
+    } catch (err) {
+      showNotification((err as Error).message);
+    } finally {
+      setGerandoLinkId(null);
+    }
   };
 
   // Helper copy function
@@ -362,6 +438,57 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Mercado Pago: só aparece quando a plataforma ativou a conexão */}
+        {(mp.configurado || mp.conectado) && (
+          <section
+            aria-label="Mercado Pago"
+            className={`rounded-2xl p-5 border flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+              mp.conectado ? 'bg-emerald-50 border-emerald-200' : 'bg-sky-50 border-sky-200'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${mp.conectado ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>
+                {mp.conectado ? <CheckCircle2 className="w-5 h-5" /> : <CreditCard className="w-5 h-5" />}
+              </div>
+              {mp.conectado ? (
+                <div>
+                  <h2 className="text-sm font-bold text-[#091426]">Mercado Pago conectado</h2>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    {mp.apelido || mp.email ? <>Recebendo na conta de <strong>{mp.apelido || mp.email}</strong>. </> : null}
+                    Cada cobrança nova já sai com link para o aluno pagar com Pix, cartão ou boleto, e vira <strong>Pago</strong> sozinha quando ele paga.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <h2 className="text-sm font-bold text-[#091426]">Receba pelo Mercado Pago</h2>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    Seu aluno paga com Pix, cartão ou boleto, o dinheiro cai na sua conta e a cobrança dá baixa sozinha.
+                    É só entrar na sua conta do Mercado Pago e clicar em <strong>Autorizar</strong>. Não precisa copiar nenhuma chave.
+                  </p>
+                </div>
+              )}
+            </div>
+            {mp.conectado ? (
+              <button
+                onClick={handleDesconectarMercadoPago}
+                disabled={mpOcupado}
+                className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold shrink-0 disabled:opacity-60"
+              >
+                Desconectar
+              </button>
+            ) : (
+              <button
+                onClick={handleConectarMercadoPago}
+                disabled={mpOcupado}
+                className="px-5 py-2.5 bg-[#009ee3] hover:bg-[#007eb5] text-white rounded-xl text-xs font-bold shrink-0 flex items-center gap-2 disabled:opacity-60"
+              >
+                {mpOcupado ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
+                <span>Conectar Mercado Pago</span>
+              </button>
+            )}
+          </section>
+        )}
 
         {/* Financial KPI Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -688,18 +815,29 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
                             <MessageSquare className="w-4 h-4" />
                           </button>
 
-                          {/* Copy Payment Link */}
-                          <button
-                            onClick={() => handleCopy(inv.paymentLinkUrl || `https://pay.agendaprofessor.com.br/pay/${inv.id}`, `link-${inv.id}`)}
-                            className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
-                            title="Copiar Link de Pagamento"
-                          >
-                            {copiedId === `link-${inv.id}` ? (
-                              <Check className="w-4 h-4 text-emerald-600" />
-                            ) : (
-                              <Copy className="w-4 h-4" />
-                            )}
-                          </button>
+                          {/* Copiar link de pagamento, ou gerar no Mercado Pago */}
+                          {inv.paymentLinkUrl ? (
+                            <button
+                              onClick={() => handleCopy(inv.paymentLinkUrl!, `link-${inv.id}`)}
+                              className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                              title="Copiar Link de Pagamento"
+                            >
+                              {copiedId === `link-${inv.id}` ? (
+                                <Check className="w-4 h-4 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-4 h-4" />
+                              )}
+                            </button>
+                          ) : mp.conectado && inv.status !== 'pago' && inv.status !== 'cancelado' ? (
+                            <button
+                              onClick={() => handleGerarLink(inv)}
+                              disabled={gerandoLinkId === inv.id}
+                              className="px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 rounded-lg font-bold text-[11px] transition-colors disabled:opacity-60"
+                              title="Gerar link de pagamento no Mercado Pago"
+                            >
+                              {gerandoLinkId === inv.id ? 'Gerando...' : 'Gerar link'}
+                            </button>
+                          ) : null}
 
                           {/* Quick Toggle Paid */}
                           {inv.status !== 'pago' ? (
@@ -759,7 +897,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
             <div className="p-4 bg-[#1e293b] rounded-xl border border-slate-700 space-y-2">
               <span className="text-xs font-bold text-[#57dffe]">1. Geração de Link & PIX</span>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Ao cadastrar a cobrança, o sistema gera o <strong>PIX Copia e Cola</strong> e o link seguro de pagamento com os dados do seu banco cadastrado.
+                Ao cadastrar a cobrança, o sistema gera o <strong>PIX Copia e Cola</strong> com a sua chave. Com o Mercado Pago conectado, sai também o link para pagar com Pix, cartão ou boleto, e a baixa é automática.
               </p>
             </div>
 
@@ -792,6 +930,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
             onUpdateInvoices([newInvoice, ...invoices]);
             setIsNewInvoiceOpen(false);
             showNotification('Cobrança criada com sucesso!');
+            if (mp.conectado) handleGerarLink(newInvoice);
           }}
         />
       )}
@@ -883,7 +1022,6 @@ const NewInvoiceModal: React.FC<NewInvoiceModalProps> = ({
     }
 
     const newId = `inv-${Date.now().toString().slice(-6)}`;
-    const pixKey = currentTeacher.pixKey || currentTeacher.email;
 
     const newInvoice: PaymentInvoice = {
       id: newId,
@@ -899,8 +1037,8 @@ const NewInvoiceModal: React.FC<NewInvoiceModalProps> = ({
       installments,
       notes: notes.trim() || undefined,
       createdAt: new Date().toISOString().split('T')[0],
-      paymentLinkUrl: `https://pay.agendaprofessor.com.br/pay/${newId}`,
-      pixCode: `00020126580014br.gov.bcb.pix0136${pixKey}5204000053039865405${Number(amount).toFixed(2)}5802BR5920${currentTeacher.name.slice(0, 20)}6009Sao Paulo62070503***6304XYZ`,
+      // O link só existe de verdade quando o Mercado Pago o gera (ver handleGerarLink)
+      pixCode: pixDaCobranca(currentTeacher, Number(amount), newId) || undefined,
     };
 
     onSave(newInvoice);
@@ -1108,15 +1246,23 @@ const SharePaymentModal: React.FC<SharePaymentModalProps> = ({
     return `${d}/${m}/${y}`;
   };
 
-  const pixKey = currentTeacher.pixKey || currentTeacher.email || 'roberto.almeida@agendaprofessor.com.br';
-  const paymentLink = invoice.paymentLinkUrl || `https://pay.agendaprofessor.com.br/pay/${invoice.id}`;
+  // Só o que existe de verdade: chave cadastrada e link gerado pelo Mercado Pago.
+  // Antes havia um link em pay.agendaprofessor.com.br, domínio que não é da
+  // plataforma -- o aluno clicava e caía numa página que não abria.
+  const pixKey = currentTeacher.pixKey || '';
+  const paymentLink = invoice.paymentLinkUrl || '';
 
   const isOverdue = invoice.status === 'vencido';
 
+  const formasDePagar = [
+    pixKey ? `🔑 *Chave PIX:* ${pixKey}` : '',
+    paymentLink ? `🔗 *Pagar com Pix, cartão ou boleto:* ${paymentLink}` : '',
+  ].filter(Boolean).join('\n');
+
   // Customized WhatsApp text message
   const whatsappMessage = isOverdue
-    ? `*LEMBRETE DE PAGAMENTO PENDENTE* ⚠️\n\nOlá, ${invoice.studentName}! Tudo bem? 👋\nAqui é do atendimento do Prof. ${currentTeacher.name}.\n\nConstatamos em nosso sistema que a fatura referente a *${invoice.serviceOrPlanName}* no valor de *${formatCurrency(invoice.amount)}* venceu no dia *${formatDateBR(invoice.dueDate)}*.\n\n🔑 *Chave PIX:* ${pixKey}\n🔗 *Link para Pagamento Online / Cartão:* ${paymentLink}\n\nCaso já tenha realizado o pagamento, favor desconsiderar ou nos enviar o comprovante por aqui. Obrigado! 🙏`
-    : `*LINK DE PAGAMENTO - ${currentTeacher.name.toUpperCase()}* 💳\n\nOlá, ${invoice.studentName}! Tudo bem? 👋\nSegue o link para o pagamento referente a *${invoice.serviceOrPlanName}*:\n\n💰 *Valor:* ${formatCurrency(invoice.amount)}\n🗓️ *Vencimento:* ${formatDateBR(invoice.dueDate)}\n\n🔑 *Chave PIX:* ${pixKey}\n🔗 *Pagar com Cartão / Link:* ${paymentLink}\n\nQualquer dúvida, estamos à disposição!`;
+    ? `*LEMBRETE DE PAGAMENTO PENDENTE* ⚠️\n\nOlá, ${invoice.studentName}! Tudo bem? 👋\nAqui é do atendimento do Prof. ${currentTeacher.name}.\n\nConstatamos em nosso sistema que a fatura referente a *${invoice.serviceOrPlanName}* no valor de *${formatCurrency(invoice.amount)}* venceu no dia *${formatDateBR(invoice.dueDate)}*.\n\n${formasDePagar}\n\nCaso já tenha realizado o pagamento, favor desconsiderar ou nos enviar o comprovante por aqui. Obrigado! 🙏`
+    : `*LINK DE PAGAMENTO - ${currentTeacher.name.toUpperCase()}* 💳\n\nOlá, ${invoice.studentName}! Tudo bem? 👋\nSegue o link para o pagamento referente a *${invoice.serviceOrPlanName}*:\n\n💰 *Valor:* ${formatCurrency(invoice.amount)}\n🗓️ *Vencimento:* ${formatDateBR(invoice.dueDate)}\n\n${formasDePagar}\n\nQualquer dúvida, estamos à disposição!`;
 
   const handleCopyText = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -1200,7 +1346,7 @@ const SharePaymentModal: React.FC<SharePaymentModalProps> = ({
 
         {/* Quick Copy Link and PIX */}
         <div className="space-y-3 pt-1 text-xs">
-          <div>
+          {pixKey && (<div>
             <label className="block font-semibold text-slate-600 mb-1">Chave PIX do Professor:</label>
             <div className="flex gap-2">
               <input
@@ -1217,9 +1363,9 @@ const SharePaymentModal: React.FC<SharePaymentModalProps> = ({
                 {copiedKey === 'pix-key' ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
               </button>
             </div>
-          </div>
+          </div>)}
 
-          <div>
+          {paymentLink && (<div>
             <label className="block font-semibold text-slate-600 mb-1">Link de Pagamento Seguro:</label>
             <div className="flex gap-2">
               <input
@@ -1236,7 +1382,7 @@ const SharePaymentModal: React.FC<SharePaymentModalProps> = ({
                 {copiedKey === 'pay-link' ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
               </button>
             </div>
-          </div>
+          </div>)}
         </div>
 
         {/* Actions */}
@@ -1302,14 +1448,12 @@ const PixSettingsModal: React.FC<PixSettingsModalProps> = ({
   const [pixKeyType, setPixKeyType] = useState(currentTeacher.pixKeyType || 'email');
   const [pixReceiverName, setPixReceiverName] = useState(currentTeacher.pixReceiverName || '');
   const [pixBankName, setPixBankName] = useState(currentTeacher.pixBankName || '');
-  const [defaultPaymentGateway, setDefaultPaymentGateway] = useState(currentTeacher.defaultPaymentGateway || 'pix');
 
   const formularioPix = (): Partial<TeacherProfile> => ({
     pixKey,
     pixKeyType: pixKeyType as any,
     pixReceiverName,
     pixBankName,
-    defaultPaymentGateway,
   });
   // A cópia de quando a tela abriu: o salvar manda só o que mudou
   const [inicialPix] = useState(formularioPix);
@@ -1396,21 +1540,6 @@ const PixSettingsModal: React.FC<PixSettingsModalProps> = ({
             />
           </div>
 
-          <div>
-            <label className="block font-bold text-slate-700 mb-1">Gateway de Cartão / Pagamentos Online</label>
-            <select
-              value={defaultPaymentGateway}
-              onChange={(e) => setDefaultPaymentGateway(e.target.value)}
-              className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:bg-white"
-            >
-              <option value="pix">PIX Direto na Conta (Sem taxas adicionais)</option>
-              <option value="mercadopago">Mercado Pago (Checkout transparente)</option>
-              <option value="stripe">Stripe</option>
-              <option value="asaas">Asaas (Cobranças & Carnês)</option>
-              <option value="infinitepay">InfinitePay</option>
-              <option value="pagbank">PagBank (PagSeguro)</option>
-            </select>
-          </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
             <button

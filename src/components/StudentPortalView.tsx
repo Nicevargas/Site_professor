@@ -28,6 +28,7 @@ import {
   Plus
 } from 'lucide-react';
 import { getFirstName } from '../utils/names';
+import { pixDaCobranca } from '../utils/pix';
 
 interface StudentPortalViewProps {
   currentUser: AuthUser | null;
@@ -106,6 +107,13 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
   const myVideos = videos.filter(
     (v) => !v.teacherId || myTeachers.some((t) => t.id === v.teacherId)
   );
+
+  // Cada cobrança paga o professor DELA. Antes o Pix era sempre o do
+  // professor da tela, e o aluno de dois professores pagava o errado.
+  const teacherOfInvoice = (inv: PaymentInvoice) =>
+    (inv.teacherId && teacherById.get(inv.teacherId)) || currentTeacher;
+  const pixOf = (inv: PaymentInvoice) =>
+    inv.pixCode || pixDaCobranca(teacherOfInvoice(inv), inv.amount, inv.id);
 
   const handleCopyPix = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -399,6 +407,17 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
                             <span>Pagar com Pix</span>
                           </button>
                         )}
+                        {isPending && inv.paymentLinkUrl && (
+                          <a
+                            href={inv.paymentLinkUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#009ee3] hover:bg-[#007eb5] text-white text-xs font-bold shadow-xs transition-colors"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>Pagar pelo Mercado Pago</span>
+                          </a>
+                        )}
                         {inv.status === 'pago' && (
                           <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
                             <CheckCircle2 className="w-4 h-4" />
@@ -474,37 +493,57 @@ export const StudentPortalView: React.FC<StudentPortalViewProps> = ({
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
                 <p className="text-xs text-slate-500">Valor a pagar:</p>
                 <p className="text-2xl font-extrabold text-[#091426] mt-0.5">R$ {selectedInvoice.amount.toFixed(2)}</p>
-                <p className="text-[11px] text-slate-400 mt-1">Beneficiário: {currentTeacher.pixReceiverName || currentTeacher.name}</p>
+                <p className="text-[11px] text-slate-400 mt-1">Beneficiário: {teacherOfInvoice(selectedInvoice).pixReceiverName || teacherOfInvoice(selectedInvoice).name}</p>
               </div>
 
-              {/* Pix Copy Code Box */}
-              <div className="space-y-2 text-left">
-                <label className="text-xs font-bold text-slate-700">Código Pix Copia e Cola:</label>
-                <div className="p-3 bg-slate-100 rounded-xl text-[11px] font-mono text-slate-700 break-all select-all border border-slate-200 max-h-24 overflow-y-auto">
-                  {selectedInvoice.pixCode || `00020126580014br.gov.bcb.pix0136${currentTeacher.pixKey || currentTeacher.email}5204000053039865405${selectedInvoice.amount.toFixed(2)}5802BR5922${currentTeacher.name}6009Sao Paulo62070503***63049911`}
-                </div>
-              </div>
+              {pixOf(selectedInvoice) ? (
+                <>
+                  {/* Pix Copy Code Box */}
+                  <div className="space-y-2 text-left">
+                    <label className="text-xs font-bold text-slate-700">Código Pix Copia e Cola:</label>
+                    <div className="p-3 bg-slate-100 rounded-xl text-[11px] font-mono text-slate-700 break-all select-all border border-slate-200 max-h-24 overflow-y-auto">
+                      {pixOf(selectedInvoice)}
+                    </div>
+                  </div>
 
-              <button
-                onClick={() => handleCopyPix(selectedInvoice.pixCode || currentTeacher.pixKey || currentTeacher.email)}
-                className={`w-full py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${
-                  copiedPix
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-[#00687a] hover:bg-[#004e5c] text-white'
-                }`}
-              >
-                {copiedPix ? (
-                  <>
-                    <Check className="w-4 h-4" />
-                    <span>Código Pix Copiado com Sucesso!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-4 h-4" />
-                    <span>Copiar Código Pix</span>
-                  </>
-                )}
-              </button>
+                  <button
+                    onClick={() => handleCopyPix(pixOf(selectedInvoice))}
+                    className={`w-full py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${
+                      copiedPix
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-[#00687a] hover:bg-[#004e5c] text-white'
+                    }`}
+                  >
+                    {copiedPix ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        <span>Código Pix Copiado com Sucesso!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        <span>Copiar Código Pix</span>
+                      </>
+                    )}
+                  </button>
+                </>
+              ) : (
+                <p className="text-xs text-slate-600 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                  Seu professor ainda não cadastrou a chave Pix. Fale com ele pelo WhatsApp para combinar o pagamento.
+                </p>
+              )}
+
+              {selectedInvoice.paymentLinkUrl && (
+                <a
+                  href={selectedInvoice.paymentLinkUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 bg-[#009ee3] hover:bg-[#007eb5] text-white"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  <span>Pagar pelo Mercado Pago</span>
+                </a>
+              )}
 
               <button
                 onClick={() => setSelectedInvoice(null)}

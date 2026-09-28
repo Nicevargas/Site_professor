@@ -117,7 +117,7 @@ describe('financeiro', () => {
     expect(screen.queryByTitle(/reverter para pendente/i)).not.toBeInTheDocument();
   });
 
-  it('nova cobrança nasce pendente, com aluno, valor do serviço, link e código Pix', () => {
+  it('nova cobrança nasce pendente, com aluno, valor do serviço, código Pix válido e sem link inventado', () => {
     const { onUpdateInvoices } = renderPayments();
     fireEvent.click(screen.getByRole('button', { name: /nova cobrança \/ link/i }));
     expect(screen.getByText(/nova cobrança \/ link de pagamento/i)).toBeInTheDocument();
@@ -137,8 +137,11 @@ describe('financeiro', () => {
       amount: 150,
       method: 'pix',
     });
-    expect(created.paymentLinkUrl).toContain(created.id);
+    // Sem Mercado Pago conectado não há link: antes era inventado num domínio que não abre
+    expect(created.paymentLinkUrl).toBeUndefined();
     expect(created.pixCode).toContain('roberto@teste.com');
+    expect(created.pixCode).toContain('5406150.00');
+    expect(created.pixCode).toMatch(/6304[0-9A-F]{4}$/);
   });
 
   it('salvar configuração de Pix devolve o professor com a nova chave e mantém o restante', () => {

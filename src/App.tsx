@@ -1984,6 +1984,12 @@ function AppInner() {
               services={services}
               currentTeacher={currentTeacher}
               onUpdateInvoices={handleUpdateInvoices}
+              onRefreshInvoices={async () => {
+                // O Mercado Pago dá baixa direto no banco; sem reler, a tela
+                // mostraria "Pendente" e um salvar qualquer desfaria o "Pago"
+                const dbInvoices = await supabaseService.getInvoices();
+                if (dbInvoices) setAllInvoices(dbInvoices);
+              }}
               onUpdateTeacher={(updated) => {
                 setCurrentTeacher(updated);
                 setTeachers((prev) =>
