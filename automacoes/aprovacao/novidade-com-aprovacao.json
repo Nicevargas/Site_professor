@@ -1,0 +1,631 @@
+{
+  "name": "Aquagenda - novidade com aprovação",
+  "nodes": [
+    {
+      "id": "aquagenda-aprov-01",
+      "name": "Novidade do GitHub",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "aquagenda-aquagenda-novidade-post",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "aquagenda-novidade",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "aquagendaNovTok1",
+          "name": "Aquagenda - token da novidade"
+        }
+      }
+    },
+    {
+      "id": "aquagenda-aprov-02",
+      "name": "Guardar pendente",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const CONFIG = {\"grupo\":\"__GRUPO__\",\"numeroPrevia\":\"__NUMERO_PREVIA__\",\"linkAprovar\":\"https://n8n.curtatche.com.br/webhook/aquagenda-aprovar\",\"nomeDoGrupo\":\"AquAgenda\",\"validadeMs\":604800000};\nconst escapar = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst pagina = (titulo, corpo) => '<!doctype html><html lang=\"pt-BR\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta name=\"robots\" content=\"noindex\"><title>' + escapar(titulo) + '</title><style>body{font-family:system-ui,sans-serif;background:#f7f9fb;color:#091426;margin:0;padding:24px}main{max-width:520px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px}h1{font-size:20px;margin:0 0 12px}pre{white-space:pre-wrap;font:inherit;background:#f1f5f9;border-radius:12px;padding:12px;font-size:14px}img{max-width:100%;border-radius:12px;margin:12px 0}button{width:100%;padding:14px;border:0;border-radius:12px;background:#00687a;color:#fff;font-size:16px;font-weight:700}p{font-size:14px;color:#45474c}</style></head><body><main>' + corpo + '</main></body></html>';\nconst dados = $getWorkflowStaticData('global');\ndados.pendentes = dados.pendentes || {};\nconst agora = Date.now();\nfor (const [t, p] of Object.entries(dados.pendentes)) {\n  if (agora - p.criadoEm > CONFIG.validadeMs) delete dados.pendentes[t];\n}\nconst b = $input.first().json.body || {};\nconst valido = typeof b.token === 'string' && /^[A-Za-z0-9_-]{32,}$/.test(b.token)\n  && typeof b.texto === 'string' && b.texto.trim() && b.texto.length <= 1000\n  && typeof b.imagemUrl === 'string' && b.imagemUrl.startsWith('https://raw.githubusercontent.com/Nicevargas/Site_professor/')\n  && Array.isArray(b.videos || [])\n  && (b.videos || []).every((v) => typeof v.url === 'string' && v.url.startsWith('https://raw.githubusercontent.com/Nicevargas/Site_professor/'));\nif (!valido) return [{ json: { ok: false, motivo: 'pedido inválido' } }];\n\n// A mesma novidade de novo: se já foi para o grupo, recusa. Se ainda estava\n// esperando (a prévia pode ter falhado no meio), a nova substitui a antiga e\n// o link antigo deixa de valer.\nfor (const [t, p] of Object.entries(dados.pendentes)) {\n  if (p.id !== b.id) continue;\n  if (p.enviado) return [{ json: { ok: false, motivo: 'novidade já enviada no grupo' } }];\n  delete dados.pendentes[t];\n}\n\ndados.pendentes[b.token] = {\n  id: String(b.id || ''),\n  titulo: String(b.titulo || 'Novidade'),\n  texto: b.texto,\n  imagemUrl: b.imagemUrl,\n  videos: (b.videos || []).map((v) => ({ url: v.url, nome: String(v.nome || 'video.mp4') })),\n  criadoEm: agora,\n  enviado: false,\n};\nreturn [{ json: {\n  ok: true,\n  numero: CONFIG.numeroPrevia,\n  imagemUrl: b.imagemUrl,\n  legenda: '🔎 *PRÉVIA — só você está vendo*\\n\\n' + b.texto,\n  arquivo: b.imagemUrl.split('/').pop(),\n  aviso: '✅ *Para enviar no grupo ' + CONFIG.nomeDoGrupo + '*, abra o link e toque em Enviar no grupo:\\n' + CONFIG.linkAprovar + '?t=' + b.token + '\\n\\nSe não quiser enviar, é só ignorar. O link vale 7 dias.',\n  videos: (b.videos || []).map((v) => ({ url: v.url, nome: String(v.nome || 'video.mp4') })),\n} }];"
+      }
+    },
+    {
+      "id": "aquagenda-aprov-03",
+      "name": "Pedido válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-1",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "aquagenda-aprov-04",
+      "name": "Prévia: imagem e texto",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "evolutionApiKey1",
+          "name": "Evolution API - apikey"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "http://evolution-api:8080/message/sendMedia/curtatche",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $('Guardar pendente').first().json.numero, mediatype: 'image', media: $('Guardar pendente').first().json.imagemUrl, caption: $('Guardar pendente').first().json.legenda, fileName: $('Guardar pendente').first().json.arquivo, delay: 1200 }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      }
+    },
+    {
+      "id": "aquagenda-aprov-05",
+      "name": "Prévia: link de aprovação",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "evolutionApiKey1",
+          "name": "Evolution API - apikey"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "http://evolution-api:8080/message/sendText/curtatche",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $('Guardar pendente').first().json.numero, text: $('Guardar pendente').first().json.aviso, linkPreview: false, delay: 1200 }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      }
+    },
+    {
+      "id": "aquagenda-aprov-06",
+      "name": "Responder ao GitHub",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "aquagenda-aprov-07",
+      "name": "Vídeos da prévia",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const d = $('Guardar pendente').first().json;\nreturn (d.videos || []).map((v) => ({ json: { numero: d.numero, url: v.url, nome: v.nome } }));"
+      }
+    },
+    {
+      "id": "aquagenda-aprov-08",
+      "name": "Prévia: vídeo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "evolutionApiKey1",
+          "name": "Evolution API - apikey"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "http://evolution-api:8080/message/sendMedia/curtatche",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $json.numero, mediatype: 'video', mimetype: 'video/mp4', media: $json.url, fileName: $json.nome, caption: '', delay: 2500 }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      }
+    },
+    {
+      "id": "aquagenda-aprov-09",
+      "name": "Recusar pedido",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        132
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, motivo: $json.motivo }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      }
+    },
+    {
+      "id": "aquagenda-aprov-10",
+      "name": "Abrir aprovação",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        440
+      ],
+      "webhookId": "aquagenda-aquagenda-aprovar-get",
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "aquagenda-aprovar",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "aquagenda-aprov-11",
+      "name": "Montar página",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        440
+      ],
+      "parameters": {
+        "jsCode": "const CONFIG = {\"grupo\":\"__GRUPO__\",\"numeroPrevia\":\"__NUMERO_PREVIA__\",\"linkAprovar\":\"https://n8n.curtatche.com.br/webhook/aquagenda-aprovar\",\"nomeDoGrupo\":\"AquAgenda\",\"validadeMs\":604800000};\nconst escapar = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst pagina = (titulo, corpo) => '<!doctype html><html lang=\"pt-BR\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta name=\"robots\" content=\"noindex\"><title>' + escapar(titulo) + '</title><style>body{font-family:system-ui,sans-serif;background:#f7f9fb;color:#091426;margin:0;padding:24px}main{max-width:520px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px}h1{font-size:20px;margin:0 0 12px}pre{white-space:pre-wrap;font:inherit;background:#f1f5f9;border-radius:12px;padding:12px;font-size:14px}img{max-width:100%;border-radius:12px;margin:12px 0}button{width:100%;padding:14px;border:0;border-radius:12px;background:#00687a;color:#fff;font-size:16px;font-weight:700}p{font-size:14px;color:#45474c}</style></head><body><main>' + corpo + '</main></body></html>';\nconst dados = $getWorkflowStaticData('global');\ndados.pendentes = dados.pendentes || {};\nconst agora = Date.now();\nfor (const [t, p] of Object.entries(dados.pendentes)) {\n  if (agora - p.criadoEm > CONFIG.validadeMs) delete dados.pendentes[t];\n}\nconst t = String(($input.first().json.query || {}).t || '');\nconst p = dados.pendentes[t];\nif (!p) return [{ json: { html: pagina('Link inválido', '<h1>Link inválido ou vencido</h1><p>Esta novidade não está mais esperando aprovação.</p>') } }];\nif (p.enviado) return [{ json: { html: pagina('Já enviada', '<h1>✅ Já foi enviada</h1><p>Esta novidade já está no grupo ' + escapar(CONFIG.nomeDoGrupo) + '.</p>') } }];\nconst videos = p.videos.length ? '<p>Vai junto: ' + p.videos.length + ' vídeo(s): ' + p.videos.map((v) => escapar(v.nome)).join(', ') + '.</p>' : '';\nreturn [{ json: { html: pagina('Enviar no grupo?', '<h1>Enviar no grupo ' + escapar(CONFIG.nomeDoGrupo) + '?</h1><p><strong>' + escapar(p.titulo) + '</strong></p><img src=\"' + escapar(p.imagemUrl) + '\" alt=\"\"><pre>' + escapar(p.texto) + '</pre>' + videos + '<form method=\"post\"><input type=\"hidden\" name=\"t\" value=\"' + escapar(t) + '\"><button type=\"submit\">Enviar no grupo</button></form><p>Para não enviar, é só fechar esta página.</p>') } }];"
+      }
+    },
+    {
+      "id": "aquagenda-aprov-12",
+      "name": "Mostrar página",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        440
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "aquagenda-aprov-13",
+      "name": "Aprovar envio",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        660
+      ],
+      "webhookId": "aquagenda-aquagenda-aprovar-post",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "aquagenda-aprovar",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "aquagenda-aprov-14",
+      "name": "Conferir aprovação",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        660
+      ],
+      "parameters": {
+        "jsCode": "const CONFIG = {\"grupo\":\"__GRUPO__\",\"numeroPrevia\":\"__NUMERO_PREVIA__\",\"linkAprovar\":\"https://n8n.curtatche.com.br/webhook/aquagenda-aprovar\",\"nomeDoGrupo\":\"AquAgenda\",\"validadeMs\":604800000};\nconst escapar = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst pagina = (titulo, corpo) => '<!doctype html><html lang=\"pt-BR\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta name=\"robots\" content=\"noindex\"><title>' + escapar(titulo) + '</title><style>body{font-family:system-ui,sans-serif;background:#f7f9fb;color:#091426;margin:0;padding:24px}main{max-width:520px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px}h1{font-size:20px;margin:0 0 12px}pre{white-space:pre-wrap;font:inherit;background:#f1f5f9;border-radius:12px;padding:12px;font-size:14px}img{max-width:100%;border-radius:12px;margin:12px 0}button{width:100%;padding:14px;border:0;border-radius:12px;background:#00687a;color:#fff;font-size:16px;font-weight:700}p{font-size:14px;color:#45474c}</style></head><body><main>' + corpo + '</main></body></html>';\nconst dados = $getWorkflowStaticData('global');\ndados.pendentes = dados.pendentes || {};\nconst agora = Date.now();\nfor (const [t, p] of Object.entries(dados.pendentes)) {\n  if (agora - p.criadoEm > CONFIG.validadeMs) delete dados.pendentes[t];\n}\nconst entrada = $input.first().json;\nconst t = String((entrada.body || {}).t || (entrada.query || {}).t || '');\nconst p = dados.pendentes[t];\nif (!p) return [{ json: { ok: false, html: pagina('Link inválido', '<h1>Link inválido ou vencido</h1><p>Nada foi enviado.</p>') } }];\nif (p.enviado) return [{ json: { ok: false, html: pagina('Já enviada', '<h1>✅ Já foi enviada</h1><p>Esta novidade já está no grupo. Não enviei de novo.</p>') } }];\n// Marca ANTES de enviar: dois toques seguidos no botão não viram duas mensagens no grupo\np.enviado = true;\np.enviadoEm = agora;\nreturn [{ json: {\n  ok: true,\n  numero: CONFIG.grupo,\n  imagemUrl: p.imagemUrl,\n  legenda: p.texto,\n  arquivo: p.imagemUrl.split('/').pop(),\n  videos: p.videos,\n  html: pagina('Enviada', '<h1>✅ Enviada no grupo ' + escapar(CONFIG.nomeDoGrupo) + '</h1><p>' + escapar(p.titulo) + (p.videos.length ? ' — os vídeos chegam em seguida.' : '') + '</p>'),\n} }];"
+      }
+    },
+    {
+      "id": "aquagenda-aprov-15",
+      "name": "Pode enviar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        660
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-2",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "aquagenda-aprov-16",
+      "name": "Grupo: imagem e texto",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        660
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "evolutionApiKey1",
+          "name": "Evolution API - apikey"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "http://evolution-api:8080/message/sendMedia/curtatche",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $('Conferir aprovação').first().json.numero, mediatype: 'image', media: $('Conferir aprovação').first().json.imagemUrl, caption: $('Conferir aprovação').first().json.legenda, fileName: $('Conferir aprovação').first().json.arquivo, delay: 1200 }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      }
+    },
+    {
+      "id": "aquagenda-aprov-17",
+      "name": "Confirmar envio",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        660
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $('Conferir aprovação').first().json.html }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "aquagenda-aprov-18",
+      "name": "Vídeos do grupo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        660
+      ],
+      "parameters": {
+        "jsCode": "const d = $('Conferir aprovação').first().json;\nreturn (d.videos || []).map((v) => ({ json: { numero: d.numero, url: v.url, nome: v.nome } }));"
+      }
+    },
+    {
+      "id": "aquagenda-aprov-19",
+      "name": "Grupo: vídeo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        660
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "evolutionApiKey1",
+          "name": "Evolution API - apikey"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "http://evolution-api:8080/message/sendMedia/curtatche",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $json.numero, mediatype: 'video', mimetype: 'video/mp4', media: $json.url, fileName: $json.nome, caption: '', delay: 2500 }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      }
+    },
+    {
+      "id": "aquagenda-aprov-20",
+      "name": "Não enviar",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        792
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Novidade do GitHub": {
+      "main": [
+        [
+          {
+            "node": "Guardar pendente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar pendente": {
+      "main": [
+        [
+          {
+            "node": "Pedido válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pedido válido?": {
+      "main": [
+        [
+          {
+            "node": "Prévia: imagem e texto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Recusar pedido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prévia: imagem e texto": {
+      "main": [
+        [
+          {
+            "node": "Prévia: link de aprovação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prévia: link de aprovação": {
+      "main": [
+        [
+          {
+            "node": "Responder ao GitHub",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Responder ao GitHub": {
+      "main": [
+        [
+          {
+            "node": "Vídeos da prévia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vídeos da prévia": {
+      "main": [
+        [
+          {
+            "node": "Prévia: vídeo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Abrir aprovação": {
+      "main": [
+        [
+          {
+            "node": "Montar página",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar página": {
+      "main": [
+        [
+          {
+            "node": "Mostrar página",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aprovar envio": {
+      "main": [
+        [
+          {
+            "node": "Conferir aprovação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conferir aprovação": {
+      "main": [
+        [
+          {
+            "node": "Pode enviar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pode enviar?": {
+      "main": [
+        [
+          {
+            "node": "Grupo: imagem e texto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Não enviar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Grupo: imagem e texto": {
+      "main": [
+        [
+          {
+            "node": "Confirmar envio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirmar envio": {
+      "main": [
+        [
+          {
+            "node": "Vídeos do grupo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vídeos do grupo": {
+      "main": [
+        [
+          {
+            "node": "Grupo: vídeo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

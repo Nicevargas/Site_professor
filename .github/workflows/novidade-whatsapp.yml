@@ -31,7 +31,7 @@ jobs:
           node-version: 22
 
       - name: Conferir as regras do aviso
-        run: node --test automacoes/whatsapp/aviso.teste.mjs
+        run: node --test automacoes/whatsapp/aviso.teste.mjs automacoes/aprovacao/fluxo.teste.mjs
 
       - name: Abrir o aviso para enviar no grupo
         env:
@@ -39,3 +39,14 @@ jobs:
           ANTES: ${{ github.event.before }}
           RESPONSAVEL: Nicevargas
         run: node automacoes/whatsapp/avisar.mjs
+
+      # Prévia no WhatsApp da Nice, com link de aprovação (automacoes/aprovacao).
+      # Sem os dois segredos, o passo só avisa que está desligado. Se o n8n
+      # falhar, a issue acima já foi aberta: o envio manual continua valendo.
+      - name: Mandar a prévia para aprovação no WhatsApp
+        continue-on-error: true
+        env:
+          N8N_NOVIDADE_URL: ${{ secrets.N8N_NOVIDADE_URL }}
+          N8N_NOVIDADE_TOKEN: ${{ secrets.N8N_NOVIDADE_TOKEN }}
+          ANTES: ${{ github.event.before }}
+        run: node automacoes/aprovacao/enviar-previa.mjs
