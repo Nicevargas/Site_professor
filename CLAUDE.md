@@ -14,6 +14,8 @@ Toda alteração publicada que o professor percebe (tela nova, mudança no jeito
 - nunca crie arquivo de novidade de teste ou rascunho no `main`;
 - nunca envie mensagem por outra via.
 
+**Prévia com aprovação (desde 09/10/2026):** além da issue, o GitHub avisa o n8n da VPS (`automacoes/aprovacao/README.md`). A Nice recebe uma prévia no WhatsApp do número curtatche com um link; só quando ela toca em **Enviar no grupo** a novidade vai para o grupo AquAgenda, com os vídeos da seção opcional `## Vídeos`. O repositório é público: vídeo em `novidades/videos/` fica público, então só versões sem dado pessoal.
+
 Alteração que o professor não vê não gera post.
 
 Escrever sempre em português simples, com o nome dos botões exatamente como aparecem na tela.

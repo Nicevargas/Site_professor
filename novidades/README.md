@@ -37,6 +37,17 @@ Dúvidas? É só responder aqui no grupo. 💬
 imagens/AAAA-MM-DD-assunto.png: <o que o print mostra>
 ```
 
+## Vídeos (opcional)
+
+Para mandar vídeo junto, coloque o `.mp4` (até 16 MB) em `novidades/videos/` e acrescente no fim do arquivo:
+
+```markdown
+## Vídeos
+videos/AAAA-MM-DD-assunto.mp4: <o que o vídeo mostra>
+```
+
+Os vídeos só vão pelo envio com aprovação (`automacoes/aprovacao/README.md`); o botão da issue manda só imagem e texto. **O repositório é público: o vídeo fica público.** Nunca dado real de aluno, conta bancária, e-mail, telefone ou chave.
+
 ## Regras do texto
 
 - Português simples, sem termo técnico.
