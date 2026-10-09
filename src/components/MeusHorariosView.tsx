@@ -288,8 +288,13 @@ export const MeusHorariosView: React.FC<MeusHorariosViewProps> = ({ currentTeach
         })}
       </div>
 
-      {/* Barra de salvar: sempre à vista, a tela é comprida */}
-      <div className="sticky bottom-0 -mx-4 md:-mx-8 px-4 md:px-8 py-3 bg-white/95 backdrop-blur border-t border-slate-200">
+      {/*
+        Barra de salvar: sempre à vista, a tela é comprida.
+        No celular ela sobe 12: os 16 do menu fixo de baixo menos os 4 de respiro do
+        conteúdo, para encostar no menu (SideNav). Colada no fundo, o menu ficava por cima e o professor
+        não achava o "Salvar horários" -- só no modo computador, onde o menu some.
+      */}
+      <div className="sticky bottom-12 md:bottom-0 -mx-4 md:-mx-8 px-4 md:px-8 py-3 bg-white/95 backdrop-blur border-t border-slate-200">
         <div className="max-w-3xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="text-xs min-w-0 flex-1">
             {estado === 'salvo' && (

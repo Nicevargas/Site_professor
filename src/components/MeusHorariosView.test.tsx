@@ -123,6 +123,14 @@ describe('tela de horários de aula', () => {
     expect(dia('Segunda').getByText('07:00')).toBeInTheDocument();
   });
 
+  it('no celular a barra de salvar fica acima do menu fixo de baixo', () => {
+    montar({});
+    // O menu de baixo (SideNav) fica por cima de tudo: colada
+    // no fundo, a barra sumia atrás dele e o professor não achava o botão
+    const barra = screen.getByRole('button', { name: /salvar horários/i }).closest('.sticky');
+    expect(barra).toHaveClass('bottom-12', 'md:bottom-0');
+  });
+
   it('grade sem nenhum horário avisa que o agendamento fica fechado', () => {
     montar({});
     expect(screen.getByText(/agendamento pelo site fica fechado/i)).toBeInTheDocument();

@@ -2,6 +2,26 @@ import React, { useState, useEffect } from 'react';
 import { ServiceItem, StudentLevel, STUDENT_LEVEL_LABELS } from '../types';
 import { X, Dumbbell, Waves, Activity, GraduationCap, Calculator, Sparkles } from 'lucide-react';
 
+/** Durações oferecidas na lista. Qualquer outra entra por "Outra duração…". */
+export const DURACOES_PADRAO = [20, 30, 40, 45, 50, 60, 75, 90, 120];
+const DURACAO_MIN = 5;
+const DURACAO_MAX = 240;
+const CAPACIDADE_MAX = 60;
+
+const rotuloDaDuracao = (min: number) => {
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const resto = min % 60;
+  return `${min} min (${h}h${resto ? String(resto).padStart(2, '0') : ''})`;
+};
+
+/** Número inteiro dentro da faixa; texto vazio ou inválido vira o padrão. */
+const inteiroNaFaixa = (texto: string, min: number, max: number, padrao: number) => {
+  const n = Math.round(Number(texto.replace(',', '.')));
+  if (!texto.trim() || !Number.isFinite(n)) return padrao;
+  return Math.min(max, Math.max(min, n));
+};
+
 interface ServiceModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -19,34 +39,45 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
 
   const [name, setName] = useState(editingService?.name || '');
   const [description, setDescription] = useState(editingService?.description || '');
-  const [price, setPrice] = useState(editingService?.price || 150);
+  // Valor, limite e duração livre ficam como TEXTO enquanto a pessoa digita.
+  // Guardados como número, apagar o "1" devolvia 1 na hora e digitar 5 virava
+  // 15: no celular não dava para trocar o limite de alunos.
+  const [price, setPrice] = useState(String(editingService?.price ?? 150));
   const [durationMinutes, setDurationMinutes] = useState(editingService?.durationMinutes || 60);
+  const [duracaoLivre, setDuracaoLivre] = useState(
+    Boolean(editingService && !DURACOES_PADRAO.includes(editingService.durationMinutes))
+  );
+  const [duracaoDigitada, setDuracaoDigitada] = useState(String(editingService?.durationMinutes || ''));
   const [modality, setModality] = useState(editingService?.modality || 'Online / Presencial');
   const [iconName, setIconName] = useState<ServiceItem['iconName']>(editingService?.iconName || 'school');
   const [active, setActive] = useState(editingService ? editingService.active : true);
-  const [capacity, setCapacity] = useState(editingService?.capacity || 1);
+  const [capacity, setCapacity] = useState(String(editingService?.capacity || 1));
   const [levels, setLevels] = useState<StudentLevel[]>(editingService?.levels || []);
 
   useEffect(() => {
     if (editingService) {
       setName(editingService.name);
       setDescription(editingService.description);
-      setPrice(editingService.price);
+      setPrice(String(editingService.price ?? 150));
       setDurationMinutes(editingService.durationMinutes);
+      setDuracaoLivre(!DURACOES_PADRAO.includes(editingService.durationMinutes));
+      setDuracaoDigitada(String(editingService.durationMinutes || ''));
       setModality(editingService.modality);
       setIconName(editingService.iconName);
       setActive(editingService.active);
-      setCapacity(editingService.capacity || 1);
+      setCapacity(String(editingService.capacity || 1));
       setLevels(editingService.levels || []);
     } else {
       setName('');
       setDescription('');
-      setPrice(150);
+      setPrice('150');
       setDurationMinutes(60);
+      setDuracaoLivre(false);
+      setDuracaoDigitada('');
       setModality('Online / Presencial');
       setIconName('school');
       setActive(true);
-      setCapacity(1);
+      setCapacity('1');
       setLevels([]);
     }
   }, [editingService]);
@@ -59,12 +90,15 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
       id: editingService ? editingService.id : `serv-${Date.now()}`,
       name: name.trim(),
       description: description.trim() || 'Serviço personalizado com metodologia exclusiva.',
-      price: Number(price),
-      durationMinutes: Number(durationMinutes),
+      // R$ 0 é aula gratuita: só o campo vazio ou negativo vira 0
+      price: Math.max(0, Number(price.replace(',', '.')) || 0),
+      durationMinutes: duracaoLivre
+        ? inteiroNaFaixa(duracaoDigitada, DURACAO_MIN, DURACAO_MAX, 60)
+        : Number(durationMinutes),
       modality: modality as any,
       iconName,
       active,
-      capacity: Math.max(1, Number(capacity) || 1),
+      capacity: inteiroNaFaixa(capacity, 1, CAPACIDADE_MAX, 1),
       levels: levels.length ? levels : undefined,
     };
 
@@ -74,7 +108,8 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in">
-      <div className="bg-white rounded-2xl max-w-lg w-full p-6 md:p-8 shadow-2xl border border-slate-200">
+      {/* Rolagem própria: com o teclado do celular aberto, o "Salvar Serviço" saía da tela */}
+      <div className="bg-white rounded-2xl max-w-lg w-full p-6 md:p-8 shadow-2xl border border-slate-200 max-h-[90dvh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-[#091426]">
             {editingService ? 'Editar Serviço' : 'Novo Serviço'}
@@ -114,34 +149,58 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor="svc-price" className="block text-xs font-semibold text-slate-700 mb-1">
                 Valor (R$) *
               </label>
               <input
+                id="svc-price"
                 type="number"
+                inputMode="decimal"
                 min="0"
+                step="any"
                 required
                 value={price}
-                onChange={(e) => setPrice(Number(e.target.value))}
+                onChange={(e) => setPrice(e.target.value)}
                 className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-[#00687a]"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor="svc-duration" className="block text-xs font-semibold text-slate-700 mb-1">
                 Duração (minutos)
               </label>
               <select
-                value={durationMinutes}
-                onChange={(e) => setDurationMinutes(Number(e.target.value))}
+                id="svc-duration"
+                value={duracaoLivre ? 'outra' : durationMinutes}
+                onChange={(e) => {
+                  if (e.target.value === 'outra') {
+                    setDuracaoLivre(true);
+                    setDuracaoDigitada((atual) => atual || String(durationMinutes));
+                  } else {
+                    setDuracaoLivre(false);
+                    setDurationMinutes(Number(e.target.value));
+                  }
+                }}
                 className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-[#00687a]"
               >
-                <option value={30}>30 min</option>
-                <option value={45}>45 min</option>
-                <option value={60}>60 min (1h)</option>
-                <option value={90}>90 min (1h30)</option>
-                <option value={120}>120 min (2h)</option>
+                {DURACOES_PADRAO.map((min) => (
+                  <option key={min} value={min}>{rotuloDaDuracao(min)}</option>
+                ))}
+                <option value="outra">Outra duração…</option>
               </select>
+              {duracaoLivre && (
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={DURACAO_MIN}
+                  max={DURACAO_MAX}
+                  aria-label="Duração em minutos"
+                  placeholder="Ex.: 35"
+                  value={duracaoDigitada}
+                  onChange={(e) => setDuracaoDigitada(e.target.value)}
+                  className="w-full mt-2 p-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-[#00687a]"
+                />
+              )}
             </div>
           </div>
 
@@ -153,10 +212,11 @@ export const ServiceModal: React.FC<ServiceModalProps> = ({
               <input
                 id="svc-capacity"
                 type="number"
+                inputMode="numeric"
                 min="1"
-                max="60"
+                max={CAPACIDADE_MAX}
                 value={capacity}
-                onChange={(e) => setCapacity(Math.max(1, Number(e.target.value) || 1))}
+                onChange={(e) => setCapacity(e.target.value)}
                 className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:border-[#00687a]"
               />
               <p className="text-[11px] text-slate-400 mt-1">
