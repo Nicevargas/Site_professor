@@ -35,7 +35,7 @@
         0
       ],
       "parameters": {
-        "jsCode": "const CONFIG = {\"grupo\":\"__GRUPO__\",\"numeroPrevia\":\"__NUMERO_PREVIA__\",\"linkAprovar\":\"https://n8n.curtatche.com.br/webhook/aquagenda-aprovar\",\"nomeDoGrupo\":\"AquAgenda\",\"validadeMs\":604800000};\nconst escapar = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst pagina = (titulo, corpo) => '<!doctype html><html lang=\"pt-BR\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta name=\"robots\" content=\"noindex\"><title>' + escapar(titulo) + '</title><style>body{font-family:system-ui,sans-serif;background:#f7f9fb;color:#091426;margin:0;padding:24px}main{max-width:520px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px}h1{font-size:20px;margin:0 0 12px}pre{white-space:pre-wrap;font:inherit;background:#f1f5f9;border-radius:12px;padding:12px;font-size:14px}img{max-width:100%;border-radius:12px;margin:12px 0}button{width:100%;padding:14px;border:0;border-radius:12px;background:#00687a;color:#fff;font-size:16px;font-weight:700}p{font-size:14px;color:#45474c}</style></head><body><main>' + corpo + '</main></body></html>';\nconst dados = $getWorkflowStaticData('global');\ndados.pendentes = dados.pendentes || {};\nconst agora = Date.now();\nfor (const [t, p] of Object.entries(dados.pendentes)) {\n  if (agora - p.criadoEm > CONFIG.validadeMs) delete dados.pendentes[t];\n}\nconst b = $input.first().json.body || {};\nconst valido = typeof b.token === 'string' && /^[A-Za-z0-9_-]{32,}$/.test(b.token)\n  && typeof b.texto === 'string' && b.texto.trim() && b.texto.length <= 1000\n  && typeof b.imagemUrl === 'string' && b.imagemUrl.startsWith('https://raw.githubusercontent.com/Nicevargas/Site_professor/')\n  && Array.isArray(b.videos || [])\n  && (b.videos || []).every((v) => typeof v.url === 'string' && v.url.startsWith('https://raw.githubusercontent.com/Nicevargas/Site_professor/'));\nif (!valido) return [{ json: { ok: false, motivo: 'pedido inválido' } }];\n\n// A mesma novidade de novo: se já foi para o grupo, recusa. Se ainda estava\n// esperando (a prévia pode ter falhado no meio), a nova substitui a antiga e\n// o link antigo deixa de valer.\nfor (const [t, p] of Object.entries(dados.pendentes)) {\n  if (p.id !== b.id) continue;\n  if (p.enviado) return [{ json: { ok: false, motivo: 'novidade já enviada no grupo' } }];\n  delete dados.pendentes[t];\n}\n\ndados.pendentes[b.token] = {\n  id: String(b.id || ''),\n  titulo: String(b.titulo || 'Novidade'),\n  texto: b.texto,\n  imagemUrl: b.imagemUrl,\n  videos: (b.videos || []).map((v) => ({ url: v.url, nome: String(v.nome || 'video.mp4') })),\n  criadoEm: agora,\n  enviado: false,\n};\nreturn [{ json: {\n  ok: true,\n  numero: CONFIG.numeroPrevia,\n  imagemUrl: b.imagemUrl,\n  legenda: '🔎 *PRÉVIA — só você está vendo*\\n\\n' + b.texto,\n  arquivo: b.imagemUrl.split('/').pop(),\n  aviso: '✅ *Para enviar no grupo ' + CONFIG.nomeDoGrupo + '*, abra o link e toque em Enviar no grupo:\\n' + CONFIG.linkAprovar + '?t=' + b.token + '\\n\\nSe não quiser enviar, é só ignorar. O link vale 7 dias.',\n  videos: (b.videos || []).map((v) => ({ url: v.url, nome: String(v.nome || 'video.mp4') })),\n} }];"
+        "jsCode": "const CONFIG = {\"grupo\":\"__GRUPO__\",\"numeroPrevia\":\"__NUMERO_PREVIA__\",\"linkAprovar\":\"https://n8n.curtatche.com.br/webhook/aquagenda-aprovar\",\"nomeDoGrupo\":\"AquAgenda\",\"validadeMs\":604800000};\nconst escapar = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst pagina = (titulo, corpo) => '<!doctype html><html lang=\"pt-BR\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta name=\"robots\" content=\"noindex\"><title>' + escapar(titulo) + '</title><style>body{font-family:system-ui,sans-serif;background:#f7f9fb;color:#091426;margin:0;padding:24px}main{max-width:520px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px}h1{font-size:20px;margin:0 0 12px}pre{white-space:pre-wrap;font:inherit;background:#f1f5f9;border-radius:12px;padding:12px;font-size:14px}img{max-width:100%;border-radius:12px;margin:12px 0}button{width:100%;padding:14px;border:0;border-radius:12px;background:#00687a;color:#fff;font-size:16px;font-weight:700}p{font-size:14px;color:#45474c}</style></head><body><main>' + corpo + '</main></body></html>';\n// Anexos que seguem depois da imagem principal: mais imagens e vídeos\nconst TIPOS = { image: ['image/png', 'image/jpeg', 'image/webp'], video: ['video/mp4'] };\nconst anexosValidos = (lista) => Array.isArray(lista) && lista.length <= 10 && lista.every((a) => a\n  && typeof a.url === 'string' && a.url.startsWith('https://raw.githubusercontent.com/Nicevargas/Site_professor/')\n  && TIPOS[a.tipo] && TIPOS[a.tipo].includes(a.mime));\nconst limparAnexos = (lista) => (lista || []).map((a) => ({ url: a.url, nome: String(a.nome || 'arquivo'), tipo: a.tipo, mime: a.mime }));\nconst resumoDosAnexos = (lista) => {\n  const imagens = lista.filter((a) => a.tipo === 'image').length;\n  const videos = lista.filter((a) => a.tipo === 'video').length;\n  return [imagens ? imagens + ' imagem(ns)' : '', videos ? videos + ' vídeo(s)' : ''].filter(Boolean).join(' e ');\n};\nconst dados = $getWorkflowStaticData('global');\ndados.pendentes = dados.pendentes || {};\nconst agora = Date.now();\nfor (const [t, p] of Object.entries(dados.pendentes)) {\n  if (agora - p.criadoEm > CONFIG.validadeMs) delete dados.pendentes[t];\n  // Pendente guardado antes de existirem anexos\n  else p.anexos = p.anexos || [];\n}\nconst b = $input.first().json.body || {};\nconst valido = typeof b.token === 'string' && /^[A-Za-z0-9_-]{32,}$/.test(b.token)\n  && typeof b.texto === 'string' && b.texto.trim() && b.texto.length <= 1000\n  && typeof b.imagemUrl === 'string' && b.imagemUrl.startsWith('https://raw.githubusercontent.com/Nicevargas/Site_professor/')\n  && anexosValidos(b.anexos || []);\nif (!valido) return [{ json: { ok: false, motivo: 'pedido inválido' } }];\n\n// A mesma novidade de novo: se já foi para o grupo, recusa. Se ainda estava\n// esperando (a prévia pode ter falhado no meio), a nova substitui a antiga e\n// o link antigo deixa de valer.\nfor (const [t, p] of Object.entries(dados.pendentes)) {\n  if (p.id !== b.id) continue;\n  if (p.enviado) return [{ json: { ok: false, motivo: 'novidade já enviada no grupo' } }];\n  delete dados.pendentes[t];\n}\n\ndados.pendentes[b.token] = {\n  id: String(b.id || ''),\n  titulo: String(b.titulo || 'Novidade'),\n  texto: b.texto,\n  imagemUrl: b.imagemUrl,\n  anexos: limparAnexos(b.anexos),\n  criadoEm: agora,\n  enviado: false,\n};\nreturn [{ json: {\n  ok: true,\n  numero: CONFIG.numeroPrevia,\n  imagemUrl: b.imagemUrl,\n  legenda: '🔎 *PRÉVIA — só você está vendo*\\n\\n' + b.texto,\n  arquivo: b.imagemUrl.split('/').pop(),\n  aviso: '✅ *Para enviar no grupo ' + CONFIG.nomeDoGrupo + '*, abra o link e toque em Enviar no grupo:\\n' + CONFIG.linkAprovar + '?t=' + b.token + '\\n\\nSe não quiser enviar, é só ignorar. O link vale 7 dias.',\n  anexos: limparAnexos(b.anexos),\n} }];"
       }
     },
     {
@@ -147,7 +147,7 @@
     },
     {
       "id": "aquagenda-aprov-07",
-      "name": "Vídeos da prévia",
+      "name": "Anexos da prévia",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -155,12 +155,12 @@
         0
       ],
       "parameters": {
-        "jsCode": "const d = $('Guardar pendente').first().json;\nreturn (d.videos || []).map((v) => ({ json: { numero: d.numero, url: v.url, nome: v.nome } }));"
+        "jsCode": "const d = $('Guardar pendente').first().json;\nreturn (d.anexos || []).map((a) => ({ json: { numero: d.numero, url: a.url, nome: a.nome, tipo: a.tipo, mime: a.mime } }));"
       }
     },
     {
       "id": "aquagenda-aprov-08",
-      "name": "Prévia: vídeo",
+      "name": "Prévia: anexo",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -180,7 +180,7 @@
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ number: $json.numero, mediatype: 'video', mimetype: 'video/mp4', media: $json.url, fileName: $json.nome, caption: '', delay: 2500 }) }}",
+        "jsonBody": "={{ JSON.stringify({ number: $json.numero, mediatype: $json.tipo, mimetype: $json.mime, media: $json.url, fileName: $json.nome, caption: '', delay: 2500 }) }}",
         "options": {
           "timeout": 120000
         }
@@ -230,7 +230,7 @@
         440
       ],
       "parameters": {
-        "jsCode": "const CONFIG = {\"grupo\":\"__GRUPO__\",\"numeroPrevia\":\"__NUMERO_PREVIA__\",\"linkAprovar\":\"https://n8n.curtatche.com.br/webhook/aquagenda-aprovar\",\"nomeDoGrupo\":\"AquAgenda\",\"validadeMs\":604800000};\nconst escapar = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst pagina = (titulo, corpo) => '<!doctype html><html lang=\"pt-BR\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta name=\"robots\" content=\"noindex\"><title>' + escapar(titulo) + '</title><style>body{font-family:system-ui,sans-serif;background:#f7f9fb;color:#091426;margin:0;padding:24px}main{max-width:520px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px}h1{font-size:20px;margin:0 0 12px}pre{white-space:pre-wrap;font:inherit;background:#f1f5f9;border-radius:12px;padding:12px;font-size:14px}img{max-width:100%;border-radius:12px;margin:12px 0}button{width:100%;padding:14px;border:0;border-radius:12px;background:#00687a;color:#fff;font-size:16px;font-weight:700}p{font-size:14px;color:#45474c}</style></head><body><main>' + corpo + '</main></body></html>';\nconst dados = $getWorkflowStaticData('global');\ndados.pendentes = dados.pendentes || {};\nconst agora = Date.now();\nfor (const [t, p] of Object.entries(dados.pendentes)) {\n  if (agora - p.criadoEm > CONFIG.validadeMs) delete dados.pendentes[t];\n}\nconst t = String(($input.first().json.query || {}).t || '');\nconst p = dados.pendentes[t];\nif (!p) return [{ json: { html: pagina('Link inválido', '<h1>Link inválido ou vencido</h1><p>Esta novidade não está mais esperando aprovação.</p>') } }];\nif (p.enviado) return [{ json: { html: pagina('Já enviada', '<h1>✅ Já foi enviada</h1><p>Esta novidade já está no grupo ' + escapar(CONFIG.nomeDoGrupo) + '.</p>') } }];\nconst videos = p.videos.length ? '<p>Vai junto: ' + p.videos.length + ' vídeo(s): ' + p.videos.map((v) => escapar(v.nome)).join(', ') + '.</p>' : '';\nreturn [{ json: { html: pagina('Enviar no grupo?', '<h1>Enviar no grupo ' + escapar(CONFIG.nomeDoGrupo) + '?</h1><p><strong>' + escapar(p.titulo) + '</strong></p><img src=\"' + escapar(p.imagemUrl) + '\" alt=\"\"><pre>' + escapar(p.texto) + '</pre>' + videos + '<form method=\"post\"><input type=\"hidden\" name=\"t\" value=\"' + escapar(t) + '\"><button type=\"submit\">Enviar no grupo</button></form><p>Para não enviar, é só fechar esta página.</p>') } }];"
+        "jsCode": "const CONFIG = {\"grupo\":\"__GRUPO__\",\"numeroPrevia\":\"__NUMERO_PREVIA__\",\"linkAprovar\":\"https://n8n.curtatche.com.br/webhook/aquagenda-aprovar\",\"nomeDoGrupo\":\"AquAgenda\",\"validadeMs\":604800000};\nconst escapar = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst pagina = (titulo, corpo) => '<!doctype html><html lang=\"pt-BR\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta name=\"robots\" content=\"noindex\"><title>' + escapar(titulo) + '</title><style>body{font-family:system-ui,sans-serif;background:#f7f9fb;color:#091426;margin:0;padding:24px}main{max-width:520px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px}h1{font-size:20px;margin:0 0 12px}pre{white-space:pre-wrap;font:inherit;background:#f1f5f9;border-radius:12px;padding:12px;font-size:14px}img{max-width:100%;border-radius:12px;margin:12px 0}button{width:100%;padding:14px;border:0;border-radius:12px;background:#00687a;color:#fff;font-size:16px;font-weight:700}p{font-size:14px;color:#45474c}</style></head><body><main>' + corpo + '</main></body></html>';\n// Anexos que seguem depois da imagem principal: mais imagens e vídeos\nconst TIPOS = { image: ['image/png', 'image/jpeg', 'image/webp'], video: ['video/mp4'] };\nconst anexosValidos = (lista) => Array.isArray(lista) && lista.length <= 10 && lista.every((a) => a\n  && typeof a.url === 'string' && a.url.startsWith('https://raw.githubusercontent.com/Nicevargas/Site_professor/')\n  && TIPOS[a.tipo] && TIPOS[a.tipo].includes(a.mime));\nconst limparAnexos = (lista) => (lista || []).map((a) => ({ url: a.url, nome: String(a.nome || 'arquivo'), tipo: a.tipo, mime: a.mime }));\nconst resumoDosAnexos = (lista) => {\n  const imagens = lista.filter((a) => a.tipo === 'image').length;\n  const videos = lista.filter((a) => a.tipo === 'video').length;\n  return [imagens ? imagens + ' imagem(ns)' : '', videos ? videos + ' vídeo(s)' : ''].filter(Boolean).join(' e ');\n};\nconst dados = $getWorkflowStaticData('global');\ndados.pendentes = dados.pendentes || {};\nconst agora = Date.now();\nfor (const [t, p] of Object.entries(dados.pendentes)) {\n  if (agora - p.criadoEm > CONFIG.validadeMs) delete dados.pendentes[t];\n  // Pendente guardado antes de existirem anexos\n  else p.anexos = p.anexos || [];\n}\nconst t = String(($input.first().json.query || {}).t || '');\nconst p = dados.pendentes[t];\nif (!p) return [{ json: { html: pagina('Link inválido', '<h1>Link inválido ou vencido</h1><p>Esta novidade não está mais esperando aprovação.</p>') } }];\nif (p.enviado) return [{ json: { html: pagina('Já enviada', '<h1>✅ Já foi enviada</h1><p>Esta novidade já está no grupo ' + escapar(CONFIG.nomeDoGrupo) + '.</p>') } }];\nconst anexos = p.anexos.length ? '<p>Vai junto: ' + resumoDosAnexos(p.anexos) + '.</p>' + p.anexos.filter((a) => a.tipo === 'image').map((a) => '<img src=\"' + escapar(a.url) + '\" alt=\"\">').join('') : '';\nreturn [{ json: { html: pagina('Enviar no grupo?', '<h1>Enviar no grupo ' + escapar(CONFIG.nomeDoGrupo) + '?</h1><p><strong>' + escapar(p.titulo) + '</strong></p><img src=\"' + escapar(p.imagemUrl) + '\" alt=\"\"><pre>' + escapar(p.texto) + '</pre>' + anexos + '<form method=\"post\"><input type=\"hidden\" name=\"t\" value=\"' + escapar(t) + '\"><button type=\"submit\">Enviar no grupo</button></form><p>Para não enviar, é só fechar esta página.</p>') } }];"
       }
     },
     {
@@ -285,7 +285,7 @@
         660
       ],
       "parameters": {
-        "jsCode": "const CONFIG = {\"grupo\":\"__GRUPO__\",\"numeroPrevia\":\"__NUMERO_PREVIA__\",\"linkAprovar\":\"https://n8n.curtatche.com.br/webhook/aquagenda-aprovar\",\"nomeDoGrupo\":\"AquAgenda\",\"validadeMs\":604800000};\nconst escapar = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst pagina = (titulo, corpo) => '<!doctype html><html lang=\"pt-BR\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta name=\"robots\" content=\"noindex\"><title>' + escapar(titulo) + '</title><style>body{font-family:system-ui,sans-serif;background:#f7f9fb;color:#091426;margin:0;padding:24px}main{max-width:520px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px}h1{font-size:20px;margin:0 0 12px}pre{white-space:pre-wrap;font:inherit;background:#f1f5f9;border-radius:12px;padding:12px;font-size:14px}img{max-width:100%;border-radius:12px;margin:12px 0}button{width:100%;padding:14px;border:0;border-radius:12px;background:#00687a;color:#fff;font-size:16px;font-weight:700}p{font-size:14px;color:#45474c}</style></head><body><main>' + corpo + '</main></body></html>';\nconst dados = $getWorkflowStaticData('global');\ndados.pendentes = dados.pendentes || {};\nconst agora = Date.now();\nfor (const [t, p] of Object.entries(dados.pendentes)) {\n  if (agora - p.criadoEm > CONFIG.validadeMs) delete dados.pendentes[t];\n}\nconst entrada = $input.first().json;\nconst t = String((entrada.body || {}).t || (entrada.query || {}).t || '');\nconst p = dados.pendentes[t];\nif (!p) return [{ json: { ok: false, html: pagina('Link inválido', '<h1>Link inválido ou vencido</h1><p>Nada foi enviado.</p>') } }];\nif (p.enviado) return [{ json: { ok: false, html: pagina('Já enviada', '<h1>✅ Já foi enviada</h1><p>Esta novidade já está no grupo. Não enviei de novo.</p>') } }];\n// Marca ANTES de enviar: dois toques seguidos no botão não viram duas mensagens no grupo\np.enviado = true;\np.enviadoEm = agora;\nreturn [{ json: {\n  ok: true,\n  numero: CONFIG.grupo,\n  imagemUrl: p.imagemUrl,\n  legenda: p.texto,\n  arquivo: p.imagemUrl.split('/').pop(),\n  videos: p.videos,\n  html: pagina('Enviada', '<h1>✅ Enviada no grupo ' + escapar(CONFIG.nomeDoGrupo) + '</h1><p>' + escapar(p.titulo) + (p.videos.length ? ' — os vídeos chegam em seguida.' : '') + '</p>'),\n} }];"
+        "jsCode": "const CONFIG = {\"grupo\":\"__GRUPO__\",\"numeroPrevia\":\"__NUMERO_PREVIA__\",\"linkAprovar\":\"https://n8n.curtatche.com.br/webhook/aquagenda-aprovar\",\"nomeDoGrupo\":\"AquAgenda\",\"validadeMs\":604800000};\nconst escapar = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst pagina = (titulo, corpo) => '<!doctype html><html lang=\"pt-BR\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta name=\"robots\" content=\"noindex\"><title>' + escapar(titulo) + '</title><style>body{font-family:system-ui,sans-serif;background:#f7f9fb;color:#091426;margin:0;padding:24px}main{max-width:520px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px}h1{font-size:20px;margin:0 0 12px}pre{white-space:pre-wrap;font:inherit;background:#f1f5f9;border-radius:12px;padding:12px;font-size:14px}img{max-width:100%;border-radius:12px;margin:12px 0}button{width:100%;padding:14px;border:0;border-radius:12px;background:#00687a;color:#fff;font-size:16px;font-weight:700}p{font-size:14px;color:#45474c}</style></head><body><main>' + corpo + '</main></body></html>';\n// Anexos que seguem depois da imagem principal: mais imagens e vídeos\nconst TIPOS = { image: ['image/png', 'image/jpeg', 'image/webp'], video: ['video/mp4'] };\nconst anexosValidos = (lista) => Array.isArray(lista) && lista.length <= 10 && lista.every((a) => a\n  && typeof a.url === 'string' && a.url.startsWith('https://raw.githubusercontent.com/Nicevargas/Site_professor/')\n  && TIPOS[a.tipo] && TIPOS[a.tipo].includes(a.mime));\nconst limparAnexos = (lista) => (lista || []).map((a) => ({ url: a.url, nome: String(a.nome || 'arquivo'), tipo: a.tipo, mime: a.mime }));\nconst resumoDosAnexos = (lista) => {\n  const imagens = lista.filter((a) => a.tipo === 'image').length;\n  const videos = lista.filter((a) => a.tipo === 'video').length;\n  return [imagens ? imagens + ' imagem(ns)' : '', videos ? videos + ' vídeo(s)' : ''].filter(Boolean).join(' e ');\n};\nconst dados = $getWorkflowStaticData('global');\ndados.pendentes = dados.pendentes || {};\nconst agora = Date.now();\nfor (const [t, p] of Object.entries(dados.pendentes)) {\n  if (agora - p.criadoEm > CONFIG.validadeMs) delete dados.pendentes[t];\n  // Pendente guardado antes de existirem anexos\n  else p.anexos = p.anexos || [];\n}\nconst entrada = $input.first().json;\nconst t = String((entrada.body || {}).t || (entrada.query || {}).t || '');\nconst p = dados.pendentes[t];\nif (!p) return [{ json: { ok: false, html: pagina('Link inválido', '<h1>Link inválido ou vencido</h1><p>Nada foi enviado.</p>') } }];\nif (p.enviado) return [{ json: { ok: false, html: pagina('Já enviada', '<h1>✅ Já foi enviada</h1><p>Esta novidade já está no grupo. Não enviei de novo.</p>') } }];\n// Marca ANTES de enviar: dois toques seguidos no botão não viram duas mensagens no grupo\np.enviado = true;\np.enviadoEm = agora;\nreturn [{ json: {\n  ok: true,\n  numero: CONFIG.grupo,\n  imagemUrl: p.imagemUrl,\n  legenda: p.texto,\n  arquivo: p.imagemUrl.split('/').pop(),\n  anexos: p.anexos,\n  html: pagina('Enviada', '<h1>✅ Enviada no grupo ' + escapar(CONFIG.nomeDoGrupo) + '</h1><p>' + escapar(p.titulo) + (p.anexos.length ? ' — ' + resumoDosAnexos(p.anexos) + ' chegam em seguida.' : '') + '</p>'),\n} }];"
       }
     },
     {
@@ -377,7 +377,7 @@
     },
     {
       "id": "aquagenda-aprov-18",
-      "name": "Vídeos do grupo",
+      "name": "Anexos do grupo",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -385,12 +385,12 @@
         660
       ],
       "parameters": {
-        "jsCode": "const d = $('Conferir aprovação').first().json;\nreturn (d.videos || []).map((v) => ({ json: { numero: d.numero, url: v.url, nome: v.nome } }));"
+        "jsCode": "const d = $('Conferir aprovação').first().json;\nreturn (d.anexos || []).map((a) => ({ json: { numero: d.numero, url: a.url, nome: a.nome, tipo: a.tipo, mime: a.mime } }));"
       }
     },
     {
       "id": "aquagenda-aprov-19",
-      "name": "Grupo: vídeo",
+      "name": "Grupo: anexo",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -410,7 +410,7 @@
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ number: $json.numero, mediatype: 'video', mimetype: 'video/mp4', media: $json.url, fileName: $json.nome, caption: '', delay: 2500 }) }}",
+        "jsonBody": "={{ JSON.stringify({ number: $json.numero, mediatype: $json.tipo, mimetype: $json.mime, media: $json.url, fileName: $json.nome, caption: '', delay: 2500 }) }}",
         "options": {
           "timeout": 120000
         }
@@ -509,18 +509,18 @@
       "main": [
         [
           {
-            "node": "Vídeos da prévia",
+            "node": "Anexos da prévia",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Vídeos da prévia": {
+    "Anexos da prévia": {
       "main": [
         [
           {
-            "node": "Prévia: vídeo",
+            "node": "Prévia: anexo",
             "type": "main",
             "index": 0
           }
@@ -604,18 +604,18 @@
       "main": [
         [
           {
-            "node": "Vídeos do grupo",
+            "node": "Anexos do grupo",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Vídeos do grupo": {
+    "Anexos do grupo": {
       "main": [
         [
           {
-            "node": "Grupo: vídeo",
+            "node": "Grupo: anexo",
             "type": "main",
             "index": 0
           }

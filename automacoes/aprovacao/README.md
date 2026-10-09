@@ -10,13 +10,23 @@ O envio manual pela issue (`automacoes/whatsapp/README.md`) continua existindo, 
 1. Um arquivo novo `novidades/AAAA-MM-DD-assunto.md` chega no `main`.
 2. O GitHub Actions avisa o n8n, numa chamada privada com token.
 3. O n8n manda uma **prévia para o próprio número curtatche** (conversa "você"):
-   a imagem com o texto, o **link de aprovação** e os vídeos, se houver.
+   a imagem com o texto, o **link de aprovação** e os anexos (mais imagens e vídeos), se houver.
 4. Você abre o link. Aparece a novidade e o botão **Enviar no grupo**.
    Abrir o link **não envia nada**.
 5. Você toca em **Enviar no grupo**. O número curtatche posta no grupo AquAgenda:
-   a imagem com o texto e, em seguida, os vídeos.
+   a imagem com o texto e, em seguida, os anexos.
 
 Se não quiser enviar, é só ignorar. O link vale 7 dias e funciona uma vez só.
+
+## Mais imagens (opcional)
+
+Para mandar mais de um print, cite os outros no fim da novidade. Eles seguem logo
+depois da imagem principal, e o WhatsApp junta tudo num álbum:
+
+```markdown
+## Mais imagens
+imagens/2026-10-09-outra-tela.png: o que o print mostra
+```
 
 ## Vídeos (opcional)
 
@@ -59,6 +69,14 @@ seu WhatsApp, e o código dele é sorteado a cada novidade.
    - `N8N_NOVIDADE_TOKEN` = o mesmo código do passo 1.
 
 Sem os segredos, o passo do Actions só avisa que a prévia está desligada.
+
+## Reenviar a prévia de uma novidade que já existe
+
+Editar uma novidade não avisa de novo. Para mandar a prévia outra vez (por exemplo,
+depois de acrescentar uma imagem), em **Actions → Avisar novidade para o WhatsApp →
+Run workflow**, informe o arquivo (`novidades/AAAA-MM-DD-assunto.md`). A prévia nova
+substitui a anterior, e o link antigo deixa de valer. Se a novidade já foi para o
+grupo, o reenvio é recusado.
 
 ## Testar sem enviar
 

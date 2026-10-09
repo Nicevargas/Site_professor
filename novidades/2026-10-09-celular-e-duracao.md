@@ -17,3 +17,6 @@ Dúvidas? É só responder aqui no grupo. 💬
 
 ## Imagem
 imagens/2026-10-09-celular-e-duracao.png: janela "Novo Serviço" no celular com duração de 40 min e limite de 8 alunos por horário.
+
+## Mais imagens
+imagens/2026-10-09-salvar-horarios.png: tela "Horários de aula" no celular com o botão "Salvar horários" acima do menu de baixo.

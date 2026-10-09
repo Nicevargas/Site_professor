@@ -8,6 +8,14 @@ on:
     branches: [main]
     paths:
       - "novidades/*.md"
+  # Reenviar a prévia de uma novidade que já existe (ex.: depois de trocar a
+  # imagem). Só manda a prévia para a Nice; não abre issue de novo.
+  workflow_dispatch:
+    inputs:
+      arquivo:
+        description: "Novidade para reenviar a prévia (novidades/AAAA-MM-DD-assunto.md)"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -34,6 +42,7 @@ jobs:
         run: node --test automacoes/whatsapp/aviso.teste.mjs automacoes/aprovacao/fluxo.teste.mjs
 
       - name: Abrir o aviso para enviar no grupo
+        if: github.event_name == 'push'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ANTES: ${{ github.event.before }}
@@ -49,4 +58,5 @@ jobs:
           N8N_NOVIDADE_URL: ${{ secrets.N8N_NOVIDADE_URL }}
           N8N_NOVIDADE_TOKEN: ${{ secrets.N8N_NOVIDADE_TOKEN }}
           ANTES: ${{ github.event.before }}
-        run: node automacoes/aprovacao/enviar-previa.mjs
+          ARQUIVO: ${{ inputs.arquivo }}
+        run: node automacoes/aprovacao/enviar-previa.mjs ${ARQUIVO:+--arquivos "$ARQUIVO"}

@@ -37,6 +37,17 @@ Dúvidas? É só responder aqui no grupo. 💬
 imagens/AAAA-MM-DD-assunto.png: <o que o print mostra>
 ```
 
+## Mais imagens (opcional)
+
+Para mostrar mais de uma tela, acrescente no fim do arquivo (vão como álbum, depois da imagem principal):
+
+```markdown
+## Mais imagens
+imagens/AAAA-MM-DD-outra-tela.png: <o que o print mostra>
+```
+
+Como os vídeos, só vão pelo envio com aprovação.
+
 ## Vídeos (opcional)
 
 Para mandar vídeo junto, coloque o `.mp4` (até 16 MB) em `novidades/videos/` e acrescente no fim do arquivo:

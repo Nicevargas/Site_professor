@@ -50,15 +50,15 @@ for (const caminho of novidades) {
   try {
     const token = randomBytes(32).toString('base64url');
     const pedido = pedidoDePrevia({ markdown: readFileSync(caminho, 'utf8'), caminho, repositorio, commit, token });
-    for (const video of pedido.videos) {
-      if (!existsSync(video.caminho)) throw new Error(`${caminho}: o vídeo ${video.caminho} não está no repositório`);
-      const tamanho = statSync(video.caminho).size;
+    for (const anexo of pedido.anexos) {
+      if (!existsSync(anexo.caminho)) throw new Error(`${caminho}: o arquivo ${anexo.caminho} não está no repositório`);
+      const tamanho = statSync(anexo.caminho).size;
       if (tamanho > LIMITE_VIDEO_BYTES) {
-        throw new Error(`${video.caminho} tem ${(tamanho / 1048576).toFixed(1)} MB; o limite para o WhatsApp é 16 MB`);
+        throw new Error(`${anexo.caminho} tem ${(tamanho / 1048576).toFixed(1)} MB; o limite para o WhatsApp é 16 MB`);
       }
     }
     // O token nunca vai para o log: o repositório é público e os logs também
-    const resumo = `${caminho}: "${pedido.titulo}", ${pedido.videos.length} vídeo(s)`;
+    const resumo = `${caminho}: "${pedido.titulo}", ${pedido.anexos.length} anexo(s)`;
     if (simular) {
       console.log(`[simulação] ${resumo}`);
       console.log(JSON.stringify({ ...pedido, token: '<oculto>' }, null, 2));

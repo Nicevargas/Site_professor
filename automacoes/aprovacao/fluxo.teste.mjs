@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PADRAO, codigos, montarFluxo } from './montar-fluxo.mjs';
-import { pedidoDePrevia, videosDaNovidade } from './previa.mjs';
+import { imagensExtrasDaNovidade, pedidoDePrevia, videosDaNovidade } from './previa.mjs';
 
 const aqui = dirname(fileURLToPath(import.meta.url));
 const repositorio = 'Nicevargas/Site_professor';
@@ -28,6 +28,10 @@ Texto com <b>tag</b> & "aspas".
 
 ## Imagem
 imagens/2026-10-09-pix.png: janela de envio.
+
+## Mais imagens
+imagens/2026-10-09-pix.png: a principal repetida não vai duas vezes
+imagens/2026-10-09-outra-tela.jpg: outra tela
 
 ## Vídeos
 videos/2026-10-09-mercado-pago.mp4: como conectar
@@ -50,8 +54,18 @@ test('vídeos saem da seção "## Vídeos" e viram endereços travados no commit
     'novidades/videos/2026-10-09-asaas.mp4',
   ]);
   assert.deepEqual(videosDaNovidade('# x\n\n## Imagem\nimagens/a.png', 'novidades/a.md'), []);
+  assert.deepEqual(imagensExtrasDaNovidade(markdown, 'novidades/2026-10-09-pix.md'), [
+    'novidades/imagens/2026-10-09-pix.png',
+    'novidades/imagens/2026-10-09-outra-tela.jpg',
+  ]);
   const p = pedido();
-  assert.equal(p.videos[0].url, `https://raw.githubusercontent.com/${repositorio}/${commit}/novidades/videos/2026-10-09-mercado-pago.mp4`);
+  // Imagens primeiro (viram álbum com a principal), depois vídeos; a principal não repete
+  assert.deepEqual(p.anexos.map((a) => [a.nome, a.tipo, a.mime]), [
+    ['2026-10-09-outra-tela.jpg', 'image', 'image/jpeg'],
+    ['2026-10-09-mercado-pago.mp4', 'video', 'video/mp4'],
+    ['2026-10-09-asaas.mp4', 'video', 'video/mp4'],
+  ]);
+  assert.equal(p.anexos[1].url, `https://raw.githubusercontent.com/${repositorio}/${commit}/novidades/videos/2026-10-09-mercado-pago.mp4`);
   assert.equal(p.imagemUrl, `https://raw.githubusercontent.com/${repositorio}/${commit}/novidades/imagens/2026-10-09-pix.png`);
 });
 
@@ -68,16 +82,17 @@ test('caminho completo: prévia para a Nice, link aberto não envia, botão envi
   assert.equal(previa.numero, cfg.numeroPrevia, 'a prévia vai para o número da Nice, não para o grupo');
   assert.match(previa.legenda, /PRÉVIA/);
   assert.ok(previa.aviso.includes(`${cfg.baseN8n}/webhook/aquagenda-aprovar?t=${TOKEN}`));
-  assert.equal(previa.videos.length, 2);
+  assert.equal(previa.anexos.length, 3);
 
-  const videosPrevia = rodar(js.videos.replace('__ORIGEM__', 'Guardar pendente'), { estatico, nos: { 'Guardar pendente': previa } });
-  assert.deepEqual(videosPrevia.map((v) => v.json.numero), [cfg.numeroPrevia, cfg.numeroPrevia]);
+  const anexosPrevia = rodar(js.anexos.replace('__ORIGEM__', 'Guardar pendente'), { estatico, nos: { 'Guardar pendente': previa } });
+  assert.deepEqual(anexosPrevia.map((v) => [v.json.numero, v.json.tipo]), [[cfg.numeroPrevia, 'image'], [cfg.numeroPrevia, 'video'], [cfg.numeroPrevia, 'video']]);
 
   // 2. abrir o link só mostra a página: nada é marcado como enviado
   const [{ json: pagina }] = rodar(js.pagina, { entrada: { query: { t: TOKEN } }, estatico });
   assert.match(pagina.html, /Enviar no grupo AquAgenda\?/);
   assert.match(pagina.html, /<form method="post">/);
   assert.ok(pagina.html.includes('&lt;b&gt;tag&lt;/b&gt; &amp; &quot;aspas&quot;'), 'o texto da novidade entra escapado na página');
+  assert.ok(pagina.html.includes('Vai junto: 1 imagem(ns) e 2 vídeo(s).'), 'a página avisa o que segue junto');
   assert.equal(estatico.pendentes[TOKEN].enviado, false);
 
   // 3. botão: vai para o GRUPO, com o texto sem a palavra "prévia"
@@ -86,8 +101,9 @@ test('caminho completo: prévia para a Nice, link aberto não envia, botão envi
   assert.equal(envio.numero, cfg.grupo);
   assert.doesNotMatch(envio.legenda, /PRÉVIA/);
   assert.equal(estatico.pendentes[TOKEN].enviado, true);
-  const videosGrupo = rodar(js.videos.replace('__ORIGEM__', 'Conferir aprovação'), { estatico, nos: { 'Conferir aprovação': envio } });
-  assert.deepEqual(videosGrupo.map((v) => v.json.numero), [cfg.grupo, cfg.grupo]);
+  const anexosGrupo = rodar(js.anexos.replace('__ORIGEM__', 'Conferir aprovação'), { estatico, nos: { 'Conferir aprovação': envio } });
+  assert.deepEqual(anexosGrupo.map((v) => v.json.numero), [cfg.grupo, cfg.grupo, cfg.grupo]);
+  assert.deepEqual(anexosGrupo[0].json, { numero: cfg.grupo, url: envio.anexos[0].url, nome: '2026-10-09-outra-tela.jpg', tipo: 'image', mime: 'image/jpeg' });
 
   // 4. segundo toque no botão, ou abrir o link de novo: não envia de novo
   const [{ json: repetido }] = rodar(js.aprovar, { entrada: { body: { t: TOKEN } }, estatico });
@@ -117,7 +133,8 @@ test('pedido com imagem ou vídeo de fora do repositório é recusado', () => {
   const estatico = {};
   const ruins = [
     { ...pedido(), imagemUrl: 'https://exemplo.com/x.png' },
-    { ...pedido(), videos: [{ url: 'https://exemplo.com/x.mp4', nome: 'x.mp4' }] },
+    { ...pedido(), anexos: [{ url: 'https://exemplo.com/x.mp4', nome: 'x.mp4', tipo: 'video', mime: 'video/mp4' }] },
+    { ...pedido(), anexos: [{ url: pedido().imagemUrl, nome: 'x.exe', tipo: 'document', mime: 'application/x-msdownload' }] },
     { ...pedido(), texto: 'a'.repeat(1001) },
     { ...pedido(), token: 'curto' },
     {},
@@ -135,6 +152,16 @@ test('prévia que falhou pode ser pedida de novo: o link antigo deixa de valer',
   assert.equal(rodar(js.guardar, { entrada: { body: { ...pedido(), token: novo } }, estatico })[0].json.ok, true);
   assert.equal(rodar(js.aprovar, { entrada: { body: { t: TOKEN } }, estatico })[0].json.ok, false);
   assert.equal(rodar(js.aprovar, { entrada: { body: { t: novo } }, estatico })[0].json.ok, true);
+});
+
+test('pendente guardado antes de existirem anexos ainda pode ser aprovado', () => {
+  const estatico = {};
+  rodar(js.guardar, { entrada: { body: pedido() }, estatico });
+  delete estatico.pendentes[TOKEN].anexos;
+  assert.match(rodar(js.pagina, { entrada: { query: { t: TOKEN } }, estatico })[0].json.html, /Enviar no grupo/);
+  const [{ json }] = rodar(js.aprovar, { entrada: { body: { t: TOKEN } }, estatico });
+  assert.equal(json.ok, true);
+  assert.deepEqual(json.anexos, []);
 });
 
 test('link de aprovação vence em 7 dias', () => {
