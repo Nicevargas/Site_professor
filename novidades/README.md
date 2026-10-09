@@ -37,9 +37,19 @@ Dúvidas? É só responder aqui no grupo. 💬
 imagens/AAAA-MM-DD-assunto.png: <o que o print mostra>
 ```
 
+## Mais de uma tela: faça uma montagem
+
+Quando a novidade mexe em mais de uma tela, **junte os prints numa imagem só**. Imagem extra enviada separada chega solta no grupo, sem texto nem contexto (aconteceu em 09/10/2026).
+
+```bash
+node scripts/montar-novidade.mjs --saida novidades/imagens/AAAA-MM-DD-assunto.png   --titulo "Título curto da novidade"   --tela "caminho/do/print1.png::O que mudou nesta tela"   --tela "caminho/do/print2.png::O que mudou nesta outra"
+```
+
+De 2 a 4 telas, numeradas e com legenda. A montagem é a imagem da seção `## Imagem`; os prints soltos não precisam ir para o repositório.
+
 ## Mais imagens (opcional)
 
-Para mostrar mais de uma tela, acrescente no fim do arquivo (vão como álbum, depois da imagem principal):
+Só quando a montagem não servir (ex.: um print que precisa ser lido em tamanho cheio). Acrescente no fim do arquivo (vão depois da imagem principal, sem texto):
 
 ```markdown
 ## Mais imagens

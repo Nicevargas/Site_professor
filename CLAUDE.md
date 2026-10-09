@@ -5,7 +5,7 @@
 Toda alteração publicada que o professor percebe (tela nova, mudança no jeito de usar, correção que ele notaria) sai com um conteúdo para o grupo de WhatsApp dos professores, **no mesmo commit**:
 
 1. `novidades/AAAA-MM-DD-assunto.md`: texto pronto para colar, no modelo de `novidades/README.md`.
-2. `novidades/imagens/AAAA-MM-DD-assunto.png`: print feito com `node scripts/print-novidade.mjs` (só modo demonstração, sem dado real).
+2. `novidades/imagens/AAAA-MM-DD-assunto.png`: print feito com `node scripts/print-novidade.mjs` (só modo demonstração, sem dado real). Se a novidade mexe em mais de uma tela, junte os prints numa imagem só com `node scripts/montar-novidade.mjs` (telas numeradas e com legenda): imagem extra enviada separada chega solta no grupo.
 3. Na resposta final, colar o texto para a Nice copiar.
 
 **O envio para o grupo é da Nice, com 1 toque**: quando um `novidades/AAAA-MM-DD-assunto.md` novo chega no `main`, o GitHub Actions abre uma issue para ela com o link "Enviar no WhatsApp" (ver `automacoes/whatsapp/README.md`). O fluxo antigo do n8n + Evolution (`automacoes/n8n/`) foi desligado em 16/09/2026, quando a VPS saiu do ar. Por isso:
